@@ -12,11 +12,11 @@
 
   function buildTabs() {
     return [
-      { label: '홈', icon: 'ph-house', href: 'entry.html' },
-      { label: '할일', icon: 'ph-check-square', href: isChildContext() ? 'child-todo.html' : 'parent-tasks.html' },
-      { label: '정보', icon: 'ph-newspaper', href: 'info-feed.html' },
-      { label: '주말', icon: 'ph-confetti', href: 'weekend.html' },
-      { label: '아지트', icon: 'ph-tent', href: 'family-room.html' }
+      { label: '홈', emoji: '🏠', href: 'entry.html' },
+      { label: '할일', emoji: '✅', href: isChildContext() ? 'child-todo.html' : 'parent-tasks.html' },
+      { label: '정보', emoji: '📰', href: 'info-feed.html' },
+      { label: '주말', emoji: '🎈', href: 'weekend.html' },
+      { label: '아지트', emoji: '⛺', href: 'family-room.html' }
     ];
   }
 
@@ -32,7 +32,7 @@
         var active = tab.href === cur;
         return '' +
           '<a href="' + tab.href + '" class="flex flex-col items-center gap-1 py-2.5 active:scale-95 transition duration-150" aria-current="' + (active ? 'page' : 'false') + '">' +
-            '<i class="' + (active ? 'ph-fill' : 'ph-bold') + ' ' + tab.icon + ' text-xl ' + (active ? 'text-primary' : 'text-foreground-muted') + '"></i>' +
+            '<span class="text-xl ' + (active ? '' : 'opacity-60 grayscale') + '" aria-hidden="true">' + tab.emoji + '</span>' +
             '<span class="text-[11px] font-display font-bold ' + (active ? 'text-primary' : 'text-foreground-muted') + '">' + tab.label + '</span>' +
           '</a>';
       }).join('') +

@@ -1,121 +1,61 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Navigate, Outlet, Routes, Route } from 'react-router-dom'
+import { FamilyProvider, useFamily } from './context/FamilyContext'
+import Layout from './components/Layout'
+import ConnectionError from './components/ConnectionError'
+import OnboardingScreen from './pages/OnboardingScreen'
+import EntryScreen from './pages/EntryScreen'
+import ChildOutfitScreen from './pages/ChildOutfitScreen'
+import ChildTodoScreen from './pages/ChildTodoScreen'
+import ParentRecipeScreen from './pages/ParentRecipeScreen'
+import ParentTasksScreen from './pages/ParentTasksScreen'
+import FamilyRoomScreen from './pages/FamilyRoomScreen'
+import InfoFeedScreen from './pages/InfoFeedScreen'
+import ParentProgressScreen from './pages/ParentProgressScreen'
+import WeekendScreen from './pages/WeekendScreen'
+import NotFoundScreen from './pages/NotFoundScreen'
+
+function ProtectedLayout() {
+  const { familyId, loading, loadError, reload } = useFamily()
+  if (loading) return null
+  if (loadError === 'network') return <ConnectionError onRetry={reload} />
+  if (!familyId) return <Navigate to="/onboarding" replace />
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  )
+}
+
+// 이미 가족이 있는 상태에서 /onboarding에 들어오면 두 번째 가족이 만들어지고
+// localStorage가 덮어써져 기존 데이터가 고아가 되므로 홈으로 되돌린다.
+function OnboardingRoute() {
+  const { familyId, loading } = useFamily()
+  if (loading) return null
+  if (familyId) return <Navigate to="/" replace />
+  return <OnboardingScreen />
+}
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <FamilyProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/onboarding" element={<OnboardingRoute />} />
+          <Route element={<ProtectedLayout />}>
+            <Route path="/" element={<EntryScreen />} />
+            <Route path="/child-outfit/:memberId" element={<ChildOutfitScreen />} />
+            <Route path="/child-todo/:memberId" element={<ChildTodoScreen />} />
+            <Route path="/parent-recipe" element={<ParentRecipeScreen />} />
+            <Route path="/parent-tasks" element={<ParentTasksScreen />} />
+            <Route path="/family-room" element={<FamilyRoomScreen />} />
+            <Route path="/info-feed" element={<InfoFeedScreen />} />
+            <Route path="/parent-progress" element={<ParentProgressScreen />} />
+            <Route path="/weekend" element={<WeekendScreen />} />
+            <Route path="*" element={<NotFoundScreen />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </FamilyProvider>
   )
 }
 

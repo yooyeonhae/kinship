@@ -63,7 +63,7 @@
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
     <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
-      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <span class="font-doodle font-bold text-[19px] text-foreground" id="header-date"></span>
       <div class="flex items-center gap-4 text-foreground-muted">
         <i class="ph ph-globe text-xl" aria-hidden="true"></i>
         <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
@@ -238,6 +238,7 @@
     <div class="flex-1"></div>
   </div>
   <script src="js/store.js"></script>
+  <script src="js/header.js"></script>
   <script>
     (function () {
       function selectedTag(select) { return select.options[select.selectedIndex].dataset.tag; }

@@ -17,7 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 (부부 완료 동기화, 레시피, 아이용 할일체크는 Should 등급 — 화면에는 포함되지만 Must는 아님)
 
-**데이터 구조**: 6개 테이블 — `families`(family_id, name) / `members`(family_id FK, name, role) / `weekly_outfit_rules`(member_id FK, day_of_week, outfit_type) / `todos`(family_id FK, title, assignee_member_id FK, is_done, completed_by FK, completed_at) / `recipes`(title, description — 가족 구분 없는 공용 테이블) / `favorite_links`(family_id FK, platform, url). 관계: families 1:N members, members 1:N weekly_outfit_rules, families 1:N todos, members 1:N todos(assignee/completed_by 두 역할), families 1:N favorite_links. 날씨는 외부 API 실시간 호출로 별도 저장하지 않음(의도적). 실제 DDL/RLS는 `app/supabase/schema.sql`·`app/supabase/policies.sql`에 구현되어 있고, Seoul 리전의 `kinship` 전용 Supabase 프로젝트에 적용됨(RLS는 family_id 기반 격리, 로그인 없이 `x-family-id` 헤더로 구분).
+**데이터 구조**: 6개 테이블 — `families`(family_id, name) / `members`(family_id FK, name, role) / `weekly_outfit_rules`(member_id FK, day_of_week, outfit_type) / `todos`(family_id FK, title, assignee_member_id FK, is_done, completed_by FK, completed_at) / `recipes`(title, description — 가족 구분 없는 공용 테이블) / `favorite_links`(family_id FK, platform, url). 관계: families 1:N members, members 1:N weekly_outfit_rules, families 1:N todos, members 1:N todos(assignee/completed_by 두 역할), families 1:N favorite_links. 날씨는 외부 API 실시간 호출로 별도 저장하지 않음(의도적). 실제 DDL/RLS는 `app/supabase/schema.sql`·`app/supabase/policies.sql`에 구현되어 있고, Seoul 리전의 `kinship` 전용 Supabase 프로젝트에 적용됨(RLS는 family_id 기반 격리, 로그인 없이 `x-family-id` 헤더로 구분). `app/supabase/migration_01_families_delete.sql`(정책명 `families_delete_own_empty`)도 적용 완료 — **구성원이 하나도 없는 가족만** 삭제할 수 있다. `createFamily()`가 members insert에서 실패했을 때 이미 커밋된 빈 families 행을 되돌리는 용도이고, 구성원이 있는 가족은 API로 삭제할 수 없다(FK가 `on delete cascade`라 열어두면 앱에서 가장 파괴적인 권한이 된다). 정식 "가족 삭제" 기능이 필요해지면 이 정책을 넓히지 말고 부모 역할 확인이 들어간 별도 정책을 만들 것. 양방향 동작은 REST로 검증했다(빈 가족 → 실제 삭제됨 / 구성원 있는 가족 → 보호됨, 단 **둘 다 `204`를 반환**한다).
+
+앞으로 정책·스키마를 추가할 때는 `app/supabase/`에 `migration_NN_*.sql`로 파일을 만들고, Dashboard의 SQL Editor에서 실행해야 반영된다(anon 키로는 정책 생성이 불가능하고, 이 환경에는 Supabase CLI·psql이 설치되어 있지 않다).
 
 **확정된 기술스택** (8단계, 경량 버전 선택 — 로그인 없는 가족 내부용 웹앱이라 SSR/Edge Functions 불필요):
 - 프론트엔드: React + Vite (정적 SPA)
@@ -39,11 +41,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `screens/` is still **static HTML + vanilla JS + Tailwind CDN, with no build step, no bundler**, and runs client-side against `localStorage` — treat that as intentional for those files, not a shortcut to "fix".
 
-The PRD's target stack (React/Vite/Supabase) has since started being adopted, with explicit user confirmation at each step: a separate `app/` directory holds a Vite + React scaffold (`npm create vite@latest app -- --template react`), with `@supabase/supabase-js` installed and `app/.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, gitignored) wired to a dedicated `kinship` Supabase project (Seoul region). The schema/RLS policies for that project live in `app/supabase/schema.sql` and `app/supabase/policies.sql`. `screens/` has **not** yet been migrated onto this stack or connected to Supabase — it's still the standalone localStorage version. Don't start that migration, or wire real backend calls into `screens/`, without confirming with the user first.
+The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, with explicit user confirmation at each step. **`app/` is now a working React SPA, not just a scaffold:** a single `app/index.html` entry + `react-router-dom`, with all 9 screens ported from `screens/*.html` into `app/src/pages/*.jsx` and the shared chrome (`Layout` / `Header` / `BottomNav`) in `app/src/components/`. `app/.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, gitignored) points at the dedicated `kinship` Supabase project.
 
-There is no lint or test suite. The only verification available is:
+**Supabase is wired for the 가족 할일 domain only.** `families` / `members` / `todos` are live (entry, child-outfit name lookup, child-todo, parent-tasks, parent-progress). Everything else is still hardcoded dummy data on purpose: 요일별 지정복(`weekly_outfit_rules`), 냉장고 재료(스키마에 테이블 자체가 없음), 레시피, 정보 피드, 주말 나들이, 아지트 채팅·게임. Don't assume a screen is connected just because it renders real-looking data.
+
+**No login — `family_id` is the whole auth model.** `app/src/context/FamilyContext.jsx` owns it: stored in `localStorage` under `kinship_family_id`, sent as the `x-family-id` header by the client factory in `app/src/lib/supabaseClient.js`. `OnboardingScreen` creates the family; `App.jsx` gates every other route behind it and redirects to `/onboarding` when absent. `FamilyContext` also verifies the stored id still resolves to a real `families` row and self-clears if it doesn't (a stale id otherwise leaves the user stuck in an empty shell, because RLS returns `[]` rather than an error for a family that doesn't exist).
+
+**Non-obvious RLS constraint — don't "simplify" `createFamily()`.** Inserting into `families` must (a) supply a client-generated `family_id` (`crypto.randomUUID()`), (b) use a client whose `x-family-id` header already equals that id, and (c) **not** chain `.select()`. Reason: `.select()` makes PostgREST send `Prefer: return=representation`, and Postgres applies the SELECT policy to the `INSERT ... RETURNING` row. `families_select_own` requires `family_id = current_family_id()`, so a DB-generated id can never match the header and the entire INSERT is rolled back with `42501`. This was verified empirically (`return=minimal` → 201, `return=representation` → 42501). `todos` and `members` are immune because their policies are `FOR ALL`, which covers the returning-select too.
+
+`screens/` has **not** been migrated or connected to Supabase — it's still the standalone localStorage version, and both versions now coexist. Don't wire real backend calls into `screens/` without confirming with the user first.
+
+There is no test suite anywhere. Available verification:
+
+For `screens/` (static version):
 - `node --check screens/js/<file>.js` for syntax
 - Actually serving `screens/` (e.g. `python -m http.server <port>` from inside `screens/`, or the VS Code Live Server config in `.vscode/settings.json`, port 5501) and driving it in a real/headless browser — this repo has no dev-server script, so start one manually.
+
+For `app/` (React version) — run these from `app/`:
+- `npm run build` (Vite; catches syntax/import errors) and `npm run lint` (oxlint). A pre-existing non-blocking `react(only-export-components)` warning on `FamilyContext.jsx` is expected — it's the `useFamily` hook exported alongside the provider.
+- `npm run dev` (port 5173). Vite serves the SPA fallback for deep links; production needs the rewrite in `app/vercel.json` instead.
+- **RLS / backend behavior is best verified with `curl` against the REST API**, which is much faster than clicking through the UI and is the only way to confirm policy behavior directly. Pattern: `curl "$VITE_SUPABASE_URL/rest/v1/<table>?select=*" -H "apikey: $VITE_SUPABASE_ANON_KEY" -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" -H "x-family-id: <uuid>"`. Add `-H "Prefer: return=representation"` to reproduce what supabase-js's `.select()` does after a write. Note that a *wrong* `x-family-id` yields `200 []` and a delete affecting 0 rows still returns `204` — absence of an error does **not** mean the operation did anything, so assert on the resulting row state, not the status code.
+- Anything visual (animations, the child-todo progress marker, layout) can only be verified by actually driving a browser; build/lint/curl will not catch it.
 
 ## Architecture
 
