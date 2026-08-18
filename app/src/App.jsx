@@ -9,6 +9,7 @@ import ChildOutfitScreen from './pages/ChildOutfitScreen'
 import ChildTodoScreen from './pages/ChildTodoScreen'
 import ParentRecipeScreen from './pages/ParentRecipeScreen'
 import ParentTasksScreen from './pages/ParentTasksScreen'
+import OutfitSettingsScreen from './pages/OutfitSettingsScreen'
 import FamilyRoomScreen from './pages/FamilyRoomScreen'
 import InfoFeedScreen from './pages/InfoFeedScreen'
 import ParentProgressScreen from './pages/ParentProgressScreen'
@@ -117,6 +118,14 @@ function App() {
               element={
                 <RequireParent>
                   <ParentProgressScreen />
+                </RequireParent>
+              }
+            />
+            <Route
+              path="/outfit-settings"
+              element={
+                <RequireParent>
+                  <OutfitSettingsScreen />
                 </RequireParent>
               }
             />

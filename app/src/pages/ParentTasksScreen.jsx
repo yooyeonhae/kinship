@@ -125,13 +125,22 @@ function ParentTasksScreen() {
         <span className="font-display font-bold text-[15px] text-foreground-muted">
           부모{currentMember ? ` · ${currentMember.name}` : ''}
         </span>
-        <Link
-          to="/parent-progress"
-          className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
-          aria-label="완료 현황 보기"
-        >
-          <i className="ph-duotone ph-users-three text-xl text-foreground-muted" aria-hidden="true"></i>
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            to="/outfit-settings"
+            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            aria-label="요일별 지정복 설정"
+          >
+            <i className="ph-duotone ph-t-shirt text-xl text-foreground-muted" aria-hidden="true"></i>
+          </Link>
+          <Link
+            to="/parent-progress"
+            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            aria-label="완료 현황 보기"
+          >
+            <i className="ph-duotone ph-users-three text-xl text-foreground-muted" aria-hidden="true"></i>
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">
