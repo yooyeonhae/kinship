@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>오늘의 정보 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <div class="flex items-center justify-between mb-6">
+      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">오늘의 정보</span>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="relative mb-6">
+      <span class="absolute -top-2 left-0 w-12 h-5 bg-tape-blue/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">오늘의 정보</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">관심 있는 소식만 골라 카테고리를 자유롭게 추가·삭제할 수 있어요.</p>
+    </div>
+
+    <div class="flex flex-col gap-5" id="category-list"></div>
+
+    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6">
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
+        <i class="ph-duotone ph-squares-four text-base"></i>새 카테고리 만들기
+      </p>
+      <form id="category-add-form" class="flex items-center gap-2">
+        <input id="category-add-input" type="text" placeholder="예: 날씨, 부동산, IT 뉴스" class="flex-1 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none" autocomplete="off">
+        <button type="submit" class="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="카테고리 추가">
+          <i class="ph-bold ph-plus text-lg"></i>
+        </button>
+      </form>
+    </div>
+
+    <div class="flex-1"></div>
+  </div>
+  <script src="js/store.js"></script>
+  <script>
+    (function () {
+      var listEl = document.getElementById('category-list');
+
+      function render() {
+        var cats = OFStore.info.listCategories();
+        listEl.innerHTML = cats.map(function (cat) {
+          var items = cat.items.map(function (item) {
+            return '' +
+              '<div class="flex items-start gap-2 py-2 border-t border-border first:border-t-0" data-item-id="' + item.id + '">' +
+                '<i class="ph-fill ph-circle text-[6px] text-foreground-muted mt-2 shrink-0"></i>' +
+                '<div class="flex-1">' +
+                  '<p class="text-[15px] leading-[22px]">' + item.title + '</p>' +
+                  (item.source ? '<p class="text-[12px] text-foreground-muted mt-0.5">' + item.source + '</p>' : '') +
+                '</div>' +
+                '<button type="button" class="item-remove w-7 h-7 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150" data-cat-id="' + cat.id + '" data-item-id="' + item.id + '" aria-label="소식 삭제">' +
+                  '<i class="ph-bold ph-x text-sm text-foreground-muted"></i>' +
+                '</button>' +
+              '</div>';
+          }).join('') || '<p class="text-[14px] text-foreground-muted py-2">아직 등록된 소식이 없어요.</p>';
+
+          return '' +
+            '<div class="relative bg-surface border border-border rounded-lg shadow-soft p-card-padding" data-cat-id="' + cat.id + '">' +
+              '<div class="flex items-center justify-between mb-2">' +
+                '<span class="flex items-center gap-2">' +
+                  '<i class="ph-duotone ' + cat.icon + ' text-xl text-primary"></i>' +
+                  '<span class="font-display font-bold text-[17px]">' + cat.label + '</span>' +
+                '</span>' +
+                '<button type="button" class="category-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150" data-cat-id="' + cat.id + '" aria-label="' + cat.label + ' 카테고리 삭제">' +
+                  '<i class="ph-bold ph-trash text-base text-foreground-muted"></i>' +
+                '</button>' +
+              '</div>' +
+              '<div class="mb-3">' + items + '</div>' +
+              '<form class="item-add-form flex items-center gap-2" data-cat-id="' + cat.id + '">' +
+                '<input type="text" placeholder="새 소식 제목 추가" class="item-add-input flex-1 bg-surface-muted rounded-md px-3 py-2 text-[14px] border border-border outline-none" autocomplete="off">' +
+                '<button type="submit" class="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="소식 추가">' +
+                  '<i class="ph-bold ph-plus text-base"></i>' +
+                '</button>' +
+              '</form>' +
+            '</div>';
+        }).join('');
+
+        Array.prototype.forEach.call(listEl.querySelectorAll('.category-remove'), function (btn) {
+          btn.addEventListener('click', function () { OFStore.info.removeCategory(btn.dataset.catId); });
+        });
+        Array.prototype.forEach.call(listEl.querySelectorAll('.item-remove'), function (btn) {
+          btn.addEventListener('click', function () { OFStore.info.removeItem(btn.dataset.catId, btn.dataset.itemId); });
+        });
+        Array.prototype.forEach.call(listEl.querySelectorAll('.item-add-form'), function (form) {
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var input = form.querySelector('.item-add-input');
+            var v = input.value.trim();
+            if (!v) return;
+            OFStore.info.addItem(form.dataset.catId, v, '');
+            input.value = '';
+          });
+        });
+      }
+
+      document.getElementById('category-add-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var input = document.getElementById('category-add-input');
+        var v = input.value.trim();
+        if (!v) return;
+        OFStore.info.addCategory(v, 'ph-newspaper');
+        input.value = '';
+      });
+
+      OFStore.onChange(render);
+      render();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

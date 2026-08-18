@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>주말에 뭐하지 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+  .filter-chip[data-active="true"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <div class="flex items-center justify-between mb-6">
+      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">주말에 뭐하지</span>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="relative mb-5">
+      <span class="absolute -top-2 left-0 w-12 h-5 bg-tape-pink/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">주말에 뭐하지?</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">우리 지역 축제·볼거리·공연을 골라봐요. 대상별로 자유롭게 추가·삭제할 수 있어요.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-5" id="filter-chips">
+      <button type="button" class="filter-chip bg-surface border border-border rounded-full px-4 py-2 text-[14px] font-display font-bold transition duration-150" data-category="all" data-active="true">전체</button>
+      <button type="button" class="filter-chip bg-surface border border-border rounded-full px-4 py-2 text-[14px] font-display font-bold transition duration-150" data-category="student" data-active="false">초중고 학생</button>
+      <button type="button" class="filter-chip bg-surface border border-border rounded-full px-4 py-2 text-[14px] font-display font-bold transition duration-150" data-category="family" data-active="false">가족</button>
+    </div>
+
+    <div class="flex flex-col gap-3" id="activity-list"></div>
+
+    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6">
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
+        <i class="ph-duotone ph-map-pin-plus text-base"></i>새 나들이 추가하기
+      </p>
+      <form id="activity-add-form" class="flex flex-col gap-2">
+        <input id="activity-title" type="text" placeholder="이름 (예: 벚꽃 축제)" class="bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none" autocomplete="off" required>
+        <div class="grid grid-cols-2 gap-2">
+          <select id="activity-category" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none">
+            <option value="family">가족</option>
+            <option value="student">초중고 학생</option>
+          </select>
+          <select id="activity-type" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none">
+            <option value="festival">축제</option>
+            <option value="sight">볼거리</option>
+            <option value="play">공연/연극</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="activity-region" type="text" placeholder="지역 (예: 서울)" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none" autocomplete="off">
+          <input id="activity-date" type="text" placeholder="시기 (예: 이번 주말)" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none" autocomplete="off">
+        </div>
+        <input id="activity-location" type="text" placeholder="장소 (선택)" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none" autocomplete="off">
+        <button type="submit" class="mt-1 bg-primary text-on-primary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150">
+          <i class="ph-bold ph-plus"></i>추가하기
+        </button>
+      </form>
+    </div>
+
+    <div class="flex-1"></div>
+  </div>
+  <script src="js/store.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/tourapi.js"></script>
+  <script>
+    (function () {
+      var TYPE_ICON = { festival: 'ph-confetti', sight: 'ph-binoculars', play: 'ph-ticket' };
+      var CATEGORY_LABEL = { student: '초중고 학생', family: '가족' };
+      var CATEGORY_COLOR = { student: 'primary', family: 'secondary' };
+      var listEl = document.getElementById('activity-list');
+      var currentFilter = 'all';
+
+      function render() {
+        var items = OFStore.weekend.list(currentFilter);
+        if (!items.length) {
+          listEl.innerHTML = '<p class="text-[14px] text-foreground-muted py-4 text-center">아직 등록된 나들이가 없어요. 아래에서 추가해보세요.</p>';
+          return;
+        }
+        listEl.innerHTML = items.map(function (a) {
+          var color = CATEGORY_COLOR[a.category] || 'primary';
+          return '' +
+            '<div class="bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-start gap-3" data-id="' + a.id + '">' +
+              '<span class="w-11 h-11 rounded-full bg-' + color + '/10 flex items-center justify-center shrink-0">' +
+                '<i class="ph-duotone ' + (TYPE_ICON[a.type] || 'ph-confetti') + ' text-xl text-' + color + '"></i>' +
+              '</span>' +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-start flex-wrap gap-2 mb-1">' +
+                  '<span class="font-display font-bold text-[16px] flex-1 min-w-[120px]">' + a.title + '</span>' +
+                  '<span class="text-[11px] font-display font-bold px-2 py-0.5 rounded-full bg-' + color + ' text-on-' + color + ' shrink-0">' + (CATEGORY_LABEL[a.category] || a.category) + '</span>' +
+                '</div>' +
+                '<p class="text-[13px] text-foreground-muted">' + a.region + (a.location ? ' · ' + a.location : '') + ' · ' + a.date + '</p>' +
+                (a.source === 'tourapi' ? '<p class="text-[11px] text-foreground-muted/70 mt-1">공공데이터포털(TourAPI) 제공 · 임시 데이터</p>' : '') +
+              '</div>' +
+              '<button type="button" class="activity-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150" data-id="' + a.id + '" aria-label="' + a.title + ' 삭제">' +
+                '<i class="ph-bold ph-trash text-base text-foreground-muted"></i>' +
+              '</button>' +
+            '</div>';
+        }).join('');
+
+        Array.prototype.forEach.call(listEl.querySelectorAll('.activity-remove'), function (btn) {
+          btn.addEventListener('click', function () { OFStore.weekend.remove(btn.dataset.id); });
+        });
+      }
+
+      Array.prototype.forEach.call(document.querySelectorAll('.filter-chip'), function (chip) {
+        chip.addEventListener('click', function () {
+          currentFilter = chip.dataset.category;
+          Array.prototype.forEach.call(document.querySelectorAll('.filter-chip'), function (c) { c.dataset.active = String(c === chip); });
+          render();
+        });
+      });
+
+      document.getElementById('activity-add-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var title = document.getElementById('activity-title');
+        var v = title.value.trim();
+        if (!v) return;
+        OFStore.weekend.add({
+          title: v,
+          category: document.getElementById('activity-category').value,
+          type: document.getElementById('activity-type').value,
+          region: document.getElementById('activity-region').value.trim() || '서울',
+          date: document.getElementById('activity-date').value.trim() || '이번 주말',
+          location: document.getElementById('activity-location').value.trim()
+        });
+        e.target.reset();
+        title.focus();
+      });
+
+      function syncTourApi() {
+        OFTourAPI.fetchFestivals().then(function (list) {
+          list.forEach(function (item) {
+            if (!OFStore.weekend.hasTitle(item.title)) OFStore.weekend.add(item);
+          });
+        });
+      }
+
+      OFStore.onChange(render);
+      render();
+      syncTourApi();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

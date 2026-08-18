@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>내 할일 체크 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  .todo-row[data-done="true"] .todo-label { color: #5C5852; text-decoration: line-through; }
+  .todo-circle { transition: background-color 0.25s ease, border-color 0.25s ease; }
+  .todo-row[data-done="true"] .todo-circle { background-color: #2E7D32; border-color: #2E7D32; }
+  .todo-row[data-done="true"] .todo-check { opacity: 1; transform: scale(1); }
+  .todo-check { opacity: 0; transform: scale(0.5); transition: opacity 0.15s ease, transform 0.15s ease; }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+
+  /* 별 스티커 리워드 모션 */
+  @keyframes circle-pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  @keyframes star-pop { 0% { transform: scale(0.4) rotate(0deg); } 50% { transform: scale(1.35) rotate(18deg); } 75% { transform: scale(0.9) rotate(-10deg); } 100% { transform: scale(1) rotate(0deg); } }
+  @keyframes star-fill-pop { 0% { transform: scale(0.3) rotate(-20deg); opacity: 0; } 55% { transform: scale(1.4) rotate(12deg); opacity: 1; } 78% { transform: scale(0.85) rotate(-6deg); } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+  @keyframes celebrate-in { 0% { opacity: 0; transform: translateY(6px) scale(0.92); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+  .todo-circle.pop { animation: circle-pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .todo-check.pop { animation: star-pop 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+  .progress-star.pop { animation: star-fill-pop 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+  #remaining-msg.celebrate { animation: celebrate-in 0.4s ease-out; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <div class="flex items-center justify-between mb-6">
+      <a href="child-outfit.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="옷차림 화면으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">하준</span>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="relative mb-6">
+      <i class="ph-duotone ph-baseball-cap absolute -top-1 right-0 text-3xl text-member-1 rotate-[8deg]" aria-hidden="true"></i>
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">오늘 내 할일</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">하나씩 눌러서 별 스티커를 모아봐요.</p>
+    </div>
+
+    <!-- 스티커 차트: 모은 별 스티커 진행도 -->
+    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
+      <span class="absolute -top-2 right-6 w-11 h-5 bg-tape-blue/90 rotate-[5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <div class="flex gap-1" id="progress-stars" aria-hidden="true">
+        <i class="ph-fill ph-star progress-star text-2xl text-tape-yellow drop-shadow"></i>
+        <i class="ph-fill ph-star progress-star text-2xl text-tape-yellow drop-shadow"></i>
+        <i class="ph-light ph-star progress-star text-2xl text-foreground-muted/50"></i>
+        <i class="ph-light ph-star progress-star text-2xl text-foreground-muted/50"></i>
+      </div>
+      <p class="font-doodle text-[15px] text-foreground" id="progress-count-text">별 스티커 2/4개 모았어요!</p>
+    </div>
+
+    <div class="flex flex-col gap-3" id="todo-list"></div>
+
+    <div class="flex-1"></div>
+
+    <p class="font-doodle text-[16px] text-accent mt-6 text-center" id="remaining-msg">2개 남았어요, 하나씩 눌러봐요!</p>
+  </div>
+  <script src="js/store.js"></script>
+  <script>
+    (function () {
+      var CHILD_NAME = '하준';
+      var listEl = document.getElementById('todo-list');
+      var starsWrap = document.getElementById('progress-stars');
+      var countText = document.getElementById('progress-count-text');
+      var remainingMsg = document.getElementById('remaining-msg');
+
+      function replay(el, className) {
+        el.classList.remove(className);
+        void el.offsetWidth;
+        el.classList.add(className);
+      }
+
+      function renderTodos() {
+        var todos = OFStore.todos.list(CHILD_NAME);
+        var firstUndoneId = (todos.find(function (t) { return !t.isDone; }) || {}).id;
+
+        listEl.innerHTML = todos.map(function (t) {
+          var decorate = t.id === firstUndoneId;
+          return '' +
+            '<button type="button" class="todo-row ' + (decorate ? 'relative rotate-[-1deg]' : '') + ' bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4 text-left" data-done="' + t.isDone + '" data-id="' + t.id + '" aria-pressed="' + t.isDone + '">' +
+              (decorate ? '<span class="absolute -top-2 left-6 w-11 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>' : '') +
+              '<span class="todo-circle w-12 h-12 rounded-full border-2 border-border flex items-center justify-center shrink-0">' +
+                '<i class="ph-fill ph-star todo-check text-on-secondary text-xl"></i>' +
+              '</span>' +
+              '<span class="todo-label font-display font-bold text-[17px] flex-1">' + t.title + '</span>' +
+            '</button>';
+        }).join('');
+
+        var rows = Array.prototype.slice.call(listEl.querySelectorAll('.todo-row'));
+        var stars = Array.prototype.slice.call(starsWrap.querySelectorAll('.progress-star'));
+        var total = rows.length;
+        var filled = todos.filter(function (t) { return t.isDone; }).length;
+
+        stars.forEach(function (star, i) {
+          var shouldFill = i < filled;
+          if (shouldFill) {
+            star.classList.remove('ph-light', 'text-foreground-muted/50');
+            star.classList.add('ph-fill', 'text-tape-yellow', 'drop-shadow');
+          } else {
+            star.classList.remove('ph-fill', 'text-tape-yellow', 'drop-shadow');
+            star.classList.add('ph-light', 'text-foreground-muted/50');
+          }
+        });
+        countText.textContent = '별 스티커 ' + filled + '/' + total + '개 모았어요!';
+
+        var remaining = total - filled;
+        if (remaining === 0 && total > 0) {
+          remainingMsg.textContent = '다 했어요! 오늘도 최고예요!';
+        } else {
+          remainingMsg.textContent = remaining + '개 남았어요, 하나씩 눌러봐요!';
+        }
+
+        rows.forEach(function (row) {
+          row.addEventListener('click', function () {
+            replay(row.querySelector('.todo-circle'), 'pop');
+            replay(row.querySelector('.todo-check'), 'pop');
+            replay(remainingMsg, 'celebrate');
+            OFStore.todos.toggle(row.dataset.id);
+          });
+        });
+      }
+
+      OFStore.onChange(renderTodos);
+      renderTodos();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>가족 할일 리스트 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  .task-row[data-done="true"] .task-label { color: #5C5852; text-decoration: line-through; }
+  .task-row[data-done="true"] .task-circle { background-color: #2E7D32; border-color: #2E7D32; }
+  .task-row[data-done="true"] .task-check { opacity: 1; transform: scale(1); }
+  .task-check { opacity: 0; transform: scale(0.5); }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <div class="flex items-center justify-between mb-6">
+      <a href="parent-recipe.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="레시피 화면으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">부모 · 서연</span>
+      <a href="parent-progress.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="완료 현황 보기">
+        <i class="ph-duotone ph-users-three text-xl text-foreground-muted"></i>
+      </a>
+    </div>
+
+    <div class="mb-6">
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">오늘 가족 할일</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">누가 뭘 끝냈는지 한눈에 보여요. 자주 쓰는 항목은 탭 한 번으로 바로 추가돼요.</p>
+    </div>
+
+    <!-- 원탭 추가: 자주 쓰는 항목은 칩 하나로 바로 등록, 새 항목은 입력해서 추가 -->
+    <div class="relative mb-5">
+      <span class="absolute -top-2 left-2 w-11 h-5 bg-tape-pink/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-2">자주 쓰는 항목 — 눌러서 바로 추가</p>
+      <div class="flex flex-wrap gap-2 mb-3" id="quick-chips">
+        <button type="button" class="quick-chip inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-4 py-2 text-[14px] font-display font-bold active:scale-95 transition duration-150" data-title="우유 사기">
+          <i class="ph-bold ph-plus text-primary"></i>우유 사기
+        </button>
+        <button type="button" class="quick-chip inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-4 py-2 text-[14px] font-display font-bold active:scale-95 transition duration-150" data-title="쓰레기 버리기">
+          <i class="ph-bold ph-plus text-primary"></i>쓰레기 버리기
+        </button>
+        <button type="button" class="quick-chip inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-4 py-2 text-[14px] font-display font-bold active:scale-95 transition duration-150" data-title="준비물 확인">
+          <i class="ph-bold ph-plus text-primary"></i>준비물 확인
+        </button>
+      </div>
+      <form id="task-add-form" class="bg-surface border border-border rounded-lg shadow-soft px-4 py-3 flex items-center gap-3">
+        <span class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0" aria-hidden="true">
+          <i class="ph-bold ph-plus text-lg"></i>
+        </span>
+        <input id="task-add-input" type="text" placeholder="목록에 없으면 직접 입력하기" class="flex-1 bg-transparent text-[15px] placeholder:text-foreground-muted outline-none" autocomplete="off">
+      </form>
+    </div>
+
+    <div class="flex flex-col gap-3" id="task-list"></div>
+
+    <!-- 냉장고 재고 -->
+    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6">
+      <span class="absolute -top-2 left-6 w-11 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
+        <i class="ph-duotone ph-refrigerator text-base"></i>냉장고 재료
+      </p>
+      <div class="flex flex-wrap gap-2 mb-3" id="fridge-list"></div>
+      <form id="fridge-add-form" class="flex items-center gap-2">
+        <input id="fridge-add-input" type="text" placeholder="재료 이름 입력 후 추가" class="flex-1 bg-surface rounded-md px-3 py-2 text-[14px] border border-border outline-none" autocomplete="off">
+        <button type="submit" class="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="냉장고에 추가">
+          <i class="ph-bold ph-plus text-base"></i>
+        </button>
+      </form>
+    </div>
+
+    <div class="flex-1"></div>
+    <a href="parent-progress.html" class="mt-6 flex items-center justify-center gap-2 text-secondary font-display font-bold text-[15px] py-2">
+      부부 완료 현황 보기
+      <i class="ph-bold ph-arrow-right"></i>
+    </a>
+  </div>
+  <script src="js/store.js"></script>
+  <script>
+    (function () {
+      var MEMBER_INITIAL = { 'member-1': '하', 'member-2': '서', 'member-3': '서', 'member-4': '민' };
+
+      function renderTasks() {
+        var list = document.getElementById('task-list');
+        var todos = OFStore.todos.list();
+        list.innerHTML = todos.map(function (t) {
+          var initial = MEMBER_INITIAL[t.memberTag] || t.assignee.charAt(0);
+          var badge = '<span class="w-8 h-8 rounded-full bg-' + t.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" title="' + t.assignee + (t.isDone ? ' 완료' : ', 아직 완료 안 함') + '">' + initial + '</span>';
+          return '' +
+            '<div class="task-row bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4" data-done="' + t.isDone + '" data-id="' + t.id + '">' +
+              '<button type="button" class="task-circle task-toggle w-11 h-11 rounded-full border-2 border-border flex items-center justify-center shrink-0" data-id="' + t.id + '" aria-label="완료 체크">' +
+                '<i class="ph-bold ph-check task-check text-on-secondary text-lg"></i>' +
+              '</button>' +
+              '<span class="task-label font-display font-bold text-[16px] flex-1">' + t.title + (t.time ? ' <span class="text-foreground-muted font-body font-normal text-[13px]">· ' + t.time + '</span>' : '') + '</span>' +
+              badge +
+              '<button type="button" class="task-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150" data-id="' + t.id + '" aria-label="삭제">' +
+                '<i class="ph-bold ph-trash text-base text-foreground-muted"></i>' +
+              '</button>' +
+            '</div>';
+        }).join('');
+
+        Array.prototype.forEach.call(list.querySelectorAll('.task-toggle'), function (btn) {
+          btn.addEventListener('click', function () { OFStore.todos.toggle(btn.dataset.id); });
+        });
+        Array.prototype.forEach.call(list.querySelectorAll('.task-remove'), function (btn) {
+          btn.addEventListener('click', function () { OFStore.todos.remove(btn.dataset.id); });
+        });
+      }
+
+      function renderFridge() {
+        var wrap = document.getElementById('fridge-list');
+        var items = OFStore.fridge.list();
+        if (!items.length) {
+          wrap.innerHTML = '<span class="text-foreground-muted text-[14px]">냉장고가 비어있어요.</span>';
+          return;
+        }
+        wrap.innerHTML = items.map(function (f) {
+          return '' +
+            '<span class="inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-2 py-1.5 text-[14px] font-body" data-id="' + f.id + '">' +
+              f.name +
+              '<button type="button" class="fridge-remove w-5 h-5 rounded-full flex items-center justify-center active:scale-90 transition duration-150" data-id="' + f.id + '" aria-label="' + f.name + ' 삭제">' +
+                '<i class="ph-bold ph-x text-[11px] text-foreground-muted"></i>' +
+              '</button>' +
+            '</span>';
+        }).join('');
+        Array.prototype.forEach.call(wrap.querySelectorAll('.fridge-remove'), function (btn) {
+          btn.addEventListener('click', function () {
+            var id = btn.dataset.id;
+            var item = OFStore.fridge.list().find(function (f) { return f.id === id; });
+            if (item) OFStore.fridge.removeByName(item.name);
+          });
+        });
+      }
+
+      function renderAll() { renderTasks(); renderFridge(); }
+
+      Array.prototype.forEach.call(document.querySelectorAll('.quick-chip'), function (chip) {
+        chip.addEventListener('click', function () { OFStore.todos.add(chip.dataset.title, { assignee: '가족', memberTag: 'member-1' }); });
+      });
+
+      document.getElementById('task-add-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var input = document.getElementById('task-add-input');
+        var v = input.value.trim();
+        if (!v) return;
+        OFStore.todos.add(v, { assignee: '가족', memberTag: 'member-1' });
+        input.value = '';
+      });
+
+      document.getElementById('fridge-add-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var input = document.getElementById('fridge-add-input');
+        var v = input.value.trim();
+        if (!v) return;
+        OFStore.fridge.add(v);
+        input.value = '';
+      });
+
+      OFStore.onChange(renderAll);
+      renderAll();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

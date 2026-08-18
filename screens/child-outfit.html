@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>오늘의 옷차림 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+
+  /* 날씨/옷차림 생동감 모션 */
+  @keyframes icon-sway { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-4px) rotate(3deg); } }
+  .icon-sway { animation: icon-sway 3.2s ease-in-out infinite; transform-origin: 50% 60%; }
+  @keyframes tape-wiggle { 0%, 100% { transform: rotate(5deg); } 50% { transform: rotate(9deg); } }
+  .tape-wiggle { animation: tape-wiggle 2.6s ease-in-out infinite; }
+  @keyframes item-pop-in { 0% { opacity: 0; transform: translateY(10px) scale(0.82); } 60% { opacity: 1; transform: translateY(-2px) scale(1.05); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+  .item-pop-in { animation: item-pop-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <!-- 상단 바 -->
+    <div class="flex items-center justify-between mb-6">
+      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">하준</span>
+      <div class="w-10"></div>
+    </div>
+
+    <!-- 날씨 히어로 카드 -->
+    <div class="relative bg-surface border border-border rounded-lg shadow-soft p-card-padding mb-6">
+      <span class="absolute -top-2 right-8 w-12 h-5 bg-tape-blue/90 rotate-[4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3" id="weather-date">오늘 날씨 · 불러오는 중...</p>
+      <div class="flex items-center gap-4">
+        <i class="ph-duotone ph-cloud-sun text-6xl text-primary icon-sway" id="weather-icon"></i>
+        <div class="relative">
+          <p class="font-display font-extrabold text-[40px] leading-none" id="weather-temp">--°C</p>
+          <svg class="absolute -left-2 -right-2 -bottom-1 top-1 pointer-events-none" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M4,42 C4,20 20,10 50,8 C82,6 96,16 96,32" fill="none" stroke="#FF85A1" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <p class="text-[15px] text-foreground-muted mt-1" id="weather-desc">날씨 정보를 불러오는 중이에요...</p>
+        </div>
+      </div>
+      <p class="text-[11px] text-foreground-muted/70 mt-3" id="weather-source-note"></p>
+    </div>
+
+    <!-- 요일별 지정복 -->
+    <div class="bg-accent rounded-lg p-4 flex items-center gap-3 mb-6 shadow-soft">
+      <i class="ph-duotone ph-t-shirt text-2xl text-on-accent"></i>
+      <p class="font-display font-bold text-[15px] text-on-accent" id="outfit-banner-text">오늘의 지정복을 확인하고 있어요...</p>
+    </div>
+
+    <!-- 추천 옷차림 (플랫레이 스타일) -->
+    <div class="flex-1">
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3">오늘의 추천 옷차림</p>
+      <div class="relative bg-surface border border-border rounded-lg shadow-soft p-card-padding">
+        <span class="absolute -top-3 -right-2 tape-wiggle bg-tape-yellow border border-border/50 rounded-sm shadow-sm px-3 py-1 z-10">
+          <span class="font-doodle text-[14px] text-foreground">Today's Outfit!</span>
+        </span>
+        <i class="ph-fill ph-smiley absolute top-2 left-2 text-xl text-tape-pink rotate-[-8deg]" aria-hidden="true"></i>
+        <i class="ph-fill ph-smiley absolute bottom-3 right-3 text-lg text-secondary rotate-[6deg]" aria-hidden="true"></i>
+
+        <div class="flex items-center justify-center gap-6 pt-4 pb-2" id="outfit-items"></div>
+
+        <p class="font-display font-bold text-[17px] mb-1 text-center mt-2" id="outfit-title">불러오는 중...</p>
+        <p class="text-[15px] text-foreground-muted leading-[22px] text-center" id="outfit-note"></p>
+      </div>
+    </div>
+
+    <!-- 확인 버튼 -->
+    <a href="child-todo.html"
+       class="mt-6 bg-primary text-on-primary rounded-lg shadow-soft py-4 flex items-center justify-center gap-2 font-display font-bold text-[17px] active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
+      확인했어요
+      <i class="ph-bold ph-arrow-right text-lg"></i>
+    </a>
+  </div>
+  <script src="js/store.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/weather.js"></script>
+  <script>
+    (function () {
+      var CHILD_NAME = '하준';
+      var DAY_LABEL = { sun: '일요일', mon: '월요일', tue: '화요일', wed: '수요일', thu: '목요일', fri: '금요일', sat: '토요일' };
+
+      function renderOutfitItems(rec) {
+        var wrap = document.getElementById('outfit-items');
+        var mainSlot = '' +
+          '<div class="relative flex flex-col items-center gap-1.5 item-pop-in" style="animation-delay: 0.1s">' +
+            '<svg class="absolute -inset-3 pointer-events-none" viewBox="0 0 90 90" aria-hidden="true">' +
+              '<path d="M8,45 C8,18 28,6 45,6 C64,6 82,20 82,45 C82,70 62,84 45,84 C26,84 8,68 8,45 Z" fill="none" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round"/>' +
+            '</svg>' +
+            '<div class="w-16 h-16 rounded-lg bg-member-4/10 flex items-center justify-center">' +
+              '<i class="ph-duotone ph-t-shirt text-4xl text-member-4"></i>' +
+            '</div>' +
+            '<span class="font-doodle text-[13px] text-foreground">' + rec.main + '</span>' +
+          '</div>';
+        var extraSlot = rec.extra ? (
+          '<div class="flex flex-col items-center gap-1.5 item-pop-in" style="animation-delay: 0.28s">' +
+            '<div class="w-16 h-16 rounded-lg flex items-center justify-center" style="background:rgba(255,209,0,0.18)">' +
+              '<i class="ph-duotone ph-t-shirt text-4xl" style="color:#B8930A"></i>' +
+            '</div>' +
+            '<span class="font-doodle text-[13px] text-foreground">' + rec.extra.name + '</span>' +
+          '</div>'
+        ) : '';
+        wrap.innerHTML = mainSlot + extraSlot;
+      }
+
+      function render() {
+        var todayKey = OFStore.outfit.todayKey();
+        var rule = OFStore.outfit.getRule(CHILD_NAME, todayKey);
+        var outfitType = rule ? rule.outfitType : '평상복';
+        document.getElementById('outfit-banner-text').textContent = '오늘은 ' + DAY_LABEL[todayKey] + ' — ' + outfitType + ' 입는 날이에요';
+
+        OFWeather.getToday().then(function (weather) {
+          document.getElementById('weather-date').textContent = '오늘 날씨 · ' + weather.dateLabel;
+          document.getElementById('weather-temp').textContent = weather.tempC + '°C';
+          document.getElementById('weather-desc').textContent = weather.description;
+          document.getElementById('weather-source-note').textContent = window.OF_CONFIG.weatherApiKey ? '기상청 공공데이터포털 제공' : '실제 기상청 API 연동 전 · 임시 데이터';
+
+          var rec = OFWeather.buildRecommendation(outfitType, weather);
+          renderOutfitItems(rec);
+          document.getElementById('outfit-title').textContent = rec.title;
+          document.getElementById('outfit-note').textContent = rec.note;
+        }).catch(function (err) {
+          document.getElementById('weather-desc').textContent = err.message;
+        });
+      }
+
+      OFStore.onChange(render);
+      render();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

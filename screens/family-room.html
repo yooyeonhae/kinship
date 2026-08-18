@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>가족소통 아지트 — 우리가족 올인원</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  .font-doodle { font-family: 'Gaegu', cursive; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+  .game-tab[data-active="true"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
+  .num-cell[data-owner="p1"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
+  .num-cell[data-owner="p2"] { background-color: #C2185B; color: #FFFFFF; border-color: #C2185B; }
+  .bingo-cell[data-marked="true"] { background-color: #2E7D32; color: #FFFFFF; border-color: #2E7D32; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <div class="flex items-center justify-between mb-6">
+      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
+        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
+      </a>
+      <span class="font-display font-bold text-[15px] text-foreground-muted">가족소통 아지트</span>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="relative mb-6">
+      <span class="absolute -top-2 left-0 w-12 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">가족소통 아지트</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">부모님이 잠깐 자리를 비워도 가족끼리 대화하고 같이 놀 수 있어요.</p>
+    </div>
+
+    <!-- 채팅 -->
+    <div class="bg-surface border border-border rounded-lg shadow-soft p-card-padding mb-6">
+      <p class="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
+        <i class="ph-duotone ph-chats-circle text-xl text-primary"></i>가족 채팅
+      </p>
+      <div id="chat-log" class="flex flex-col gap-2 max-h-64 overflow-y-auto mb-3 pr-1"></div>
+      <form id="chat-form" class="flex items-center gap-2">
+        <select id="chat-sender" class="bg-surface-muted rounded-md px-2 py-2.5 text-[13px] border border-border outline-none shrink-0">
+          <option value="하준" data-tag="member-1">하준</option>
+          <option value="서아" data-tag="member-2">서아</option>
+          <option value="서연" data-tag="member-3">서연</option>
+          <option value="민준" data-tag="member-4">민준</option>
+        </select>
+        <input id="chat-input" type="text" placeholder="메시지 입력" class="flex-1 bg-surface-muted rounded-md px-3 py-2.5 text-[14px] border border-border outline-none min-w-0" autocomplete="off">
+        <button type="submit" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="보내기">
+          <i class="ph-bold ph-paper-plane-right text-base"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- 게임존 -->
+    <div class="bg-surface border border-border rounded-lg shadow-soft p-card-padding">
+      <p class="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
+        <i class="ph-duotone ph-game-controller text-xl text-accent"></i>게임존 · 턴제 대전
+      </p>
+
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <select id="player1-select" class="bg-surface-muted rounded-md px-2 py-2 text-[13px] border border-border outline-none">
+          <option value="하준">선수1 · 하준</option>
+          <option value="서아">선수1 · 서아</option>
+          <option value="서연">선수1 · 서연</option>
+          <option value="민준">선수1 · 민준</option>
+        </select>
+        <select id="player2-select" class="bg-surface-muted rounded-md px-2 py-2 text-[13px] border border-border outline-none">
+          <option value="하준">선수2 · 하준</option>
+          <option value="서아" selected>선수2 · 서아</option>
+          <option value="서연">선수2 · 서연</option>
+          <option value="민준">선수2 · 민준</option>
+        </select>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-4" id="game-tabs">
+        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="sum15" data-active="true">합이 15</button>
+        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="bingo" data-active="false">계산 빙고</button>
+        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="stairs" data-active="false">계단 오르기</button>
+      </div>
+
+      <p class="text-[14px] font-display font-bold mb-3" id="turn-indicator">차례: -</p>
+
+      <!-- 합이 15 -->
+      <div id="panel-sum15" class="game-panel">
+        <p class="text-[13px] text-foreground-muted mb-3">번갈아 숫자를 하나씩 가져가서, 내가 가진 숫자 3개의 합이 15가 되면 승리해요.</p>
+        <div class="grid grid-cols-3 gap-2 mb-3" id="sum15-grid"></div>
+        <p class="text-[14px] font-display font-bold text-center mb-3" id="sum15-result">&nbsp;</p>
+        <button type="button" id="sum15-reset" class="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-[0.97] transition duration-150">새 게임</button>
+      </div>
+
+      <!-- 계산 빙고 -->
+      <div id="panel-bingo" class="game-panel hidden">
+        <p class="text-[13px] text-foreground-muted mb-3">내 차례에 문제가 나오면, 내 판에서 정답 칸을 찾아 눌러요. 먼저 한 줄을 완성하면 승리해요.</p>
+        <div class="bg-surface-muted rounded-md px-4 py-3 text-center mb-3">
+          <p class="text-[13px] text-foreground-muted">문제</p>
+          <p class="font-display font-extrabold text-[28px]" id="bingo-problem">-</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <p class="text-[12px] font-display font-bold text-center mb-1" id="bingo-p1-label">선수1</p>
+            <div class="grid grid-cols-3 gap-1.5" id="bingo-board-p1"></div>
+          </div>
+          <div>
+            <p class="text-[12px] font-display font-bold text-center mb-1" id="bingo-p2-label">선수2</p>
+            <div class="grid grid-cols-3 gap-1.5" id="bingo-board-p2"></div>
+          </div>
+        </div>
+        <p class="text-[14px] font-display font-bold text-center mb-3" id="bingo-result">&nbsp;</p>
+        <button type="button" id="bingo-reset" class="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-[0.97] transition duration-150">새 게임</button>
+      </div>
+
+      <!-- 계단 오르기 -->
+      <div id="panel-stairs" class="game-panel hidden">
+        <p class="text-[13px] text-foreground-muted mb-3">내 차례에 주사위를 굴려 계단을 올라가요. 먼저 목표 높이(30)에 도착하면 승리해요.</p>
+        <div class="flex flex-col gap-3 mb-3">
+          <div>
+            <div class="flex items-center justify-between text-[13px] font-display font-bold mb-1">
+              <span id="stairs-p1-label">선수1</span>
+              <span id="stairs-p1-height">0 / 30</span>
+            </div>
+            <div class="h-3 bg-surface-muted rounded-full overflow-hidden">
+              <div id="stairs-p1-bar" class="h-full bg-primary rounded-full transition-all duration-300" style="width:0%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-[13px] font-display font-bold mb-1">
+              <span id="stairs-p2-label">선수2</span>
+              <span id="stairs-p2-height">0 / 30</span>
+            </div>
+            <div class="h-3 bg-surface-muted rounded-full overflow-hidden">
+              <div id="stairs-p2-bar" class="h-full bg-accent rounded-full transition-all duration-300" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <button type="button" id="stairs-roll" class="w-full bg-primary text-on-primary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150 mb-2">
+          <i class="ph-bold ph-dice-five"></i>주사위 굴리기
+        </button>
+        <p class="text-[14px] font-display font-bold text-center mb-3" id="stairs-result">&nbsp;</p>
+        <button type="button" id="stairs-reset" class="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-[0.97] transition duration-150">새 게임</button>
+      </div>
+    </div>
+
+    <div class="flex-1"></div>
+  </div>
+  <script src="js/store.js"></script>
+  <script>
+    (function () {
+      function selectedTag(select) { return select.options[select.selectedIndex].dataset.tag; }
+
+      function renderChat() {
+        var log = document.getElementById('chat-log');
+        var msgs = OFStore.chat.list();
+        log.innerHTML = msgs.map(function (m) {
+          var initial = m.sender.charAt(0);
+          return '' +
+            '<div class="flex items-start gap-2">' +
+              '<span class="w-7 h-7 rounded-full bg-' + m.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary shrink-0">' + initial + '</span>' +
+              '<div class="bg-surface-muted rounded-lg px-3 py-2 flex-1 min-w-0">' +
+                '<p class="text-[12px] font-display font-bold text-foreground-muted mb-0.5">' + m.sender + '</p>' +
+                '<p class="text-[14px] leading-[20px]">' + m.content + '</p>' +
+              '</div>' +
+            '</div>';
+        }).join('');
+        log.scrollTop = log.scrollHeight;
+      }
+
+      document.getElementById('chat-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var senderSelect = document.getElementById('chat-sender');
+        var input = document.getElementById('chat-input');
+        var v = input.value.trim();
+        if (!v) return;
+        OFStore.chat.add(senderSelect.value, selectedTag(senderSelect), v);
+        input.value = '';
+        renderChat();
+      });
+
+      renderChat();
+
+      var p1Select = document.getElementById('player1-select');
+      var p2Select = document.getElementById('player2-select');
+      var turnIndicator = document.getElementById('turn-indicator');
+
+      function p1Name() { return p1Select.value; }
+      function p2Name() { return p2Select.value; }
+
+      function updateLabels() {
+        ['bingo-p1-label', 'stairs-p1-label'].forEach(function (id) { document.getElementById(id).textContent = p1Name(); });
+        ['bingo-p2-label', 'stairs-p2-label'].forEach(function (id) { document.getElementById(id).textContent = p2Name(); });
+      }
+      p1Select.addEventListener('change', updateLabels);
+      p2Select.addEventListener('change', updateLabels);
+      updateLabels();
+
+      // ----- 게임 탭 전환 -----
+      var GAMES = ['sum15', 'bingo', 'stairs'];
+      var activeGame = 'sum15';
+      document.getElementById('game-tabs').addEventListener('click', function (e) {
+        var btn = e.target.closest('.game-tab');
+        if (!btn) return;
+        activeGame = btn.dataset.game;
+        GAMES.forEach(function (g) {
+          document.getElementById('panel-' + g).classList.toggle('hidden', g !== btn.dataset.game);
+          document.querySelector('.game-tab[data-game="' + g + '"]').dataset.active = String(g === btn.dataset.game);
+        });
+        updateTurnIndicator();
+      });
+
+      function updateTurnIndicator() {
+        var state = { sum15: sum15State, bingo: bingoState, stairs: stairsState }[activeGame];
+        if (state.winner) {
+          turnIndicator.textContent = state.winner === 'draw' ? '무승부!' : (state.winner === 'p1' ? p1Name() : p2Name()) + ' 승리!';
+        } else {
+          turnIndicator.textContent = '차례: ' + (state.turn === 'p1' ? p1Name() : p2Name());
+        }
+      }
+
+      // ----- 합이 15 -----
+      var sum15State = null;
+      function hasSum15(arr) {
+        for (var i = 0; i < arr.length; i++)
+          for (var j = i + 1; j < arr.length; j++)
+            for (var k = j + 1; k < arr.length; k++)
+              if (arr[i] + arr[j] + arr[k] === 15) return true;
+        return false;
+      }
+      function newSum15() {
+        sum15State = { owners: {}, p1Nums: [], p2Nums: [], turn: 'p1', winner: null };
+        renderSum15();
+      }
+      function renderSum15() {
+        var grid = document.getElementById('sum15-grid');
+        grid.innerHTML = '';
+        for (var n = 1; n <= 9; n++) {
+          var owner = sum15State.owners[n] || null;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'num-cell bg-surface-muted border border-border rounded-md py-3 font-display font-bold text-[18px] active:scale-95 transition duration-150';
+          btn.textContent = n;
+          btn.disabled = !!owner || !!sum15State.winner;
+          if (owner) btn.dataset.owner = owner;
+          btn.dataset.num = n;
+          grid.appendChild(btn);
+        }
+        document.getElementById('sum15-result').textContent = sum15State.winner
+          ? (sum15State.winner === 'draw' ? '무승부예요!' : (sum15State.winner === 'p1' ? p1Name() : p2Name()) + ' 승리!')
+          : ' ';
+        updateTurnIndicator();
+      }
+      document.getElementById('sum15-grid').addEventListener('click', function (e) {
+        var btn = e.target.closest('.num-cell');
+        if (!btn || btn.disabled) return;
+        var n = parseInt(btn.dataset.num, 10);
+        var cur = sum15State.turn;
+        sum15State.owners[n] = cur;
+        (cur === 'p1' ? sum15State.p1Nums : sum15State.p2Nums).push(n);
+        var nums = cur === 'p1' ? sum15State.p1Nums : sum15State.p2Nums;
+        if (nums.length >= 3 && hasSum15(nums)) {
+          sum15State.winner = cur;
+        } else if (Object.keys(sum15State.owners).length === 9) {
+          sum15State.winner = 'draw';
+        } else {
+          sum15State.turn = cur === 'p1' ? 'p2' : 'p1';
+        }
+        renderSum15();
+      });
+      document.getElementById('sum15-reset').addEventListener('click', newSum15);
+
+      // ----- 계산 빙고 -----
+      var bingoState = null;
+      function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+        return arr;
+      }
+      function makeBoard() {
+        var pool = [];
+        for (var i = 2; i <= 20; i++) pool.push(i);
+        shuffle(pool);
+        return pool.slice(0, 9).map(function (v) { return { value: v, marked: false }; });
+      }
+      function newBingo() {
+        bingoState = {
+          boards: { p1: makeBoard(), p2: makeBoard() },
+          turn: 'p1',
+          winner: null,
+          problem: null
+        };
+        nextBingoProblem();
+        renderBingo();
+      }
+      function nextBingoProblem() {
+        var a = 2 + Math.floor(Math.random() * 8);
+        var b = 2 + Math.floor(Math.random() * 8);
+        var ops = ['+', '×'];
+        var op = ops[Math.floor(Math.random() * ops.length)];
+        var answer = op === '+' ? a + b : a * b;
+        bingoState.problem = { text: a + ' ' + op + ' ' + b, answer: answer };
+      }
+      var BINGO_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      function checkBingoWin(board) {
+        return BINGO_LINES.some(function (line) { return line.every(function (i) { return board[i].marked; }); });
+      }
+      function renderBingoBoard(key, containerId) {
+        var board = bingoState.boards[key];
+        var wrap = document.getElementById(containerId);
+        wrap.innerHTML = board.map(function (cell, i) {
+          return '<button type="button" class="bingo-cell bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-95 transition duration-150" data-owner="' + key + '" data-idx="' + i + '" data-marked="' + cell.marked + '">' + cell.value + '</button>';
+        }).join('');
+      }
+      function renderBingo() {
+        renderBingoBoard('p1', 'bingo-board-p1');
+        renderBingoBoard('p2', 'bingo-board-p2');
+        document.getElementById('bingo-problem').textContent = bingoState.winner ? '-' : bingoState.problem.text;
+        document.getElementById('bingo-result').textContent = bingoState.winner
+          ? (bingoState.winner === 'p1' ? p1Name() : p2Name()) + ' 승리! 한 줄을 완성했어요.'
+          : ' ';
+        updateTurnIndicator();
+      }
+      function handleBingoClick(e) {
+        if (bingoState.winner) return;
+        var btn = e.target.closest('.bingo-cell');
+        if (!btn) return;
+        var owner = btn.dataset.owner;
+        if (owner !== bingoState.turn) return;
+        var idx = parseInt(btn.dataset.idx, 10);
+        var cell = bingoState.boards[owner][idx];
+        if (!cell.marked && cell.value === bingoState.problem.answer) {
+          cell.marked = true;
+        }
+        if (checkBingoWin(bingoState.boards[owner])) {
+          bingoState.winner = owner;
+        } else {
+          bingoState.turn = owner === 'p1' ? 'p2' : 'p1';
+          nextBingoProblem();
+        }
+        renderBingo();
+      }
+      document.getElementById('bingo-board-p1').addEventListener('click', handleBingoClick);
+      document.getElementById('bingo-board-p2').addEventListener('click', handleBingoClick);
+      document.getElementById('bingo-reset').addEventListener('click', newBingo);
+
+      // ----- 계단 오르기 -----
+      var STAIRS_TARGET = 30;
+      var stairsState = null;
+      function newStairs() {
+        stairsState = { p1: 0, p2: 0, turn: 'p1', winner: null };
+        renderStairs();
+      }
+      function renderStairs() {
+        var p1pct = Math.min(100, Math.round(stairsState.p1 / STAIRS_TARGET * 100));
+        var p2pct = Math.min(100, Math.round(stairsState.p2 / STAIRS_TARGET * 100));
+        document.getElementById('stairs-p1-height').textContent = stairsState.p1 + ' / ' + STAIRS_TARGET;
+        document.getElementById('stairs-p2-height').textContent = stairsState.p2 + ' / ' + STAIRS_TARGET;
+        document.getElementById('stairs-p1-bar').style.width = p1pct + '%';
+        document.getElementById('stairs-p2-bar').style.width = p2pct + '%';
+        document.getElementById('stairs-result').textContent = stairsState.winner
+          ? (stairsState.winner === 'p1' ? p1Name() : p2Name()) + ' 승리! 먼저 꼭대기에 도착했어요.'
+          : ' ';
+        document.getElementById('stairs-roll').disabled = !!stairsState.winner;
+        updateTurnIndicator();
+      }
+      document.getElementById('stairs-roll').addEventListener('click', function () {
+        if (stairsState.winner) return;
+        var roll = 1 + Math.floor(Math.random() * 6);
+        var cur = stairsState.turn;
+        stairsState[cur] += roll;
+        if (stairsState[cur] >= STAIRS_TARGET) {
+          stairsState.winner = cur;
+        } else {
+          stairsState.turn = cur === 'p1' ? 'p2' : 'p1';
+        }
+        renderStairs();
+      });
+      document.getElementById('stairs-reset').addEventListener('click', newStairs);
+
+      newSum15();
+      newBingo();
+      newStairs();
+    })();
+  </script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

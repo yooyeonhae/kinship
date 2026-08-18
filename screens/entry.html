@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0055FF">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>우리가족 올인원 — 누구세요?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Gowun+Dodum&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
+          foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
+          primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
+          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          accent: '#C2185B', 'on-accent': '#FFFFFF',
+          destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
+          'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
+          'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+        },
+        fontFamily: {
+          display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
+          body: ["'Gowun Dodum'", "'Nunito Sans'", 'sans-serif'],
+          doodle: ["'Gaegu'", 'cursive'],
+        },
+        borderRadius: { sm: '10px', md: '16px', lg: '20px' },
+        boxShadow: {
+          soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Gowun Dodum', 'Nunito Sans', sans-serif; }
+  .font-display { font-family: 'Nanum Gothic', 'Varela Round', sans-serif; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+  .bubble-text {
+    font-family: 'Nanum Gothic', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    background: linear-gradient(180deg, #6B9BFF 0%, #0055FF 55%, #0044CC 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.55);
+    filter: drop-shadow(0 3px 0 rgba(0,68,204,0.3)) drop-shadow(0 8px 14px rgba(43,42,40,0.18));
+  }
+  .canvas-texture {
+    background-image:
+      radial-gradient(circle at 18% 28%, rgba(43,42,40,0.035) 0, transparent 45%),
+      radial-gradient(circle at 82% 72%, rgba(43,42,40,0.035) 0, transparent 45%),
+      radial-gradient(circle at 50% 92%, rgba(43,42,40,0.025) 0, transparent 40%);
+  }
+
+  /* 히어로 콜라주 생동감 모션 */
+  @keyframes twinkle { 0%, 100% { opacity: 0.75; transform: rotate(var(--r, 0deg)) scale(0.92); } 50% { opacity: 1; transform: rotate(var(--r, 0deg)) scale(1.18); } }
+  .twinkle { animation: twinkle 2.4s ease-in-out infinite; }
+  @keyframes avatar-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .avatar-bob { display: inline-flex; animation: avatar-bob 2.8s ease-in-out infinite; }
+  @keyframes wordmark-in { 0% { opacity: 0; transform: scale(0.85) translateY(6px); } 60% { opacity: 1; transform: scale(1.05) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+  .wordmark-in { animation: wordmark-in 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+</style>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(2rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <!-- 히어로 배너: 콜라주 스타일 로고 -->
+    <div class="canvas-texture relative bg-surface-muted border border-border rounded-lg shadow-soft py-9 px-4 mb-8 overflow-hidden">
+      <!-- 워시테이프 -->
+      <span class="absolute -top-2 left-10 w-14 h-5 bg-tape-blue/90 rotate-[-6deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+      <span class="absolute -top-2 right-10 w-14 h-5 bg-tape-pink/90 rotate-[5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+
+      <!-- 별 스티커 -->
+      <i class="ph-fill ph-star absolute top-4 left-4 text-2xl text-tape-yellow twinkle" style="--r:-12deg; animation-delay:0s" aria-hidden="true"></i>
+      <i class="ph-fill ph-star absolute bottom-5 right-6 text-xl text-tape-yellow twinkle" style="--r:10deg; animation-delay:0.8s" aria-hidden="true"></i>
+      <i class="ph-fill ph-sparkle absolute top-6 right-14 text-lg text-tape-pink twinkle" style="--r:8deg; animation-delay:1.4s" aria-hidden="true"></i>
+
+      <!-- 가족 스티커 아바타 (컷아웃 콜라주 자리) -->
+      <div class="absolute top-3 left-1/2 -translate-x-[68px] w-9 h-9 rounded-full bg-member-1 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[-6deg]" aria-hidden="true">
+        <span class="avatar-bob" style="animation-delay:0s"><i class="ph-duotone ph-baseball-cap text-base text-on-primary"></i></span>
+      </div>
+      <div class="absolute bottom-2 left-1/2 -translate-x-[78px] w-9 h-9 rounded-full bg-member-3 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[4deg]" aria-hidden="true">
+        <span class="avatar-bob font-display font-bold text-on-primary text-[12px]" style="animation-delay:0.4s">서</span>
+      </div>
+      <div class="absolute top-2 left-1/2 translate-x-[52px] w-9 h-9 rounded-full bg-member-2 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[6deg]" aria-hidden="true">
+        <span class="avatar-bob" style="animation-delay:0.8s"><i class="ph-duotone ph-flower-tulip text-base text-on-primary"></i></span>
+      </div>
+      <div class="absolute bottom-3 left-1/2 translate-x-[68px] w-9 h-9 rounded-full bg-member-4 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[-5deg]" aria-hidden="true">
+        <span class="avatar-bob font-display font-bold text-on-primary text-[12px]" style="animation-delay:1.2s">민</span>
+      </div>
+
+      <!-- 버블 워드마크 -->
+      <div class="text-center">
+        <p class="bubble-text wordmark-in text-[40px] leading-none">우리가족</p>
+        <p class="font-doodle text-[15px] text-accent mt-2 tracking-wide">OUR FAMILY · 올인원</p>
+      </div>
+    </div>
+
+    <!-- 헤드라인 -->
+    <div class="mb-8">
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">누가 확인할까요?</h1>
+      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">이름을 누르면 그 사람에게 필요한 화면으로 바로 이동해요.</p>
+    </div>
+
+    <!-- 자녀 카드 목록 -->
+    <div class="mb-8">
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3">우리 아이</p>
+      <div class="grid grid-cols-2 gap-4">
+        <a href="child-outfit.html" class="relative bg-surface border border-border rounded-lg shadow-soft p-5 flex flex-col items-center gap-3 active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] rotate-[-1deg]">
+          <span class="absolute -top-2 left-6 w-11 h-5 bg-tape-yellow/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+          <div class="w-16 h-16 rounded-full bg-member-1 ring-4 ring-surface shadow-soft flex items-center justify-center">
+            <i class="ph-duotone ph-baseball-cap text-3xl text-on-primary"></i>
+          </div>
+          <span class="font-display font-bold text-[17px]">하준</span>
+        </a>
+        <a href="child-outfit.html" class="relative bg-surface border border-border rounded-lg shadow-soft p-5 flex flex-col items-center gap-3 active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
+          <div class="w-16 h-16 rounded-full bg-member-2 ring-4 ring-surface shadow-soft flex items-center justify-center">
+            <i class="ph-duotone ph-flower-tulip text-3xl text-on-primary"></i>
+          </div>
+          <span class="font-display font-bold text-[17px]">서아</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 구분 -->
+    <div class="flex items-center gap-3 mb-8">
+      <div class="flex-1 h-px bg-border"></div>
+      <span class="text-foreground-muted text-[13px]">또는</span>
+      <div class="flex-1 h-px bg-border"></div>
+    </div>
+
+    <!-- 부모 버튼 -->
+    <a href="parent-recipe.html" class="bg-secondary text-on-secondary rounded-lg shadow-soft px-5 py-4 flex items-center justify-between active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
+      <span class="flex items-center gap-3">
+        <i class="ph-duotone ph-users-three text-2xl"></i>
+        <span class="font-display font-bold text-[17px]">부모로 시작하기</span>
+      </span>
+      <i class="ph-bold ph-caret-right text-xl"></i>
+    </a>
+
+    <div class="flex-1"></div>
+    <p class="text-center text-foreground-muted text-[13px] mt-8">2026년 8월 12일 수요일</p>
+  </div>
+  <script src="js/store.js"></script>
+  <script src="js/bottomnav.js"></script>
+  <script src="js/chatbot.js"></script>
+</body>
+</html>

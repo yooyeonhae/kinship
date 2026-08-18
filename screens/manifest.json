@@ -1,0 +1,16 @@
+{
+  "name": "우리가족 올인원",
+  "short_name": "우리가족",
+  "description": "바쁜 아침, 날씨·옷차림·할일을 한 화면에서 확인하는 가족 플래너",
+  "start_url": "entry.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF8F5",
+  "theme_color": "#0055FF",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
