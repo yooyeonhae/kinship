@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 
@@ -17,7 +17,8 @@ const QUICK_CHIPS = ['우유 사기', '쓰레기 버리기', '준비물 확인']
 let nextFridgeId = 100
 
 function ParentTasksScreen() {
-  const { supabase, familyId, members, loading: membersLoading, currentMember, currentMemberId } = useFamily()
+  const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout } = useFamily()
+  const navigate = useNavigate()
   const [todos, setTodos] = useState([])
   const [loadingTodos, setLoadingTodos] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
@@ -73,21 +74,19 @@ function ParentTasksScreen() {
   }
 
   async function toggleTask(todo) {
-    const nextDone = !todo.is_done
-    const patch = {
-      is_done: nextDone,
-      // 완료자 = 체크한 사람. 담당자를 그대로 넣으면 "누가 끝냈는지"가 항상
-      // 담당자로 기록되어 부부 완료 현황의 근거가 사라진다.
-      completed_by: nextDone ? currentMemberId : null,
-      completed_at: nextDone ? new Date().toISOString() : null,
-    }
-    const { data, error } = await supabase.from('todos').update(patch).eq('todo_id', todo.todo_id).select().single()
+    // 완료자를 서버가 정하도록 자녀 화면과 같은 RPC를 쓴다.
+    // 클라이언트가 completed_by를 보내면 "누가 끝냈는지"를 클라이언트가 주장하는 셈이 된다.
+    const { data, error } = await supabase.rpc('toggle_my_todo', { p_todo_id: todo.todo_id })
     if (error) {
       setErrorMsg('상태를 바꾸지 못했어요.')
       return
     }
+    if (!data?.ok) {
+      setErrorMsg('상태를 바꾸지 못했어요.')
+      return
+    }
     setErrorMsg('')
-    setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data : t)))
+    setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data.todo : t)))
   }
 
   async function removeTask(id) {
@@ -363,6 +362,18 @@ function ParentTasksScreen() {
         부부 완료 현황 보기
         <i className="ph-bold ph-arrow-right"></i>
       </Link>
+
+      <button
+        type="button"
+        onClick={async () => {
+          await parentLogout()
+          navigate('/', { replace: true })
+        }}
+        className="mt-2 mx-auto flex items-center gap-1.5 text-foreground-muted text-label py-2 px-3 active:scale-95 transition duration-150"
+      >
+        <i className="ph ph-lock-simple text-sm" aria-hidden="true"></i>
+        부모 모드 끝내기
+      </button>
     </>
   )
 }

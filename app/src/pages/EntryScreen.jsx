@@ -73,12 +73,12 @@ function EntryScreen() {
           {parents.map((parent) => (
             <Link
               key={parent.member_id}
-              to="/parent-recipe"
-              onClick={() => setCurrentMember(parent.member_id)}
+              // 부모 진입은 PIN 화면을 거친다. currentMember는 PIN 확인에 성공한 뒤 설정된다.
+              to={`/parent-unlock/${parent.member_id}`}
               className="bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker px-5 py-4 flex items-center justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
             >
               <span className="flex items-center gap-3">
-                <i className="ph-duotone ph-users-three text-2xl" aria-hidden="true"></i>
+                <i className="ph-duotone ph-lock-key text-2xl" aria-hidden="true"></i>
                 <span className="font-display font-bold text-body-lg">
                   {parents.length === 1 ? '부모로 시작하기' : `${parent.name}으로 시작하기`}
                 </span>

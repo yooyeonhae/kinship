@@ -19,7 +19,7 @@ function headingFor(total, filled) {
 
 function ChildTodoScreen() {
   const { memberId } = useParams()
-  const { supabase, familyId, members, currentMemberId } = useFamily()
+  const { supabase, familyId, members } = useFamily()
   const childName = members.find((m) => m.member_id === memberId)?.name || '아이'
 
   const [todos, setTodos] = useState([])
@@ -65,20 +65,23 @@ function ChildTodoScreen() {
 
   async function handleToggle(todo) {
     const nextDone = !todo.is_done
-    const patch = {
-      is_done: nextDone,
-      // 완료자는 담당자(URL의 memberId)가 아니라 지금 체크한 사람이다.
-      // 부모가 자녀 화면에서 대신 체크하면 부모가 기록되어야 한다.
-      completed_by: nextDone ? currentMemberId : null,
-      completed_at: nextDone ? new Date().toISOString() : null,
-    }
-    const { data, error } = await supabase.from('todos').update(patch).eq('todo_id', todo.todo_id).select().single()
+
+    // 자녀에게는 todos 직접 UPDATE 권한이 없다(있으면 is_done만 바꾸도록 제한할 방법이
+    // 없어서 제목·담당자까지 바꿀 수 있다). 이 RPC만 열려 있고, completed_by도
+    // 클라이언트가 보내는 값이 아니라 서버가 정한다.
+    const { data, error } = await supabase.rpc('toggle_my_todo', { p_todo_id: todo.todo_id })
+
     if (error) {
       setErrorMsg('지금은 저장이 안 됐어요. 다시 눌러볼까요?')
       return
     }
+    if (!data?.ok) {
+      setErrorMsg(data?.error === 'not_your_todo' ? '이건 내 할일이 아니에요.' : '지금은 저장이 안 됐어요.')
+      return
+    }
+
     setErrorMsg('')
-    setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data : t)))
+    setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data.todo : t)))
     setPoppedId(todo.todo_id)
     // 축하 연출은 체크할 때만 — 해제할 때는 별이 튀지 않아야 한다
     if (nextDone) {

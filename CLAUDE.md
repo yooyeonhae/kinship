@@ -17,13 +17,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 (부부 완료 동기화, 레시피, 아이용 할일체크는 Should 등급 — 화면에는 포함되지만 Must는 아님)
 
-**데이터 구조**: 6개 테이블 — `families`(family_id, name) / `members`(family_id FK, name, role) / `weekly_outfit_rules`(member_id FK, day_of_week, outfit_type) / `todos`(family_id FK, title, assignee_member_id FK, is_done, completed_by FK, completed_at) / `recipes`(title, description — 가족 구분 없는 공용 테이블) / `favorite_links`(family_id FK, platform, url). 관계: families 1:N members, members 1:N weekly_outfit_rules, families 1:N todos, members 1:N todos(assignee/completed_by 두 역할), families 1:N favorite_links. 날씨는 외부 API 실시간 호출로 별도 저장하지 않음(의도적). 실제 DDL/RLS는 `app/supabase/schema.sql`·`app/supabase/policies.sql`에 구현되어 있고, Seoul 리전의 `kinship` 전용 Supabase 프로젝트에 적용됨(RLS는 family_id 기반 격리, 로그인 없이 `x-family-id` 헤더로 구분). `app/supabase/migration_01_families_delete.sql`(정책명 `families_delete_own_empty`)도 적용 완료 — **구성원이 하나도 없는 가족만** 삭제할 수 있다. `createFamily()`가 members insert에서 실패했을 때 이미 커밋된 빈 families 행을 되돌리는 용도이고, 구성원이 있는 가족은 API로 삭제할 수 없다(FK가 `on delete cascade`라 열어두면 앱에서 가장 파괴적인 권한이 된다). 정식 "가족 삭제" 기능이 필요해지면 이 정책을 넓히지 말고 부모 역할 확인이 들어간 별도 정책을 만들 것. 양방향 동작은 REST로 검증했다(빈 가족 → 실제 삭제됨 / 구성원 있는 가족 → 보호됨, 단 **둘 다 `204`를 반환**한다).
+**데이터 구조**: 6개 테이블 — `families`(family_id, name) / `members`(family_id FK, name, role) / `weekly_outfit_rules`(member_id FK, day_of_week, outfit_type) / `todos`(family_id FK, title, assignee_member_id FK, is_done, completed_by FK, completed_at) / `recipes`(title, description — 가족 구분 없는 공용 테이블) / `favorite_links`(family_id FK, platform, url). 관계: families 1:N members, members 1:N weekly_outfit_rules, families 1:N todos, members 1:N todos(assignee/completed_by 두 역할), families 1:N favorite_links. 날씨는 외부 API 실시간 호출로 별도 저장하지 않음(의도적). 실제 DDL/RLS는 `app/supabase/schema.sql`·`app/supabase/policies.sql`에 구현되어 있고, Seoul 리전의 `kinship` 전용 Supabase 프로젝트에 적용됨(RLS는 family_id 기반 격리, 로그인 없이 `x-family-id` 헤더로 구분). 그 위에 마이그레이션 3개가 모두 적용되어 있다:
+
+- `migration_01_families_delete.sql` — `families_delete_own_empty`. **구성원이 하나도 없는 가족만** 삭제 허용. 온보딩이 members 단계에서 실패했을 때 이미 커밋된 빈 families 행을 되돌리는 용도다. 조건 없이 열면 FK의 `on delete cascade` 때문에 앱에서 가장 파괴적인 권한이 되므로, 정식 "가족 삭제" 기능이 필요해지면 이 정책을 넓히지 말고 부모 확인이 들어간 별도 정책을 만들 것. 양방향 REST 검증 완료(빈 가족 → 삭제됨 / 구성원 있는 가족 → 보호됨, **둘 다 `204`를 반환**한다).
+- `migration_02_roles_and_parent_pin.sql` — 역할 기반 정책 + 부모 PIN + RPC(`create_family`, `set_parent_pin`, `parent_login`, `parent_logout`, `toggle_my_todo`). 아래 "부모 권한" 항목 참고.
+- `migration_03_fix_pin_bruteforce.sql` — `set_parent_pin`을 통한 PIN 무제한 추측 차단.
 
 앞으로 정책·스키마를 추가할 때는 `app/supabase/`에 `migration_NN_*.sql`로 파일을 만들고, Dashboard의 SQL Editor에서 실행해야 반영된다(anon 키로는 정책 생성이 불가능하고, 이 환경에는 Supabase CLI·psql이 설치되어 있지 않다).
 
 **확정된 기술스택** (8단계, 경량 버전 선택 — 로그인 없는 가족 내부용 웹앱이라 SSR/Edge Functions 불필요):
 - 프론트엔드: React + Vite (정적 SPA)
-- 백엔드/DB: Supabase (기본 테이블 + RLS만 사용)
+- 백엔드/DB: Supabase (기본 테이블 + RLS. 워크시트 단계에서는 "RLS만"이었지만, 열 단위 제한과 원자성이 RLS로 불가능한 지점에 한해 `security definer` RPC를 쓴다 — 아래 "부모 권한" 항목)
 - 배포: Vercel 무료 티어
 
 ## Project
@@ -47,9 +51,16 @@ The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, w
 
 **No login — `family_id` is the whole auth model.** `app/src/context/FamilyContext.jsx` owns it: stored in `localStorage` under `kinship_family_id`, sent as the `x-family-id` header by the client factory in `app/src/lib/supabaseClient.js`. `OnboardingScreen` creates the family; `App.jsx` gates every other route behind it and redirects to `/onboarding` when absent. `FamilyContext` also verifies the stored id still resolves to a real `families` row and self-clears if it doesn't (a stale id otherwise leaves the user stuck in an empty shell, because RLS returns `[]` rather than an error for a family that doesn't exist).
 
-**부모/자녀 역할 게이팅은 현재 클라이언트 전용이며 강제력이 아니다.** `FamilyContext`가 "지금 누구로 쓰는 중인지"를 `currentMemberId`(localStorage `kinship_member_id`)로 들고 있고, `EntryScreen`에서 사람을 고를 때 설정된다. 이 값으로 `App.jsx`의 `RequireParent`(`/parent-tasks`, `/parent-progress`)와 `RequireChildSelf`(자녀는 자기 화면만, 부모는 모든 자녀 화면) 가드가 동작하고, `BottomNav`의 "할일" 탭 목적지도 URL 패턴이 아니라 역할로 결정된다. **다만 요청에 실려 나가는 건 여전히 `x-family-id` 하나뿐이라, DB는 부모와 자녀를 구분하지 못한다** — 즉 이 게이팅은 실수·오탐색 방지 수준이고, 홈에서 부모를 고르면 누구나 부모 화면에 들어갈 수 있다. 서버에서 실제로 강제하려면 `x-member-id` 헤더 + `current_member_role()` 기반 RLS + 자녀 완료 전용 RPC가 필요하다(권한 모델 B단계 3~4). 이 구분을 흐리지 말 것.
+**부모 권한은 서버에서 강제된다 (migration_02·03 적용 완료).** 요청에 3개가 실린다 — `x-family-id`(가족 범위), `x-member-id`(지금 누구로 쓰는지, **자기신고값**), `x-parent-token`(`parent_login()`이 발급한 토큰, 부모 권한의 유일한 근거). 강제 규칙: `todos` 조회는 가족 전체, **생성·삭제·수정은 부모만**, 자녀의 완료 체크는 `toggle_my_todo()` RPC로 **자기 담당만**. `members`·`weekly_outfit_rules` 쓰기도 부모만.
 
-관련해서 `completed_by`는 담당자가 아니라 **체크한 사람**(`currentMemberId`)을 기록한다. 담당자를 넣으면 "누가 끝냈는지"가 항상 담당자가 되어 부부 완료 현황의 근거가 사라진다. 단 이 값도 아직 클라이언트가 보내는 값이라 신뢰 수준은 위와 같다.
+- 자녀에게 `todos` UPDATE를 주지 않는 이유: **RLS는 행 단위라 열 단위 제한이 불가능**하다. 직접 UPDATE를 허용하면 `is_done`만 바꾸도록 제한할 방법이 없어 제목·담당자까지 바꿀 수 있다. 그래서 `toggle_my_todo()` 하나만 열어두고, `completed_by`도 **서버가** `acting_member_id()`로 정한다(클라이언트가 보내는 값이 아니다).
+- **PIN을 설정하지 않은 부모는 `x-member-id` 자기신고로 부모가 된다.** 마이그레이션이 기존 가족을 깨뜨리지 않게 한 의도적 설계이고, PIN을 설정하는 순간 그 부모에 대해서만 이 경로가 닫힌다(가족 단위 플래그 없음). 앱 UI는 부모 진입 시 항상 PIN을 만들게 하므로 실사용에서는 곧 닫힌다.
+- PIN은 bcrypt 해시로 `parent_pins`에 저장한다. 이 테이블과 `parent_sessions`는 **정책을 일부러 만들지 않고 `revoke all`까지** 걸어서 REST로 접근할 수 없다(`permission denied`). `security definer` 함수만 다룬다. `members`에 넣지 않은 이유는 RLS가 열 단위 제한을 못 해서 클라이언트가 `select=pin_hash`로 읽어갈 수 있기 때문이다.
+- PIN 실패는 `raise`가 아니라 **반환값**으로 알린다. `raise`하면 트랜잭션이 롤백되어 `failed_attempts` 증가까지 사라지고 잠금이 영원히 걸리지 않는다. `parent_login`과 `set_parent_pin`이 **같은 카운터를 공유**한다(migration_03) — 공유하지 않으면 `set_parent_pin`의 `old_pin` 검증으로 4자리 PIN을 무제한 전수 탐색할 수 있었다. 5회 실패 → 15분 잠금.
+- 클라이언트: `FamilyContext`가 `currentMemberId`(localStorage `kinship_member_id`)와 `parentAuth`(`kinship_parent_auth`)를 들고 있다. **토큰은 그 토큰의 주인으로 앱을 쓰고 있을 때만 전송한다** — 부모가 로그인한 뒤 자녀로 전환했는데 토큰이 계속 실려 나가면 그 자녀가 부모 권한을 그대로 쓰게 된다. `isParentRole`(역할만)과 `isParentAuthed`(토큰 있음)를 구분해서 쓸 것.
+- `App.jsx`의 `RequireParent`는 `isParentAuthed`를 요구하고, 토큰이 없으면 `/parent-unlock/:memberId`로 보낸다. 토큰 없이 화면에 들어가게 하면 화면은 열리는데 모든 쓰기가 42501로 실패한다.
+
+**남는 한계 (발표에서 과장하지 말 것)**: `x-member-id`는 자기신고값이라 자녀 A가 자녀 B의 member_id를 넣으면 B의 할일을 체크할 수 있다(형제간 장난은 막지 못한다). 가족의 **첫** PIN은 `family_id`를 아는 사람이 선점할 수 있다 — `family_id`가 유일한 공유 비밀인 이 계층의 구조적 한계다. 즉 이 시스템이 주장할 수 있는 최대치는 **"PIN을 아는 사람 = 부모"**이며, 진짜 사용자 인증(Supabase Auth)은 아니다.
 
 **Non-obvious RLS constraint — don't "simplify" `createFamily()`.** Inserting into `families` must (a) supply a client-generated `family_id` (`crypto.randomUUID()`), (b) use a client whose `x-family-id` header already equals that id, and (c) **not** chain `.select()`. Reason: `.select()` makes PostgREST send `Prefer: return=representation`, and Postgres applies the SELECT policy to the `INSERT ... RETURNING` row. `families_select_own` requires `family_id = current_family_id()`, so a DB-generated id can never match the header and the entire INSERT is rolled back with `42501`. This was verified empirically (`return=minimal` → 201, `return=representation` → 42501). `todos` and `members` are immune because their policies are `FOR ALL`, which covers the returning-select too.
 

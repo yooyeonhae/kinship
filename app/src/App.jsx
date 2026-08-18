@@ -3,6 +3,7 @@ import { FamilyProvider, useFamily } from './context/FamilyContext'
 import Layout from './components/Layout'
 import ConnectionError from './components/ConnectionError'
 import OnboardingScreen from './pages/OnboardingScreen'
+import ParentUnlockScreen from './pages/ParentUnlockScreen'
 import EntryScreen from './pages/EntryScreen'
 import ChildOutfitScreen from './pages/ChildOutfitScreen'
 import ChildTodoScreen from './pages/ChildTodoScreen'
@@ -14,15 +15,22 @@ import ParentProgressScreen from './pages/ParentProgressScreen'
 import WeekendScreen from './pages/WeekendScreen'
 import NotFoundScreen from './pages/NotFoundScreen'
 
-function ProtectedLayout() {
+// 가족이 확정되기 전에는 어떤 화면도 의미가 없다.
+function RequireFamily({ children }) {
   const { familyId, loading, loadError, reload } = useFamily()
   if (loading) return null
   if (loadError === 'network') return <ConnectionError onRetry={reload} />
   if (!familyId) return <Navigate to="/onboarding" replace />
+  return children
+}
+
+function ProtectedLayout() {
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <RequireFamily>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </RequireFamily>
   )
 }
 
@@ -35,22 +43,24 @@ function OnboardingRoute() {
   return <OnboardingScreen />
 }
 
-// 아래 두 가드는 UI 게이팅이다. 서버는 아직 역할을 구분하지 못하므로
-// (요청에 실리는 건 x-family-id 하나뿐) 실수·오탐색을 막는 수준이고
-// 진짜 강제력은 아니다. 강제하려면 x-member-id + 역할 기반 RLS가 필요하다.
+// 부모 화면은 서버가 발급한 토큰이 있을 때만 들어갈 수 있다.
+// 토큰 없이 들어가게 하면 화면은 열리는데 모든 쓰기가 42501로 실패한다.
 function RequireParent({ children }) {
-  const { currentMember, currentMemberId, isParent } = useFamily()
+  const { currentMember, currentMemberId, isParentRole, isParentAuthed } = useFamily()
   if (!currentMember) return <Navigate to="/" replace />
-  if (!isParent) return <Navigate to={`/child-todo/${currentMemberId}`} replace />
+  if (!isParentRole) return <Navigate to={`/child-todo/${currentMemberId}`} replace />
+  if (!isParentAuthed) return <Navigate to={`/parent-unlock/${currentMemberId}`} replace />
   return children
 }
 
 // 자녀는 자기 화면만, 부모는 모든 자녀 화면을 볼 수 있다.
 function RequireChildSelf({ children }) {
   const { memberId } = useParams()
-  const { currentMember, currentMemberId, isParent } = useFamily()
+  const { currentMember, currentMemberId, isParentRole } = useFamily()
   if (!currentMember) return <Navigate to="/" replace />
-  if (!isParent && currentMemberId !== memberId) return <Navigate to={`/child-outfit/${currentMemberId}`} replace />
+  if (!isParentRole && currentMemberId !== memberId) {
+    return <Navigate to={`/child-outfit/${currentMemberId}`} replace />
+  }
   return children
 }
 
@@ -60,6 +70,14 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/onboarding" element={<OnboardingRoute />} />
+          <Route
+            path="/parent-unlock/:memberId"
+            element={
+              <RequireFamily>
+                <ParentUnlockScreen />
+              </RequireFamily>
+            }
+          />
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<EntryScreen />} />
             <Route
@@ -78,7 +96,14 @@ function App() {
                 </RequireChildSelf>
               }
             />
-            <Route path="/parent-recipe" element={<ParentRecipeScreen />} />
+            <Route
+              path="/parent-recipe"
+              element={
+                <RequireParent>
+                  <ParentRecipeScreen />
+                </RequireParent>
+              }
+            />
             <Route
               path="/parent-tasks"
               element={
@@ -87,8 +112,6 @@ function App() {
                 </RequireParent>
               }
             />
-            <Route path="/family-room" element={<FamilyRoomScreen />} />
-            <Route path="/info-feed" element={<InfoFeedScreen />} />
             <Route
               path="/parent-progress"
               element={
@@ -97,6 +120,8 @@ function App() {
                 </RequireParent>
               }
             />
+            <Route path="/family-room" element={<FamilyRoomScreen />} />
+            <Route path="/info-feed" element={<InfoFeedScreen />} />
             <Route path="/weekend" element={<WeekendScreen />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Route>
