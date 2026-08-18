@@ -15,7 +15,7 @@ export function FamilyProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
 
-  const supabase = useMemo(() => createSupabaseClient(familyId), [familyId])
+  const supabase = useMemo(() => createSupabaseClient(familyId, currentMemberId), [familyId, currentMemberId])
 
   const setCurrentMember = useCallback((memberId) => {
     if (memberId) localStorage.setItem(MEMBER_ID_KEY, memberId)
