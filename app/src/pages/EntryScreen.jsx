@@ -9,8 +9,9 @@ const CHILD_STYLES = [
 ]
 
 function EntryScreen() {
-  const { members, loading, resetFamily } = useFamily()
+  const { members, loading, resetFamily, setCurrentMember } = useFamily()
   const children = members.filter((m) => m.role === 'child')
+  const parents = members.filter((m) => m.role === 'parent')
 
   function handleReset() {
     const ok = window.confirm(
@@ -45,6 +46,7 @@ function EntryScreen() {
                 <Link
                   key={child.member_id}
                   to={`/child-outfit/${child.member_id}`}
+                  onClick={() => setCurrentMember(child.member_id)}
                   className={`relative ${style.bg} text-foreground border-2 border-foreground rounded-md shadow-sticker p-5 pt-8 flex flex-col items-center gap-3 overflow-hidden aspect-square justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 ${style.rotate}`}
                 >
                   <div className="w-20 h-20 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center">
@@ -64,16 +66,28 @@ function EntryScreen() {
         <div className="flex-1 h-px bg-border"></div>
       </div>
 
-      <Link
-        to="/parent-recipe"
-        className="bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker px-5 py-4 flex items-center justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
-      >
-        <span className="flex items-center gap-3">
-          <i className="ph-duotone ph-users-three text-2xl" aria-hidden="true"></i>
-          <span className="font-display font-bold text-body-lg">부모로 시작하기</span>
-        </span>
-        <i className="ph-bold ph-caret-right text-xl" aria-hidden="true"></i>
-      </Link>
+      {parents.length === 0 ? (
+        <p className="text-foreground-muted text-body">등록된 부모가 없어요.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {parents.map((parent) => (
+            <Link
+              key={parent.member_id}
+              to="/parent-recipe"
+              onClick={() => setCurrentMember(parent.member_id)}
+              className="bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker px-5 py-4 flex items-center justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
+            >
+              <span className="flex items-center gap-3">
+                <i className="ph-duotone ph-users-three text-2xl" aria-hidden="true"></i>
+                <span className="font-display font-bold text-body-lg">
+                  {parents.length === 1 ? '부모로 시작하기' : `${parent.name}으로 시작하기`}
+                </span>
+              </span>
+              <i className="ph-bold ph-caret-right text-xl" aria-hidden="true"></i>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <button
         type="button"

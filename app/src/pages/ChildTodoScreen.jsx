@@ -19,7 +19,7 @@ function headingFor(total, filled) {
 
 function ChildTodoScreen() {
   const { memberId } = useParams()
-  const { supabase, familyId, members } = useFamily()
+  const { supabase, familyId, members, currentMemberId } = useFamily()
   const childName = members.find((m) => m.member_id === memberId)?.name || '아이'
 
   const [todos, setTodos] = useState([])
@@ -67,7 +67,9 @@ function ChildTodoScreen() {
     const nextDone = !todo.is_done
     const patch = {
       is_done: nextDone,
-      completed_by: nextDone ? memberId : null,
+      // 완료자는 담당자(URL의 memberId)가 아니라 지금 체크한 사람이다.
+      // 부모가 자녀 화면에서 대신 체크하면 부모가 기록되어야 한다.
+      completed_by: nextDone ? currentMemberId : null,
       completed_at: nextDone ? new Date().toISOString() : null,
     }
     const { data, error } = await supabase.from('todos').update(patch).eq('todo_id', todo.todo_id).select().single()

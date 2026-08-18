@@ -17,7 +17,7 @@ const QUICK_CHIPS = ['우유 사기', '쓰레기 버리기', '준비물 확인']
 let nextFridgeId = 100
 
 function ParentTasksScreen() {
-  const { supabase, familyId, members, loading: membersLoading } = useFamily()
+  const { supabase, familyId, members, loading: membersLoading, currentMember, currentMemberId } = useFamily()
   const [todos, setTodos] = useState([])
   const [loadingTodos, setLoadingTodos] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
@@ -76,7 +76,9 @@ function ParentTasksScreen() {
     const nextDone = !todo.is_done
     const patch = {
       is_done: nextDone,
-      completed_by: nextDone ? todo.assignee_member_id : null,
+      // 완료자 = 체크한 사람. 담당자를 그대로 넣으면 "누가 끝냈는지"가 항상
+      // 담당자로 기록되어 부부 완료 현황의 근거가 사라진다.
+      completed_by: nextDone ? currentMemberId : null,
       completed_at: nextDone ? new Date().toISOString() : null,
     }
     const { data, error } = await supabase.from('todos').update(patch).eq('todo_id', todo.todo_id).select().single()
@@ -121,7 +123,9 @@ function ParentTasksScreen() {
         >
           <i className="ph-bold ph-caret-left text-xl text-foreground-muted" aria-hidden="true"></i>
         </Link>
-        <span className="font-display font-bold text-[15px] text-foreground-muted">부모</span>
+        <span className="font-display font-bold text-[15px] text-foreground-muted">
+          부모{currentMember ? ` · ${currentMember.name}` : ''}
+        </span>
         <Link
           to="/parent-progress"
           className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
@@ -278,7 +282,11 @@ function ParentTasksScreen() {
                 </button>
                 <div className="flex-1 min-w-0">
                   <span className="task-label font-display font-bold text-[16px]">{t.title}</span>
-                  {t.is_done && <p className="text-[13px] text-foreground-muted mt-0.5">완료: {name || '가족'}</p>}
+                  {t.is_done && (
+                    <p className="text-[13px] text-foreground-muted mt-0.5">
+                      완료: {memberName(t.completed_by) || name || '가족'}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`w-8 h-8 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold ${token ? 'text-on-primary' : 'text-foreground-muted'} shrink-0`}

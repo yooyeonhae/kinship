@@ -2,19 +2,32 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { createSupabaseClient } from '../lib/supabaseClient'
 
 const FAMILY_ID_KEY = 'kinship_family_id'
+const MEMBER_ID_KEY = 'kinship_member_id'
 const FamilyContext = createContext(null)
 
 export function FamilyProvider({ children }) {
   const [familyId, setFamilyId] = useState(() => localStorage.getItem(FAMILY_ID_KEY))
+  // "지금 누구로 앱을 쓰는 중인지". EntryScreen에서 고른 사람이 여기에 들어간다.
+  // 주의: 이 값은 아직 클라이언트에만 존재하는 자기신고값이라 권한의 근거가 아니다.
+  // 서버에서 역할을 강제하려면 x-member-id 헤더 + 역할 기반 RLS가 필요하다.
+  const [currentMemberId, setCurrentMemberId] = useState(() => localStorage.getItem(MEMBER_ID_KEY))
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
 
   const supabase = useMemo(() => createSupabaseClient(familyId), [familyId])
 
+  const setCurrentMember = useCallback((memberId) => {
+    if (memberId) localStorage.setItem(MEMBER_ID_KEY, memberId)
+    else localStorage.removeItem(MEMBER_ID_KEY)
+    setCurrentMemberId(memberId || null)
+  }, [])
+
   const clearFamily = useCallback(() => {
     localStorage.removeItem(FAMILY_ID_KEY)
+    localStorage.removeItem(MEMBER_ID_KEY)
     setFamilyId(null)
+    setCurrentMemberId(null)
     setMembers([])
     setLoadError(null)
   }, [])
@@ -93,6 +106,18 @@ export function FamilyProvider({ children }) {
     setFamilyId(newFamilyId)
   }, [])
 
+  const currentMember = useMemo(
+    () => members.find((m) => m.member_id === currentMemberId) || null,
+    [members, currentMemberId]
+  )
+
+  // 저장된 멤버가 더 이상 이 가족에 없으면(삭제됨/다른 가족으로 바뀜) 선택을 비운다.
+  // 비우지 않으면 존재하지 않는 사람으로 앱을 쓰는 상태가 된다.
+  useEffect(() => {
+    if (loading || loadError) return
+    if (currentMemberId && !currentMember) setCurrentMember(null)
+  }, [loading, loadError, currentMemberId, currentMember, setCurrentMember])
+
   const value = useMemo(
     () => ({
       familyId,
@@ -103,8 +128,25 @@ export function FamilyProvider({ children }) {
       createFamily,
       resetFamily: clearFamily,
       reload,
+      currentMemberId,
+      currentMember,
+      setCurrentMember,
+      isParent: currentMember?.role === 'parent',
+      isChild: currentMember?.role === 'child',
     }),
-    [familyId, members, loading, loadError, supabase, createFamily, clearFamily, reload]
+    [
+      familyId,
+      members,
+      loading,
+      loadError,
+      supabase,
+      createFamily,
+      clearFamily,
+      reload,
+      currentMemberId,
+      currentMember,
+      setCurrentMember,
+    ]
   )
 
   return <FamilyContext.Provider value={value}>{children}</FamilyContext.Provider>
