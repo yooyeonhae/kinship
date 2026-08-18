@@ -23,11 +23,12 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
           'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+          'pastel-mint': '#BFEAD1', 'pastel-sky': '#BEE7F5',
         },
         fontFamily: {
           display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
@@ -37,6 +38,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -79,40 +81,18 @@
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(2rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
-    <!-- 히어로 배너: 콜라주 스타일 로고 -->
-    <div class="canvas-texture relative bg-surface-muted border border-border rounded-lg shadow-soft py-9 px-4 mb-8 overflow-hidden">
-      <!-- 워시테이프 -->
-      <span class="absolute -top-2 left-10 w-14 h-5 bg-tape-blue/90 rotate-[-6deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-      <span class="absolute -top-2 right-10 w-14 h-5 bg-tape-pink/90 rotate-[5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-
-      <!-- 별 스티커 -->
-      <i class="ph-fill ph-star absolute top-4 left-4 text-2xl text-tape-yellow twinkle" style="--r:-12deg; animation-delay:0s" aria-hidden="true"></i>
-      <i class="ph-fill ph-star absolute bottom-5 right-6 text-xl text-tape-yellow twinkle" style="--r:10deg; animation-delay:0.8s" aria-hidden="true"></i>
-      <i class="ph-fill ph-sparkle absolute top-6 right-14 text-lg text-tape-pink twinkle" style="--r:8deg; animation-delay:1.4s" aria-hidden="true"></i>
-
-      <!-- 가족 스티커 아바타 (컷아웃 콜라주 자리) -->
-      <div class="absolute top-3 left-1/2 -translate-x-[68px] w-9 h-9 rounded-full bg-member-1 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[-6deg]" aria-hidden="true">
-        <span class="avatar-bob" style="animation-delay:0s"><i class="ph-duotone ph-baseball-cap text-base text-on-primary"></i></span>
+    <!-- 공용 상단 헤더 -->
+    <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary wordmark-in">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
       </div>
-      <div class="absolute bottom-2 left-1/2 -translate-x-[78px] w-9 h-9 rounded-full bg-member-3 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[4deg]" aria-hidden="true">
-        <span class="avatar-bob font-display font-bold text-on-primary text-[12px]" style="animation-delay:0.4s">서</span>
-      </div>
-      <div class="absolute top-2 left-1/2 translate-x-[52px] w-9 h-9 rounded-full bg-member-2 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[6deg]" aria-hidden="true">
-        <span class="avatar-bob" style="animation-delay:0.8s"><i class="ph-duotone ph-flower-tulip text-base text-on-primary"></i></span>
-      </div>
-      <div class="absolute bottom-3 left-1/2 translate-x-[68px] w-9 h-9 rounded-full bg-member-4 ring-4 ring-surface shadow-soft flex items-center justify-center rotate-[-5deg]" aria-hidden="true">
-        <span class="avatar-bob font-display font-bold text-on-primary text-[12px]" style="animation-delay:1.2s">민</span>
-      </div>
-
-      <!-- 버블 워드마크 -->
-      <div class="text-center">
-        <p class="bubble-text wordmark-in text-[40px] leading-none">우리가족</p>
-        <p class="font-doodle text-[15px] text-accent mt-2 tracking-wide">OUR FAMILY · 올인원</p>
-      </div>
-    </div>
+    </header>
 
     <!-- 헤드라인 -->
     <div class="mb-8">
+      <span class="inline-block w-3 h-3 rounded-full bg-accent mb-3" aria-hidden="true"></span>
       <h1 class="font-display font-extrabold text-[28px] leading-[34px]">누가 확인할까요?</h1>
       <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">이름을 누르면 그 사람에게 필요한 화면으로 바로 이동해요.</p>
     </div>
@@ -121,31 +101,32 @@
     <div class="mb-8">
       <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3">우리 아이</p>
       <div class="grid grid-cols-2 gap-4">
-        <a href="child-outfit.html" class="relative bg-surface border border-border rounded-lg shadow-soft p-5 flex flex-col items-center gap-3 active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] rotate-[-1deg]">
-          <span class="absolute -top-2 left-6 w-11 h-5 bg-tape-yellow/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-          <div class="w-16 h-16 rounded-full bg-member-1 ring-4 ring-surface shadow-soft flex items-center justify-center">
-            <i class="ph-duotone ph-baseball-cap text-3xl text-on-primary"></i>
+        <a href="child-outfit.html" class="relative bg-pastel-mint text-foreground border-2 border-foreground rounded-md shadow-sticker p-5 pt-8 flex flex-col items-center gap-3 overflow-hidden active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 rotate-[-1deg] aspect-square justify-between">
+          <div class="w-20 h-20 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center" data-photo-slot="member-avatar-하준">
+            <i class="ph-duotone ph-baseball-cap text-4xl text-member-1"></i>
           </div>
-          <span class="font-display font-bold text-[17px]">하준</span>
+          <span class="font-display font-bold text-[18px] self-start">하준</span>
+          <i class="ph-fill ph-smiley absolute bottom-4 right-4 text-lg text-foreground/40" aria-hidden="true"></i>
         </a>
-        <a href="child-outfit.html" class="relative bg-surface border border-border rounded-lg shadow-soft p-5 flex flex-col items-center gap-3 active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
-          <div class="w-16 h-16 rounded-full bg-member-2 ring-4 ring-surface shadow-soft flex items-center justify-center">
-            <i class="ph-duotone ph-flower-tulip text-3xl text-on-primary"></i>
+        <a href="child-outfit.html" class="relative bg-pastel-sky text-foreground border-2 border-foreground rounded-md shadow-sticker p-5 pt-8 flex flex-col items-center gap-3 overflow-hidden active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 aspect-square justify-between">
+          <i class="ph-fill ph-star absolute -top-2 right-6 text-2xl text-surface rotate-[12deg]" aria-hidden="true" style="-webkit-text-stroke: 2px #2B2A28;"></i>
+          <div class="w-20 h-20 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center" data-photo-slot="member-avatar-서아">
+            <i class="ph-duotone ph-flower-tulip text-4xl text-member-2"></i>
           </div>
-          <span class="font-display font-bold text-[17px]">서아</span>
+          <span class="font-display font-bold text-[18px] self-start">서아</span>
         </a>
       </div>
     </div>
 
     <!-- 구분 -->
-    <div class="flex items-center gap-3 mb-8">
+    <div class="flex items-center gap-3 mb-6">
       <div class="flex-1 h-px bg-border"></div>
       <span class="text-foreground-muted text-[13px]">또는</span>
       <div class="flex-1 h-px bg-border"></div>
     </div>
 
     <!-- 부모 버튼 -->
-    <a href="parent-recipe.html" class="bg-secondary text-on-secondary rounded-lg shadow-soft px-5 py-4 flex items-center justify-between active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
+    <a href="parent-recipe.html" class="bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker px-5 py-4 flex items-center justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
       <span class="flex items-center gap-3">
         <i class="ph-duotone ph-users-three text-2xl"></i>
         <span class="font-display font-bold text-[17px]">부모로 시작하기</span>

@@ -23,7 +23,7 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
@@ -37,6 +37,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -49,15 +50,27 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
+  .task-row[data-done="true"] { background-color: #F1ECE4; }
   .task-row[data-done="true"] .task-label { color: #5C5852; text-decoration: line-through; }
-  .task-row[data-done="true"] .task-circle { background-color: #2E7D32; border-color: #2E7D32; }
-  .task-row[data-done="true"] .task-check { opacity: 1; transform: scale(1); }
-  .task-check { opacity: 0; transform: scale(0.5); }
+  .task-row[data-done="true"] .task-circle { background-color: transparent; border-color: #C6483B; }
+  .task-row[data-done="true"] .task-check { display: none; }
+  .task-row[data-done="true"] .task-cross { display: inline-flex; }
+  .task-row[data-done="true"] .task-corner { opacity: 1; }
+  .task-cross { display: none; }
+  .task-corner { opacity: 0; }
   a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
 </style>
 </head>
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
+
+    <header class="flex items-center justify-between px-1 py-2 mb-4 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
+      </div>
+    </header>
 
     <div class="flex items-center justify-between mb-6">
       <a href="parent-recipe.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="레시피 화면으로">
@@ -70,8 +83,30 @@
     </div>
 
     <div class="mb-6">
-      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">오늘 가족 할일</h1>
+      <h1 class="font-display font-extrabold text-[28px] leading-[34px] text-foreground">오늘의 할일 <span class="text-foreground-muted font-body font-normal text-[15px]">Today's Chaos</span></h1>
       <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">누가 뭘 끝냈는지 한눈에 보여요. 자주 쓰는 항목은 탭 한 번으로 바로 추가돼요.</p>
+    </div>
+
+    <!-- 완료 현황: 부부(서연/민준) 담당 할일의 실제 완료 비율을 계산해서 보여줌 -->
+    <div class="relative bg-surface-muted border-2 border-foreground rounded-md shadow-sticker px-4 py-4 mb-6">
+      <div class="absolute top-3 right-4 flex items-center gap-1 text-tape-yellow" aria-hidden="true">
+        <i class="ph-fill ph-star text-lg"></i>
+        <i class="ph-fill ph-star text-lg"></i>
+      </div>
+      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
+        <i class="ph-bold ph-users-three text-base"></i>완료 현황 (TEAM STATUS)
+      </p>
+      <div class="grid grid-cols-2 gap-3 mb-4" id="team-status-columns"></div>
+      <div class="flex items-center justify-between border-t border-border pt-3">
+        <span class="flex items-center gap-1.5 text-[13px] font-display font-bold text-accent">
+          <i class="ph-fill ph-bell text-base"></i>
+          <span id="team-status-remaining">0개 할일 남음</span>
+        </span>
+        <span class="flex items-center gap-1" aria-hidden="true">
+          <span class="w-2.5 h-2.5 rounded-full bg-member-3"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-member-4"></span>
+        </span>
+      </div>
     </div>
 
     <!-- 원탭 추가: 자주 쓰는 항목은 칩 하나로 바로 등록, 새 항목은 입력해서 추가 -->
@@ -89,18 +124,29 @@
           <i class="ph-bold ph-plus text-primary"></i>준비물 확인
         </button>
       </div>
-      <form id="task-add-form" class="bg-surface border border-border rounded-lg shadow-soft px-4 py-3 flex items-center gap-3">
-        <span class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0" aria-hidden="true">
+      <form id="task-add-form" class="bg-tape-yellow border-2 border-foreground rounded-md shadow-sticker px-4 py-3 flex items-center gap-3 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
+        <span class="w-9 h-9 rounded-full bg-secondary-dark text-on-secondary flex items-center justify-center shrink-0" aria-hidden="true">
           <i class="ph-bold ph-plus text-lg"></i>
         </span>
-        <input id="task-add-input" type="text" placeholder="목록에 없으면 직접 입력하기" class="flex-1 bg-transparent text-[15px] placeholder:text-foreground-muted outline-none" autocomplete="off">
+        <input id="task-add-input" type="text" placeholder="목록에 없으면 직접 입력하기" class="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/60 outline-none" autocomplete="off">
       </form>
+    </div>
+
+    <div class="relative bg-accent/10 border border-dashed border-accent rounded-md px-4 py-3 mb-3 flex items-center justify-between">
+      <span class="flex items-center gap-2 text-accent">
+        <i class="ph-fill ph-warning-circle text-lg"></i>
+        <span class="font-display font-bold text-[13px] tracking-wide" id="needs-attention-label">NEEDS ATTENTION (0)</span>
+      </span>
+      <span class="flex items-center gap-1" aria-hidden="true">
+        <span class="w-2.5 h-2.5 rounded-full bg-member-2"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-member-4"></span>
+      </span>
     </div>
 
     <div class="flex flex-col gap-3" id="task-list"></div>
 
     <!-- 냉장고 재고 -->
-    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6">
+    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6 rotate-[-1deg]">
       <span class="absolute -top-2 left-6 w-11 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
       <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
         <i class="ph-duotone ph-refrigerator text-base"></i>냉장고 재료
@@ -124,19 +170,63 @@
   <script>
     (function () {
       var MEMBER_INITIAL = { 'member-1': '하', 'member-2': '서', 'member-3': '서', 'member-4': '민' };
+      var TEAM_MEMBERS = [
+        { name: '서연', tag: 'member-3' },
+        { name: '민준', tag: 'member-4' }
+      ];
+
+      function renderTeamStatus() {
+        var wrap = document.getElementById('team-status-columns');
+        var todos = OFStore.todos.list();
+        var remainingTotal = 0;
+        wrap.innerHTML = TEAM_MEMBERS.map(function (m) {
+          var mine = todos.filter(function (t) { return t.assignee === m.name; });
+          var done = mine.filter(function (t) { return t.isDone; }).length;
+          var total = mine.length;
+          var percent = total ? Math.round(done / total * 100) : 0;
+          remainingTotal += (total - done);
+          var allDone = total > 0 && done === total;
+          return '' +
+            '<div class="relative border border-dashed border-border rounded-lg py-4 px-2 flex flex-col items-center gap-2.5">' +
+              '<div class="relative">' +
+                '<div class="w-16 h-16 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center" data-photo-slot="member-avatar-' + m.name + '">' +
+                  '<i class="ph-fill ph-user text-2xl text-foreground-muted" aria-hidden="true"></i>' +
+                '</div>' +
+                '<span class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-surface flex items-center justify-center ' + (allDone ? 'bg-secondary-dark' : 'bg-surface-muted border border-border') + '" aria-hidden="true">' +
+                  '<i class="ph-bold ' + (allDone ? 'ph-check text-on-secondary' : 'ph-hourglass text-foreground-muted') + ' text-[11px]"></i>' +
+                '</span>' +
+              '</div>' +
+              '<span class="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-display font-bold text-white bg-' + m.tag + '">' + m.name + (total ? ': ' + percent + '%' : ' · 할일 없음') + '</span>' +
+            '</div>';
+        }).join('');
+        document.getElementById('team-status-remaining').textContent = remainingTotal + '개 할일 남음';
+      }
+
+      function renderNeedsAttention() {
+        var count = OFStore.todos.list().filter(function (t) { return !t.isDone; }).length;
+        document.getElementById('needs-attention-label').textContent = 'NEEDS ATTENTION (' + count + ')';
+      }
 
       function renderTasks() {
         var list = document.getElementById('task-list');
         var todos = OFStore.todos.list();
         list.innerHTML = todos.map(function (t) {
           var initial = MEMBER_INITIAL[t.memberTag] || t.assignee.charAt(0);
-          var badge = '<span class="w-8 h-8 rounded-full bg-' + t.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" title="' + t.assignee + (t.isDone ? ' 완료' : ', 아직 완료 안 함') + '">' + initial + '</span>';
+          var badge = '<span class="w-8 h-8 rounded-full bg-' + t.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary shrink-0" title="' + t.assignee + (t.isDone ? ' 완료' : ', 아직 완료 안 함') + '">' + initial + '</span>';
+          var subLine = t.isDone
+            ? '<p class="text-[13px] text-foreground-muted mt-0.5">완료: ' + t.assignee + '</p>'
+            : (t.time ? '<p class="text-[13px] text-foreground-muted mt-0.5 flex items-center gap-1"><i class="ph-bold ph-clock text-[12px]" aria-hidden="true"></i>' + t.time + '</p>' : '');
           return '' +
-            '<div class="task-row bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4" data-done="' + t.isDone + '" data-id="' + t.id + '">' +
-              '<button type="button" class="task-circle task-toggle w-11 h-11 rounded-full border-2 border-border flex items-center justify-center shrink-0" data-id="' + t.id + '" aria-label="완료 체크">' +
+            '<div class="task-row relative overflow-hidden bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4" data-done="' + t.isDone + '" data-id="' + t.id + '">' +
+              '<span class="task-corner absolute top-0 right-0 w-8 h-8 bg-border" style="clip-path: polygon(100% 0, 0 0, 100% 100%);" aria-hidden="true"></span>' +
+              '<button type="button" class="task-circle task-toggle w-11 h-11 rounded-full border-2 border-border flex items-center justify-center shrink-0" data-id="' + t.id + '" aria-label="' + (t.isDone ? '완료 취소' : '완료 체크') + '">' +
                 '<i class="ph-bold ph-check task-check text-on-secondary text-lg"></i>' +
+                '<i class="ph-bold ph-x task-cross text-destructive text-lg" aria-hidden="true"></i>' +
               '</button>' +
-              '<span class="task-label font-display font-bold text-[16px] flex-1">' + t.title + (t.time ? ' <span class="text-foreground-muted font-body font-normal text-[13px]">· ' + t.time + '</span>' : '') + '</span>' +
+              '<div class="flex-1 min-w-0">' +
+                '<span class="task-label font-display font-bold text-[16px]">' + t.title + '</span>' +
+                subLine +
+              '</div>' +
               badge +
               '<button type="button" class="task-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150" data-id="' + t.id + '" aria-label="삭제">' +
                 '<i class="ph-bold ph-trash text-base text-foreground-muted"></i>' +
@@ -177,7 +267,7 @@
         });
       }
 
-      function renderAll() { renderTasks(); renderFridge(); }
+      function renderAll() { renderTeamStatus(); renderNeedsAttention(); renderTasks(); renderFridge(); }
 
       Array.prototype.forEach.call(document.querySelectorAll('.quick-chip'), function (chip) {
         chip.addEventListener('click', function () { OFStore.todos.add(chip.dataset.title, { assignee: '가족', memberTag: 'member-1' }); });

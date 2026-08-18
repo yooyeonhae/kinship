@@ -23,11 +23,12 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
           'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+          'pastel-mint': '#BFEAD1', 'pastel-sky': '#BEE7F5',
         },
         fontFamily: {
           display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
@@ -37,6 +38,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -50,7 +52,8 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
   a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
-  .game-tab[data-active="true"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
+  .game-tab[data-active="true"] { border-color: #0055FF; border-width: 2px; box-shadow: 0 0 0 2px rgba(0,85,255,0.25); }
+  .game-tab[data-active="true"] .game-tab-dot { background-color: #2E7D32; }
   .num-cell[data-owner="p1"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
   .num-cell[data-owner="p2"] { background-color: #C2185B; color: #FFFFFF; border-color: #C2185B; }
   .bingo-cell[data-marked="true"] { background-color: #2E7D32; color: #FFFFFF; border-color: #2E7D32; }
@@ -59,47 +62,78 @@
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
-    <div class="flex items-center justify-between mb-6">
+    <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
+      </div>
+    </header>
+
+    <div class="flex items-center justify-between mb-4">
       <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
         <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
       </a>
-      <span class="font-display font-bold text-[15px] text-foreground-muted">가족소통 아지트</span>
       <div class="w-10"></div>
     </div>
 
-    <div class="relative mb-6">
-      <span class="absolute -top-2 left-0 w-12 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">가족소통 아지트</h1>
-      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">부모님이 잠깐 자리를 비워도 가족끼리 대화하고 같이 놀 수 있어요.</p>
+    <div class="bg-surface border border-border rounded-md px-4 py-3 mb-6 shadow-soft">
+      <p class="font-display font-bold text-[15px] text-secondary flex items-center gap-2">
+        <i class="ph-duotone ph-house-line text-lg" aria-hidden="true"></i>가족 아지트 (채팅 &amp; 게임)
+      </p>
+      <p class="text-foreground-muted text-[13px] leading-[18px] mt-1">부모님이 잠깐 자리를 비워도 가족끼리 대화하고 같이 놀 수 있어요.</p>
     </div>
 
-    <!-- 채팅 -->
-    <div class="bg-surface border border-border rounded-lg shadow-soft p-card-padding mb-6">
-      <p class="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
-        <i class="ph-duotone ph-chats-circle text-xl text-primary"></i>가족 채팅
-      </p>
-      <div id="chat-log" class="flex flex-col gap-2 max-h-64 overflow-y-auto mb-3 pr-1"></div>
+    <!-- 채팅 (실제 기능: OFStore.chat, chat-log/chat-form 로직은 아래 script에서 유지) -->
+    <div class="relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding mb-6 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
+      <span class="absolute -top-2 right-4 w-11 h-4 bg-tape-pink/90 rotate-[5deg] rounded-sm" aria-hidden="true"></span>
+      <div class="flex items-center justify-between mb-3">
+        <p class="font-display font-bold text-[15px] flex items-center gap-2">
+          <i class="ph-duotone ph-chats-circle text-xl text-primary"></i>우리 가족 톡
+        </p>
+        <div class="flex items-center -space-x-2">
+          <span class="w-7 h-7 rounded-full bg-member-1 ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" data-photo-slot="member-avatar-hajun">하</span>
+          <span class="w-7 h-7 rounded-full bg-member-2 ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" data-photo-slot="member-avatar-seoa">서</span>
+          <span class="w-7 h-7 rounded-full bg-member-3 ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" data-photo-slot="member-avatar-seoyeon">연</span>
+          <span class="w-7 h-7 rounded-full bg-member-4 ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary" data-photo-slot="member-avatar-minjun">민</span>
+          <span class="w-7 h-7 rounded-full bg-surface-muted ring-2 ring-surface shadow-soft flex items-center justify-center text-[13px] font-display font-bold text-foreground-muted" aria-hidden="true">+</span>
+        </div>
+      </div>
+      <div class="border-t border-dashed border-border mb-3" aria-hidden="true"></div>
+      <div id="chat-log" class="flex flex-col gap-3 max-h-64 overflow-y-auto mb-3 pr-1"></div>
       <form id="chat-form" class="flex items-center gap-2">
-        <select id="chat-sender" class="bg-surface-muted rounded-md px-2 py-2.5 text-[13px] border border-border outline-none shrink-0">
+        <select id="chat-sender" class="bg-surface-muted rounded-full px-3 py-2.5 text-[13px] font-display font-bold border border-border outline-none shrink-0">
           <option value="하준" data-tag="member-1">하준</option>
           <option value="서아" data-tag="member-2">서아</option>
           <option value="서연" data-tag="member-3">서연</option>
           <option value="민준" data-tag="member-4">민준</option>
         </select>
-        <input id="chat-input" type="text" placeholder="메시지 입력" class="flex-1 bg-surface-muted rounded-md px-3 py-2.5 text-[14px] border border-border outline-none min-w-0" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="메시지를 입력" class="flex-1 bg-surface-muted rounded-full px-4 py-2.5 text-[14px] border border-border outline-none min-w-0" autocomplete="off">
         <button type="submit" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="보내기">
           <i class="ph-bold ph-paper-plane-right text-base"></i>
         </button>
       </form>
     </div>
 
+    <!-- 미니게임존 헤더 (장식 — 포인트 배지는 static, store.js에 연동된 점수 시스템 없음) -->
+    <div class="relative bg-foreground border-2 border-foreground rounded-md shadow-sticker p-card-padding mb-4 rotate-[-1deg]">
+      <span class="absolute -top-2 left-6 w-11 h-4 bg-tape-yellow/90 rotate-[-4deg] rounded-sm" aria-hidden="true"></span>
+      <div class="flex items-center justify-between gap-2">
+        <p class="font-display font-bold text-[15px] flex items-center gap-2 text-on-primary">
+          <i class="ph-duotone ph-game-controller text-xl text-tape-yellow"></i>미니게임존
+        </p>
+        <span class="bg-tape-yellow text-foreground font-display font-bold text-[12px] rounded-full px-3 py-1 whitespace-nowrap" aria-hidden="true">가족 포인트: 1,250p</span>
+      </div>
+      <p class="text-[13px] text-white/70 mt-2">턴제 게임으로 온 가족이 함께 놀아요.</p>
+    </div>
+
     <!-- 게임존 -->
-    <div class="bg-surface border border-border rounded-lg shadow-soft p-card-padding">
+    <div class="relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
       <p class="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
-        <i class="ph-duotone ph-game-controller text-xl text-accent"></i>게임존 · 턴제 대전
+        <i class="ph-duotone ph-users-three text-xl text-accent"></i>선수 선택 · 턴제 대전
       </p>
 
-      <div class="grid grid-cols-2 gap-2 mb-3">
+      <div class="grid grid-cols-2 gap-2 mb-4">
         <select id="player1-select" class="bg-surface-muted rounded-md px-2 py-2 text-[13px] border border-border outline-none">
           <option value="하준">선수1 · 하준</option>
           <option value="서아">선수1 · 서아</option>
@@ -114,10 +148,29 @@
         </select>
       </div>
 
-      <div class="flex flex-wrap gap-2 mb-4" id="game-tabs">
-        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="sum15" data-active="true">합이 15</button>
-        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="bingo" data-active="false">계산 빙고</button>
-        <button type="button" class="game-tab bg-surface-muted border border-border rounded-full px-3 py-1.5 text-[13px] font-display font-bold transition duration-150" data-game="stairs" data-active="false">계단 오르기</button>
+      <div class="grid grid-cols-2 gap-2 mb-4" id="game-tabs">
+        <button type="button" class="game-tab relative flex flex-col items-start gap-1 bg-pastel-mint border border-border rounded-md p-3 text-left transition duration-150" data-game="sum15" data-active="true">
+          <span class="game-tab-dot absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-border" aria-hidden="true"></span>
+          <i class="ph-bold ph-hash text-xl text-foreground" aria-hidden="true"></i>
+          <span class="font-display font-bold text-[13px] text-foreground">합이 15</span>
+          <span class="text-[11px] text-foreground-muted leading-tight">숫자 3개로 15 만들기</span>
+        </button>
+        <button type="button" class="game-tab relative flex flex-col items-start gap-1 bg-pastel-sky border border-border rounded-md p-3 text-left transition duration-150" data-game="bingo" data-active="false">
+          <span class="game-tab-dot absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-border" aria-hidden="true"></span>
+          <i class="ph-bold ph-grid-four text-xl text-foreground" aria-hidden="true"></i>
+          <span class="font-display font-bold text-[13px] text-foreground">계산 빙고</span>
+          <span class="text-[11px] text-foreground-muted leading-tight">암산으로 한 줄 빙고</span>
+        </button>
+        <button type="button" class="game-tab relative flex flex-col items-start gap-1 bg-tape-pink/25 border border-border rounded-md p-3 text-left transition duration-150" data-game="stairs" data-active="false">
+          <span class="game-tab-dot absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-border" aria-hidden="true"></span>
+          <i class="ph-bold ph-flag-checkered text-xl text-foreground" aria-hidden="true"></i>
+          <span class="font-display font-bold text-[13px] text-foreground">계단 오르기</span>
+          <span class="text-[11px] text-foreground-muted leading-tight">주사위로 먼저 도착하기</span>
+        </button>
+        <div class="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-md p-3 text-foreground-muted" aria-hidden="true">
+          <i class="ph-bold ph-plus-circle text-xl"></i>
+          <span class="text-[11px] font-display font-bold text-center leading-tight">새로운 게임<br>준비 중</span>
+        </div>
       </div>
 
       <p class="text-[14px] font-display font-bold mb-3" id="turn-indicator">차례: -</p>
@@ -189,17 +242,31 @@
     (function () {
       function selectedTag(select) { return select.options[select.selectedIndex].dataset.tag; }
 
+      function formatChatTime(ts) {
+        if (!ts || ts < 1e6) return '';
+        var d = new Date(ts);
+        var h = d.getHours();
+        var period = h < 12 ? '오전' : '오후';
+        var h12 = h % 12 || 12;
+        var m = d.getMinutes();
+        return period + ' ' + h12 + ':' + (m < 10 ? '0' : '') + m;
+      }
+
       function renderChat() {
         var log = document.getElementById('chat-log');
         var msgs = OFStore.chat.list();
         log.innerHTML = msgs.map(function (m) {
           var initial = m.sender.charAt(0);
+          var time = formatChatTime(m.ts);
           return '' +
             '<div class="flex items-start gap-2">' +
-              '<span class="w-7 h-7 rounded-full bg-' + m.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary shrink-0">' + initial + '</span>' +
-              '<div class="bg-surface-muted rounded-lg px-3 py-2 flex-1 min-w-0">' +
-                '<p class="text-[12px] font-display font-bold text-foreground-muted mb-0.5">' + m.sender + '</p>' +
-                '<p class="text-[14px] leading-[20px]">' + m.content + '</p>' +
+              '<span class="w-7 h-7 rounded-full bg-' + m.memberTag + ' ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary shrink-0" data-photo-slot="member-avatar-chat">' + initial + '</span>' +
+              '<div class="flex-1 min-w-0">' +
+                '<p class="text-[12px] font-display font-bold text-foreground-muted mb-1">' + m.sender + '</p>' +
+                '<div class="inline-block bg-tape-yellow/70 rounded-lg rounded-tl-none px-3 py-2 max-w-full">' +
+                  '<p class="text-[14px] leading-[20px] text-foreground">' + m.content + '</p>' +
+                '</div>' +
+                (time ? '<p class="text-[11px] text-foreground-muted mt-1">' + time + '</p>' : '') +
               '</div>' +
             '</div>';
         }).join('');

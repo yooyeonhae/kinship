@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## PRD 요약 (기준 문서)
+
+`prd.md`(7단계 워크시트 기반)와 8단계 기술스택 워크시트에서 확정된 내용의 요약. 이 프로젝트에서 작업할 때 항상 이 섹션을 기준으로 삼는다. 전체 근거·맥락은 `prd.md`와 `docx/7단계_워크시트*.pdf`/`docx/8단계_워크시트*.pdf` 참고.
+
+**프로젝트 개요**: "우리가족 올인원"은 맞벌이 부모의 아침 의사결정 피로(옷차림·할일 확인 누락)와 부부간 정보 확인 누락을 해결하는 가족소통 허브. 자녀는 앱을 열면 날씨·요일별 지정복 기반 옷차림을 확인하고, 부모는 오늘의 간단 레시피를 거쳐 가족 할일로 이어지는 구조.
+
+**타겟 사용자**: 육아중인 맞벌이 가족(부모+자녀 모두 포함)으로 확정. 실제 인터뷰 표본은 40대 주부 1인뿐이라는 한계를 인지한 채 진행.
+
+**핵심 기능 (Must)**:
+1. 자녀 선택 후 요일별 지정복 자동 표시 — 체육복 요일 깜박함 해결
+2. 날씨 연동 옷차림 추천 — 날씨·학교일정 확인을 하나로 통합
+3. 가족 할일 원탭 등록/자동 노출 — "적는 행위 자체의 번거로움" 해결
+
+(부부 완료 동기화, 레시피, 아이용 할일체크는 Should 등급 — 화면에는 포함되지만 Must는 아님)
+
+**데이터 구조**: 6개 테이블 — `families`(family_id, name) / `members`(family_id FK, name, role) / `weekly_outfit_rules`(member_id FK, day_of_week, outfit_type) / `todos`(family_id FK, title, assignee_member_id FK, is_done, completed_by FK, completed_at) / `recipes`(title, description — 가족 구분 없는 공용 테이블) / `favorite_links`(family_id FK, platform, url). 관계: families 1:N members, members 1:N weekly_outfit_rules, families 1:N todos, members 1:N todos(assignee/completed_by 두 역할), families 1:N favorite_links. 날씨는 외부 API 실시간 호출로 별도 저장하지 않음(의도적). 실제 DDL/RLS는 `app/supabase/schema.sql`·`app/supabase/policies.sql`에 구현되어 있고, Seoul 리전의 `kinship` 전용 Supabase 프로젝트에 적용됨(RLS는 family_id 기반 격리, 로그인 없이 `x-family-id` 헤더로 구분).
+
+**확정된 기술스택** (8단계, 경량 버전 선택 — 로그인 없는 가족 내부용 웹앱이라 SSR/Edge Functions 불필요):
+- 프론트엔드: React + Vite (정적 SPA)
+- 백엔드/DB: Supabase (기본 테이블 + RLS만 사용)
+- 배포: Vercel 무료 티어
+
 ## Project
 
 "우리가족 올인원" (family daily-planner PWA) — a school project (바이브코딩 기반 디지털플랫폼 제작). Target persona: a dual-income parent juggling kids' morning routine (weather/outfit, school prep), shared household todos, dinner recipes, and family communication while away from home.
@@ -15,7 +37,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current implementation stage
 
-This is **static HTML + vanilla JS + Tailwind CDN, with no build step, no bundler, no package.json for the app itself, and no real backend.** The PRD's target stack (React/Vite/Supabase) has not been adopted yet — everything currently runs client-side against `localStorage`. Treat this as an intentional, current-stage choice, not a shortcut to "fix": confirm with the user before introducing a framework/build step or wiring a real backend.
+`screens/` is still **static HTML + vanilla JS + Tailwind CDN, with no build step, no bundler**, and runs client-side against `localStorage` — treat that as intentional for those files, not a shortcut to "fix".
+
+The PRD's target stack (React/Vite/Supabase) has since started being adopted, with explicit user confirmation at each step: a separate `app/` directory holds a Vite + React scaffold (`npm create vite@latest app -- --template react`), with `@supabase/supabase-js` installed and `app/.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, gitignored) wired to a dedicated `kinship` Supabase project (Seoul region). The schema/RLS policies for that project live in `app/supabase/schema.sql` and `app/supabase/policies.sql`. `screens/` has **not** yet been migrated onto this stack or connected to Supabase — it's still the standalone localStorage version. Don't start that migration, or wire real backend calls into `screens/`, without confirming with the user first.
 
 There is no lint or test suite. The only verification available is:
 - `node --check screens/js/<file>.js` for syntax

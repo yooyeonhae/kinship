@@ -23,7 +23,7 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
@@ -37,6 +37,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -49,12 +50,22 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
-  .todo-row[data-done="true"] .todo-label { color: #5C5852; text-decoration: line-through; }
+  .todo-row[data-done="true"] .todo-label { color: #C2185B; text-decoration: line-through; }
   .todo-circle { transition: background-color 0.25s ease, border-color 0.25s ease; }
   .todo-row[data-done="true"] .todo-circle { background-color: #2E7D32; border-color: #2E7D32; }
   .todo-row[data-done="true"] .todo-check { opacity: 1; transform: scale(1); }
   .todo-check { opacity: 0; transform: scale(0.5); transition: opacity 0.15s ease, transform 0.15s ease; }
   a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0055FF; outline-offset: 2px; border-radius: inherit; }
+
+  /* 진행 바 — .progress-star는 그대로 JS가 토글하는 클래스(ph-fill/ph-light)만 쓰고, 그 클래스를 세그먼트 배경색으로 재해석 */
+  .progress-star { flex: 1 1 0%; height: 100%; transition: background-color 0.3s ease; }
+  .progress-star.ph-fill { background-color: #FFD100; }
+  .progress-star.ph-light { background-color: transparent; }
+  #progress-track .marker { position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%); transition: left 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  #progress-track:has(#progress-stars .progress-star:nth-child(1).ph-fill) .marker { left: 25%; }
+  #progress-track:has(#progress-stars .progress-star:nth-child(2).ph-fill) .marker { left: 50%; }
+  #progress-track:has(#progress-stars .progress-star:nth-child(3).ph-fill) .marker { left: 75%; }
+  #progress-track:has(#progress-stars .progress-star:nth-child(4).ph-fill) .marker { left: 100%; }
 
   /* 별 스티커 리워드 모션 */
   @keyframes circle-pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
@@ -70,7 +81,15 @@
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
-    <div class="flex items-center justify-between mb-6">
+    <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
+      </div>
+    </header>
+
+    <div class="flex items-center justify-between mb-4">
       <a href="child-outfit.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="옷차림 화면으로">
         <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
       </a>
@@ -78,29 +97,47 @@
       <div class="w-10"></div>
     </div>
 
-    <div class="relative mb-6">
-      <i class="ph-duotone ph-baseball-cap absolute -top-1 right-0 text-3xl text-member-1 rotate-[8deg]" aria-hidden="true"></i>
-      <h1 class="font-display font-extrabold text-[28px] leading-[34px]">오늘 내 할일</h1>
-      <p class="text-foreground-muted text-[15px] leading-[22px] mt-2">하나씩 눌러서 별 스티커를 모아봐요.</p>
-    </div>
-
-    <!-- 스티커 차트: 모은 별 스티커 진행도 -->
-    <div class="relative bg-surface-muted border border-border rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
-      <span class="absolute -top-2 right-6 w-11 h-5 bg-tape-blue/90 rotate-[5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-      <div class="flex gap-1" id="progress-stars" aria-hidden="true">
-        <i class="ph-fill ph-star progress-star text-2xl text-tape-yellow drop-shadow"></i>
-        <i class="ph-fill ph-star progress-star text-2xl text-tape-yellow drop-shadow"></i>
-        <i class="ph-light ph-star progress-star text-2xl text-foreground-muted/50"></i>
-        <i class="ph-light ph-star progress-star text-2xl text-foreground-muted/50"></i>
+    <div class="bg-surface-muted rounded-lg shadow-soft px-5 py-5 mb-6 text-center">
+      <h1 class="font-display font-extrabold text-[22px] leading-[28px] text-accent">우와, 거의 다 했어요!</h1>
+      <p class="font-doodle text-[14px] text-foreground-muted mt-1" id="progress-count-text">별 스티커 2/4개 모았어요!</p>
+      <div class="relative mt-4" id="progress-track">
+        <div class="h-3.5 rounded-full bg-border overflow-hidden flex" id="progress-stars" aria-hidden="true">
+          <span class="progress-star ph-fill text-tape-yellow drop-shadow"></span>
+          <span class="progress-star ph-fill text-tape-yellow drop-shadow"></span>
+          <span class="progress-star ph-light text-foreground-muted/50"></span>
+          <span class="progress-star ph-light text-foreground-muted/50"></span>
+        </div>
+        <span class="marker w-6 h-6 rounded-full bg-surface border-2 border-foreground shadow-sticker flex items-center justify-center" aria-hidden="true">
+          <i class="ph-fill ph-smiley text-[12px] text-tape-yellow"></i>
+        </span>
       </div>
-      <p class="font-doodle text-[15px] text-foreground" id="progress-count-text">별 스티커 2/4개 모았어요!</p>
     </div>
 
     <div class="flex flex-col gap-3" id="todo-list"></div>
 
-    <div class="flex-1"></div>
+    <p class="font-doodle text-[15px] text-accent mt-5 text-center" id="remaining-msg">2개 남았어요, 하나씩 눌러봐요!</p>
 
-    <p class="font-doodle text-[16px] text-accent mt-6 text-center" id="remaining-msg">2개 남았어요, 하나씩 눌러봐요!</p>
+    <div class="border-2 border-dashed border-border rounded-lg px-4 py-5 mt-6 mb-2 text-center">
+      <h2 class="font-display font-bold text-[15px] text-secondary">참 잘했어요! 스티커 판</h2>
+      <p class="font-doodle text-[13px] text-foreground-muted mt-0.5">Great Job! Sticker Board</p>
+      <div class="flex items-center justify-center gap-3 mt-4" aria-hidden="true">
+        <span class="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
+          <i class="ph ph-heart text-lg"></i>
+        </span>
+        <span class="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
+          <i class="ph ph-rocket text-lg"></i>
+        </span>
+        <span class="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
+          <i class="ph ph-paw-print text-lg"></i>
+        </span>
+        <span class="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
+          <i class="ph ph-sparkle text-lg"></i>
+        </span>
+        <span class="w-10 h-10 rounded-full bg-accent border-2 border-accent flex items-center justify-center text-on-accent shadow-sticker">
+          <i class="ph-fill ph-star text-lg"></i>
+        </span>
+      </div>
+    </div>
   </div>
   <script src="js/store.js"></script>
   <script>
@@ -117,19 +154,27 @@
         el.classList.add(className);
       }
 
+      function iconForTitle(title) {
+        if (/세수|양치|씻/.test(title)) return 'ph-drop-half-bottom';
+        if (/가방/.test(title)) return 'ph-backpack';
+        if (/물통|물/.test(title)) return 'ph-flask';
+        if (/신발|옷/.test(title)) return 'ph-t-shirt';
+        return 'ph-sparkle';
+      }
+
       function renderTodos() {
         var todos = OFStore.todos.list(CHILD_NAME);
-        var firstUndoneId = (todos.find(function (t) { return !t.isDone; }) || {}).id;
 
         listEl.innerHTML = todos.map(function (t) {
-          var decorate = t.id === firstUndoneId;
           return '' +
-            '<button type="button" class="todo-row ' + (decorate ? 'relative rotate-[-1deg]' : '') + ' bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4 text-left" data-done="' + t.isDone + '" data-id="' + t.id + '" aria-pressed="' + t.isDone + '">' +
-              (decorate ? '<span class="absolute -top-2 left-6 w-11 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>' : '') +
-              '<span class="todo-circle w-12 h-12 rounded-full border-2 border-border flex items-center justify-center shrink-0">' +
-                '<i class="ph-fill ph-star todo-check text-on-secondary text-xl"></i>' +
+            '<button type="button" class="todo-row w-full bg-surface border border-border rounded-full shadow-soft pl-3 pr-4 py-3 flex items-center gap-4 text-left" data-done="' + t.isDone + '" data-id="' + t.id + '" aria-pressed="' + t.isDone + '">' +
+              '<span class="todo-circle w-11 h-11 rounded-full border-2 border-border bg-surface flex items-center justify-center shrink-0">' +
+                '<i class="ph-fill ph-star todo-check text-on-secondary text-lg"></i>' +
               '</span>' +
-              '<span class="todo-label font-display font-bold text-[17px] flex-1">' + t.title + '</span>' +
+              '<span class="todo-label font-display font-bold text-[16px] leading-[22px] flex-1">' + t.title + '</span>' +
+              '<span class="w-10 h-10 rounded-full bg-surface-muted border border-border flex items-center justify-center shrink-0" data-photo-slot="child-todo-' + t.id + '" aria-hidden="true">' +
+                '<i class="ph-duotone ' + iconForTitle(t.title) + ' text-lg text-member-3"></i>' +
+              '</span>' +
             '</button>';
         }).join('');
 

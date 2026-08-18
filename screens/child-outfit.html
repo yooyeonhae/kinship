@@ -23,7 +23,7 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
@@ -37,6 +37,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -63,59 +64,69 @@
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
-    <!-- 상단 바 -->
-    <div class="flex items-center justify-between mb-6">
-      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
-        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
-      </a>
-      <span class="font-display font-bold text-[15px] text-foreground-muted">하준</span>
-      <div class="w-10"></div>
-    </div>
-
-    <!-- 날씨 히어로 카드 -->
-    <div class="relative bg-surface border border-border rounded-lg shadow-soft p-card-padding mb-6">
-      <span class="absolute -top-2 right-8 w-12 h-5 bg-tape-blue/90 rotate-[4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3" id="weather-date">오늘 날씨 · 불러오는 중...</p>
-      <div class="flex items-center gap-4">
-        <i class="ph-duotone ph-cloud-sun text-6xl text-primary icon-sway" id="weather-icon"></i>
-        <div class="relative">
-          <p class="font-display font-extrabold text-[40px] leading-none" id="weather-temp">--°C</p>
-          <svg class="absolute -left-2 -right-2 -bottom-1 top-1 pointer-events-none" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M4,42 C4,20 20,10 50,8 C82,6 96,16 96,32" fill="none" stroke="#FF85A1" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-          <p class="text-[15px] text-foreground-muted mt-1" id="weather-desc">날씨 정보를 불러오는 중이에요...</p>
-        </div>
+    <!-- 공용 상단 헤더 -->
+    <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
       </div>
-      <p class="text-[11px] text-foreground-muted/70 mt-3" id="weather-source-note"></p>
+    </header>
+
+    <!-- 날씨 카드 -->
+    <div class="bg-surface-muted rounded-lg p-card-padding mb-6 flex items-center justify-between gap-4">
+      <div>
+        <p class="font-display font-bold text-[19px] leading-snug" id="weather-date">오늘 날씨 · 불러오는 중...</p>
+        <p class="text-[15px] text-foreground-muted mt-1" id="weather-temp">--°C</p>
+        <p class="text-[11px] text-foreground-muted/70 mt-2" id="weather-source-note"></p>
+      </div>
+      <div class="text-center shrink-0">
+        <i class="ph-duotone ph-cloud-sun text-5xl text-primary icon-sway" id="weather-icon"></i>
+        <p class="text-[13px] font-display font-bold text-foreground-muted mt-1" id="weather-desc">날씨 정보를 불러오는 중이에요...</p>
+      </div>
     </div>
 
     <!-- 요일별 지정복 -->
-    <div class="bg-accent rounded-lg p-4 flex items-center gap-3 mb-6 shadow-soft">
-      <i class="ph-duotone ph-t-shirt text-2xl text-on-accent"></i>
-      <p class="font-display font-bold text-[15px] text-on-accent" id="outfit-banner-text">오늘의 지정복을 확인하고 있어요...</p>
+    <p class="mb-3">
+      <span class="font-display font-bold text-[15px] text-foreground bg-tape-yellow/70 px-1 -rotate-1 inline-block">오늘의 지정복</span>
+    </p>
+    <div class="relative bg-accent border-2 border-foreground rounded-md shadow-sticker p-6 mb-6 overflow-visible">
+      <i class="ph-fill ph-person-simple-run absolute -top-3 -right-2 text-2xl text-primary rotate-[-8deg]" aria-hidden="true"></i>
+      <i class="ph-fill ph-soccer-ball absolute -bottom-3 -left-2 text-2xl text-foreground" aria-hidden="true"></i>
+      <p class="font-display font-bold text-[19px] leading-snug text-center text-on-accent" id="outfit-banner-text">오늘의 지정복을 확인하고 있어요...</p>
+      <div class="flex items-center justify-center gap-4 mt-4">
+        <div class="w-16 h-16 rounded-full bg-surface-muted ring-4 ring-surface shadow-soft flex items-center justify-center" data-photo-slot="pe-uniform-top">
+          <i class="ph-duotone ph-shirt-folded text-3xl text-secondary" aria-hidden="true"></i>
+        </div>
+        <div class="w-16 h-16 rounded-full bg-surface-muted ring-4 ring-surface shadow-soft flex items-center justify-center" data-photo-slot="pe-uniform-bottom">
+          <i class="ph-duotone ph-pants text-3xl text-primary" aria-hidden="true"></i>
+        </div>
+      </div>
     </div>
 
     <!-- 추천 옷차림 (플랫레이 스타일) -->
     <div class="flex-1">
-      <p class="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3">오늘의 추천 옷차림</p>
-      <div class="relative bg-surface border border-border rounded-lg shadow-soft p-card-padding">
-        <span class="absolute -top-3 -right-2 tape-wiggle bg-tape-yellow border border-border/50 rounded-sm shadow-sm px-3 py-1 z-10">
-          <span class="font-doodle text-[14px] text-foreground">Today's Outfit!</span>
-        </span>
-        <i class="ph-fill ph-smiley absolute top-2 left-2 text-xl text-tape-pink rotate-[-8deg]" aria-hidden="true"></i>
-        <i class="ph-fill ph-smiley absolute bottom-3 right-3 text-lg text-secondary rotate-[6deg]" aria-hidden="true"></i>
+      <p class="font-display font-bold text-[17px] text-secondary mb-1 relative inline-block">
+        추천 옷차림
+        <svg class="absolute left-0 -bottom-1 w-full h-2 pointer-events-none" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M2,6 C20,2 35,9 50,5 C65,1 80,8 98,4" fill="none" stroke="#0055FF" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </p>
+      <div class="relative pt-6 pb-2">
+        <i class="ph-fill ph-sparkle absolute top-2 left-4 text-xl text-tape-pink rotate-[-8deg]" aria-hidden="true"></i>
+        <i class="ph-duotone ph-shirt-folded absolute bottom-0 right-8 text-lg text-primary rotate-[10deg]" aria-hidden="true"></i>
 
-        <div class="flex items-center justify-center gap-6 pt-4 pb-2" id="outfit-items"></div>
+        <div class="flex items-start justify-center gap-4 flex-wrap pt-6 pb-2" id="outfit-items"></div>
 
-        <p class="font-display font-bold text-[17px] mb-1 text-center mt-2" id="outfit-title">불러오는 중...</p>
-        <p class="text-[15px] text-foreground-muted leading-[22px] text-center" id="outfit-note"></p>
+        <p class="font-display font-bold text-[17px] mb-1 text-center mt-4" id="outfit-title">불러오는 중...</p>
+        <p class="text-[15px] text-foreground-muted leading-[22px] text-center px-2" id="outfit-note"></p>
       </div>
     </div>
 
     <!-- 확인 버튼 -->
     <a href="child-todo.html"
-       class="mt-6 bg-primary text-on-primary rounded-lg shadow-soft py-4 flex items-center justify-center gap-2 font-display font-bold text-[17px] active:scale-[0.97] transition duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]">
-      확인했어요
+       class="mt-6 bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker py-4 flex items-center justify-center gap-2 font-display font-bold text-[17px] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
+      확인했어요!
       <i class="ph-bold ph-arrow-right text-lg"></i>
     </a>
   </div>
@@ -127,27 +138,25 @@
       var CHILD_NAME = '하준';
       var DAY_LABEL = { sun: '일요일', mon: '월요일', tue: '화요일', wed: '수요일', thu: '목요일', fri: '금요일', sat: '토요일' };
 
+      var EXTRA_ICON = { '우비': 'ph-umbrella', '겉옷': 'ph-jacket', '얇은 여벌옷': 'ph-shirt-folded' };
+
+      function outfitCard(iconClass, label, slot, rotateClass, offsetClass, delay) {
+        return '' +
+          '<div class="relative bg-surface rounded-md shadow-soft p-2 pb-3 w-28 flex-shrink-0 flex flex-col items-center gap-2 item-pop-in ' + rotateClass + ' ' + offsetClass + '" style="animation-delay: ' + delay + 's">' +
+            '<div class="w-full aspect-square rounded-sm bg-surface-muted flex items-center justify-center" data-photo-slot="' + slot + '">' +
+              '<i class="ph-duotone ' + iconClass + ' text-4xl text-foreground-muted" aria-hidden="true"></i>' +
+            '</div>' +
+            '<span class="font-display font-bold text-[13px] text-foreground text-center">' + label + '</span>' +
+          '</div>';
+      }
+
       function renderOutfitItems(rec) {
         var wrap = document.getElementById('outfit-items');
-        var mainSlot = '' +
-          '<div class="relative flex flex-col items-center gap-1.5 item-pop-in" style="animation-delay: 0.1s">' +
-            '<svg class="absolute -inset-3 pointer-events-none" viewBox="0 0 90 90" aria-hidden="true">' +
-              '<path d="M8,45 C8,18 28,6 45,6 C64,6 82,20 82,45 C82,70 62,84 45,84 C26,84 8,68 8,45 Z" fill="none" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round"/>' +
-            '</svg>' +
-            '<div class="w-16 h-16 rounded-lg bg-member-4/10 flex items-center justify-center">' +
-              '<i class="ph-duotone ph-t-shirt text-4xl text-member-4"></i>' +
-            '</div>' +
-            '<span class="font-doodle text-[13px] text-foreground">' + rec.main + '</span>' +
-          '</div>';
-        var extraSlot = rec.extra ? (
-          '<div class="flex flex-col items-center gap-1.5 item-pop-in" style="animation-delay: 0.28s">' +
-            '<div class="w-16 h-16 rounded-lg flex items-center justify-center" style="background:rgba(255,209,0,0.18)">' +
-              '<i class="ph-duotone ph-t-shirt text-4xl" style="color:#B8930A"></i>' +
-            '</div>' +
-            '<span class="font-doodle text-[13px] text-foreground">' + rec.extra.name + '</span>' +
-          '</div>'
-        ) : '';
-        wrap.innerHTML = mainSlot + extraSlot;
+        var cards = [outfitCard('ph-shirt-folded', rec.main, 'outfit-item-main', '-rotate-3', '-translate-y-1', 0.1)];
+        if (rec.extra) {
+          cards.push(outfitCard(EXTRA_ICON[rec.extra.name] || 'ph-shirt-folded', rec.extra.name, 'outfit-item-extra', 'rotate-3', 'translate-y-2', 0.28));
+        }
+        wrap.innerHTML = cards.join('');
       }
 
       function render() {

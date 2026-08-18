@@ -87,7 +87,33 @@ spacing:
 
 ## Changelog
 
-**v2 (이번 업데이트)** — 사용자가 지정한 새 스타일 브리프(포토리얼 라이프스타일 사진 + 콜라주/독들·워시테이프·스티커 + 코발트블루/라임그린/브라이트옐로우/로즈핑크)로 팔레트와 장식 언어를 교체. v1의 "아침 해" 톤(번트오렌지 계열)은 폐기.
+**v3 (이번 업데이트)** — `kinship/*.png` 실제 목업과 다시 대조해서, 카드/버튼/헤더를 그 이미지에 더 가깝게 맞췄다. 하단 5탭 네비게이션(`bottomnav.js`)과 아이콘 기반 아바타(실사진 없음)는 그대로 유지하고, **레이아웃 구조가 아니라 카드 스타일·색·헤더 크롬만** 바꿨다.
+
+- **공용 상단 헤더** (모든 화면 공통, 새로 추가): 좌측에 `Kinship` 워드마크(진한 그린, `font-display font-extrabold`), 우측에 지구본 아이콘(언어) + 계정 아이콘. 얇은 `border-b border-border` 하나로 구분. entry.html의 콜라주 히어로 배너는 이 헤더로 교체한다 — 브랜드명이 "우리가족"에서 실제 제품명 `Kinship`(레포/Supabase 프로젝트명과 일치)으로 정리됨.
+  ```html
+  <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+    <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+    <div class="flex items-center gap-4 text-foreground-muted">
+      <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+      <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
+    </div>
+  </header>
+  ```
+- **스티커 컷아웃 카드 스타일** (화면당 주인공 카드 1~2개에만 — 전부 적용 시 산만해짐): `border-2 border-foreground` + 새 `shadow-sticker` 토큰(부드러운 blur 대신 단색 하드 오프셋 그림자, 스티커를 오려 붙인 느낌). 기존 `shadow-soft`는 나머지 카드에 그대로 유지.
+  ```js
+  boxShadow: {
+    soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+    sticker: '4px 4px 0 0 #2B2A28',
+  }
+  ```
+- **CTA 그린이 더 진해짐**: 새 토큰 `secondary-dark: '#1B4D3A'` — 확인/완료 계열 primary 버튼(예: "확인했어요!", "확인(To Tasks)")에 사용. 기존 `secondary #2E7D32`는 배지·태그 등 작은 요소에 계속 사용.
+- **마커 하이라이트 제목**: 섹션 제목 일부 배경에 `bg-tape-yellow/70`를 얇게 깔아 형광펜 효과. 예: `<span class="bg-tape-yellow/70 px-1 -rotate-1 inline-block">오늘의 지정복</span>`. 기존 규칙(옐로우엔 항상 진한 `foreground` 텍스트) 그대로 적용.
+- **긴급/경고 카드**: `destructive` 테두리(`border-2 border-destructive`) + 좌측 굵은 컬러 바 1개로 "오늘 마감" 같은 항목 강조 (예: parent-tasks 화면의 "Pay daycare invoice").
+- **풀컬러 카드 배경(파스텔)**: entry.html처럼 카드 전체를 색으로 채우는 경우, 채도 높은 `member-*`/`tape-*`가 아니라 새로 추가한 연한 파스텔 토큰을 쓴다 — `pastel-mint: '#BFEAD1'`, `pastel-sky: '#BEE7F5'`. 이 위엔 항상 `text-foreground`(진한 잉크색)로 텍스트를 얹는다(연한 배경이라 대비 충분).
+- **사진 자리(placeholder)**: 실사 이미지가 아직 없는 곳(가족 아바타, 옷/음식 사진)은 `surface-muted` 배경에 큼직한 Phosphor 아이콘을 중앙에 놓은 사각/원형 블록으로 채운다. 나중에 실제 이미지로 교체하기 쉽도록 `data-photo-slot="설명"` 속성을 붙여둔다 (예: `data-photo-slot="member-avatar-leo"`, `data-photo-slot="recipe-bulgogi"`) — 아직 기능은 없지만 다음 작업에서 실제 이미지를 꽂아 넣을 자리를 코드에서 바로 찾을 수 있게 하기 위함.
+- 워시테이프/회전 등 v2의 콜라주 장식 언어는 유지하되, 새 스티커 카드와 같은 요소에 동시에 몰아넣지 않는다(택1).
+
+**v2 (이전 업데이트)** — 사용자가 지정한 새 스타일 브리프(포토리얼 라이프스타일 사진 + 콜라주/독들·워시테이프·스티커 + 코발트블루/라임그린/브라이트옐로우/로즈핑크)로 팔레트와 장식 언어를 교체. v1의 "아침 해" 톤(번트오렌지 계열)은 폐기.
 
 **v1** — 웜아이보리 배경 + 번트오렌지/세이지그린 팔레트, "Soft Tactile" 미니멀 스타일. 접근성 보정(흰 텍스트 대비 4.5:1) 작업까지 마쳤던 버전. 참고용으로 changelog에만 남김.
 
@@ -213,11 +239,12 @@ Gaegu는 손글씨 폰트라 작은 캡션 한두 마디에만 쓴다 — 본문
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
           'tape-blue': '#0055FF', 'tape-lime': '#4CAF50', 'tape-yellow': '#FFD100', 'tape-pink': '#FF85A1',
+          'pastel-mint': '#BFEAD1', 'pastel-sky': '#BEE7F5',
         },
         fontFamily: {
           display: ["'Nanum Gothic'", "'Varela Round'", 'sans-serif'],
@@ -227,6 +254,7 @@ Gaegu는 손글씨 폰트라 작은 캡션 한두 마디에만 쓴다 — 본문
         borderRadius: { sm: '10px', md: '16px', lg: '20px', full: '9999px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },

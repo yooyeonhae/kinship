@@ -23,7 +23,7 @@
           background: '#FAF8F5', surface: '#FFFFFF', 'surface-muted': '#F1ECE4',
           foreground: '#2B2A28', 'foreground-muted': '#5C5852', border: '#E7DFD3',
           primary: '#0055FF', 'primary-dark': '#0044CC', 'on-primary': '#FFFFFF',
-          secondary: '#2E7D32', 'on-secondary': '#FFFFFF',
+          secondary: '#2E7D32', 'secondary-dark': '#1B4D3A', 'on-secondary': '#FFFFFF',
           accent: '#C2185B', 'on-accent': '#FFFFFF',
           destructive: '#C6483B', 'on-destructive': '#FFFFFF', ring: '#0055FF',
           'member-1': '#0055FF', 'member-2': '#C2185B', 'member-3': '#2E7D32', 'member-4': '#6A4C93',
@@ -37,6 +37,7 @@
         borderRadius: { sm: '10px', md: '16px', lg: '20px' },
         boxShadow: {
           soft: '0 2px 8px rgba(43,42,40,0.06), 0 8px 24px rgba(43,42,40,0.08)',
+          sticker: '4px 4px 0 0 #2B2A28',
         },
       },
     },
@@ -56,13 +57,13 @@
 <body class="bg-background text-foreground min-h-screen">
   <div class="max-w-md mx-auto min-h-screen flex flex-col px-6" style="padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top))); padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));">
 
-    <div class="flex items-center justify-between mb-6">
-      <a href="entry.html" class="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150" aria-label="처음으로">
-        <i class="ph-bold ph-caret-left text-xl text-foreground-muted"></i>
-      </a>
-      <span class="font-display font-bold text-[15px] text-foreground-muted">주말에 뭐하지</span>
-      <div class="w-10"></div>
-    </div>
+    <header class="flex items-center justify-between px-1 py-2 mb-6 border-b border-border">
+      <span class="font-display font-extrabold text-2xl text-secondary">Kinship</span>
+      <div class="flex items-center gap-4 text-foreground-muted">
+        <i class="ph ph-globe text-xl" aria-hidden="true"></i>
+        <i class="ph ph-user-circle text-xl" aria-hidden="true"></i>
+      </div>
+    </header>
 
     <div class="relative mb-5">
       <span class="absolute -top-2 left-0 w-12 h-5 bg-tape-pink/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
@@ -100,7 +101,7 @@
           <input id="activity-date" type="text" placeholder="시기 (예: 이번 주말)" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none" autocomplete="off">
         </div>
         <input id="activity-location" type="text" placeholder="장소 (선택)" class="bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none" autocomplete="off">
-        <button type="submit" class="mt-1 bg-primary text-on-primary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150">
+        <button type="submit" class="mt-1 bg-secondary-dark text-on-secondary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150">
           <i class="ph-bold ph-plus"></i>추가하기
         </button>
       </form>
@@ -125,10 +126,13 @@
           listEl.innerHTML = '<p class="text-[14px] text-foreground-muted py-4 text-center">아직 등록된 나들이가 없어요. 아래에서 추가해보세요.</p>';
           return;
         }
-        listEl.innerHTML = items.map(function (a) {
+        listEl.innerHTML = items.map(function (a, i) {
           var color = CATEGORY_COLOR[a.category] || 'primary';
+          var cardClass = i === 0
+            ? 'bg-surface border-2 border-foreground rounded-md shadow-sticker rotate-[-1deg] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 px-4 py-4 flex items-start gap-3'
+            : 'bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-start gap-3';
           return '' +
-            '<div class="bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-start gap-3" data-id="' + a.id + '">' +
+            '<div class="' + cardClass + '" data-id="' + a.id + '">' +
               '<span class="w-11 h-11 rounded-full bg-' + color + '/10 flex items-center justify-center shrink-0">' +
                 '<i class="ph-duotone ' + (TYPE_ICON[a.type] || 'ph-confetti') + ' text-xl text-' + color + '"></i>' +
               '</span>' +
