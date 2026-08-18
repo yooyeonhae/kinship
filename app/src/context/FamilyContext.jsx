@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { createSupabaseClient } from '../lib/supabaseClient'
+import { supabase, setIdentity } from '../lib/supabaseClient'
 
 const FAMILY_ID_KEY = 'kinship_family_id'
 const MEMBER_ID_KEY = 'kinship_member_id'
@@ -37,10 +37,12 @@ export function FamilyProvider({ children }) {
   const activeToken =
     parentAuth && !authExpired && parentAuth.memberId === currentMemberId ? parentAuth.token : null
 
-  const supabase = useMemo(
-    () => createSupabaseClient(familyId, currentMemberId, activeToken),
-    [familyId, currentMemberId, activeToken]
-  )
+  // 렌더 시점에 동기적으로 반영한다(useEffect가 아니다). supabase 클라이언트는 앱 전체에서
+  // 하나뿐인 싱글톤이고 이 값들을 fetch가 요청마다 읽어가므로, 자식 컴포넌트의 effect가
+  // 실행되기 전에(= 이 컴포넌트의 렌더가 커밋되기 전에) 최신 신원이 반영되어 있어야 한다.
+  // useEffect로 미루면 "새 memberId로 리렌더 → 자식 마운트·effect 발동 → 아직 이전 identity로
+  // fetch가 나감 → 뒤늦게 identity effect 실행"이라는 순서가 생길 수 있다.
+  setIdentity({ familyId, memberId: currentMemberId, parentToken: activeToken })
 
   const setCurrentMember = useCallback((memberId) => {
     if (memberId) localStorage.setItem(MEMBER_ID_KEY, memberId)
@@ -106,7 +108,7 @@ export function FamilyProvider({ children }) {
     }
     setMembers(data || [])
     setLoading(false)
-  }, [familyId, supabase, clearFamily])
+  }, [familyId, clearFamily])
 
   useEffect(() => {
     reload()
@@ -116,9 +118,9 @@ export function FamilyProvider({ children }) {
   // 클라이언트에서 families → members를 따로 insert하면 (a) members 실패 시
   // families가 고아로 남고, (b) members 쓰기 정책이 부모 전용이라 최초 생성이 막히고,
   // (c) families의 INSERT ... RETURNING이 SELECT 정책에 걸린다.
+  // RPC 자체는 family_id를 요구하지 않으므로 헤더 없이도 호출된다.
   const createFamily = useCallback(async (name, memberDrafts) => {
-    const client = createSupabaseClient(null)
-    const { data, error } = await client.rpc('create_family', {
+    const { data, error } = await supabase.rpc('create_family', {
       p_name: name,
       p_members: memberDrafts.map((m) => ({ name: m.name, role: m.role })),
     })
@@ -130,37 +132,31 @@ export function FamilyProvider({ children }) {
     return data.family_id
   }, [])
 
-  const parentLogin = useCallback(
-    async (memberId, pin) => {
-      const { data, error } = await supabase.rpc('parent_login', { p_member_id: memberId, p_pin: pin })
-      if (error) return { ok: false, error: 'network' }
-      if (data?.ok) {
-        const auth = { token: data.token, memberId: data.member_id, expiresAt: data.expires_at }
-        localStorage.setItem(PARENT_AUTH_KEY, JSON.stringify(auth))
-        setParentAuth(auth)
-      }
-      return data
-    },
-    [supabase]
-  )
+  const parentLogin = useCallback(async (memberId, pin) => {
+    const { data, error } = await supabase.rpc('parent_login', { p_member_id: memberId, p_pin: pin })
+    if (error) return { ok: false, error: 'network' }
+    if (data?.ok) {
+      const auth = { token: data.token, memberId: data.member_id, expiresAt: data.expires_at }
+      localStorage.setItem(PARENT_AUTH_KEY, JSON.stringify(auth))
+      setParentAuth(auth)
+    }
+    return data
+  }, [])
 
   const parentLogout = useCallback(async () => {
     await supabase.rpc('parent_logout')
     clearParentAuth()
-  }, [supabase, clearParentAuth])
+  }, [clearParentAuth])
 
-  const setParentPin = useCallback(
-    async (memberId, newPin, oldPin = null) => {
-      const { data, error } = await supabase.rpc('set_parent_pin', {
-        p_member_id: memberId,
-        p_new_pin: newPin,
-        p_old_pin: oldPin,
-      })
-      if (error) return { ok: false, error: 'network' }
-      return data
-    },
-    [supabase]
-  )
+  const setParentPin = useCallback(async (memberId, newPin, oldPin = null) => {
+    const { data, error } = await supabase.rpc('set_parent_pin', {
+      p_member_id: memberId,
+      p_new_pin: newPin,
+      p_old_pin: oldPin,
+    })
+    if (error) return { ok: false, error: 'network' }
+    return data
+  }, [])
 
   const currentMember = useMemo(
     () => members.find((m) => m.member_id === currentMemberId) || null,
@@ -201,7 +197,6 @@ export function FamilyProvider({ children }) {
       members,
       loading,
       loadError,
-      supabase,
       reload,
       createFamily,
       clearFamily,
