@@ -5,8 +5,6 @@ import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import { characterOf } from '../lib/avatars'
 import CharacterPicker from '../components/CharacterPicker'
 
-const QUICK_CHIPS = ['우유 사기', '쓰레기 버리기', '준비물 확인']
-
 function ParentTasksScreen() {
   const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout, reload } = useFamily()
   const navigate = useNavigate()
@@ -16,6 +14,11 @@ function ParentTasksScreen() {
   const [taskInput, setTaskInput] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
   const [avatarTarget, setAvatarTarget] = useState(null)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const [quickTasks, setQuickTasks] = useState([])
+  const [editingQuick, setEditingQuick] = useState(false)
+  const [quickInput, setQuickInput] = useState('')
+  const [quickMigrationNeeded, setQuickMigrationNeeded] = useState(false)
 
   const parents = members.filter((m) => m.role === 'parent')
 
@@ -47,6 +50,56 @@ function ParentTasksScreen() {
     window.addEventListener('kinship:change', loadTodos)
     return () => window.removeEventListener('kinship:change', loadTodos)
   }, [loadTodos])
+
+  const loadQuickTasks = useCallback(async () => {
+    if (!familyId) return
+    const { data, error } = await supabase
+      .from('quick_tasks')
+      .select('*')
+      .order('sort_order')
+      .order('created_at')
+    if (error) {
+      if (error.code === '42P01' || /schema cache|does not exist/i.test(error.message)) setQuickMigrationNeeded(true)
+      return
+    }
+    setQuickMigrationNeeded(false)
+    setQuickTasks(data || [])
+  }, [supabase, familyId])
+
+  useEffect(() => {
+    loadQuickTasks()
+  }, [loadQuickTasks])
+
+  async function addQuickTask(title) {
+    const v = title.trim()
+    if (!v) return
+    // 같은 걸 두 번 넣으면 칩이 나란히 겹쳐 보이기만 하고 도움이 안 된다
+    if (quickTasks.some((q) => q.title === v)) {
+      setErrorMsg('이미 있는 항목이에요.')
+      return
+    }
+    const { data, error } = await supabase
+      .from('quick_tasks')
+      .insert({ family_id: familyId, title: v, sort_order: quickTasks.length })
+      .select()
+      .single()
+    if (error) {
+      setErrorMsg('항목을 추가하지 못했어요.')
+      return
+    }
+    setErrorMsg('')
+    setQuickTasks((prev) => [...prev, data])
+  }
+
+  async function removeQuickTask(quick) {
+    const { error } = await supabase.from('quick_tasks').delete().eq('quick_task_id', quick.quick_task_id)
+    if (error) {
+      setErrorMsg('항목을 지우지 못했어요.')
+      return
+    }
+    setErrorMsg('')
+    setQuickTasks((prev) => prev.filter((q) => q.quick_task_id !== quick.quick_task_id))
+  }
 
   function memberName(id) {
     return members.find((m) => m.member_id === id)?.name || null
@@ -221,20 +274,90 @@ function ParentTasksScreen() {
 
       <div className="relative mb-5">
         <span className="absolute -top-2 right-2 w-11 h-5 bg-tape-pink/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-        <p className="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-2">자주 쓰는 항목 — 눌러서 바로 추가</p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {QUICK_CHIPS.map((title) => (
-            <button
-              key={title}
-              type="button"
-              onClick={() => addTask(title)}
-              className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-4 py-2 text-[14px] font-display font-bold active:scale-95 transition duration-150"
-            >
-              <i className="ph-bold ph-plus text-primary"></i>
-              {title}
-            </button>
-          ))}
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-display font-bold text-[13px] tracking-wide text-foreground-muted">
+            자주 쓰는 항목 — 눌러서 바로 추가
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingQuick((v) => !v)
+              setQuickInput('')
+            }}
+            className="text-[12px] font-display font-bold text-primary shrink-0 active:scale-95 transition duration-150"
+          >
+            {editingQuick ? '완료' : '고치기'}
+          </button>
         </div>
+
+        {quickMigrationNeeded && (
+          <p className="text-[12px] text-destructive mb-2 leading-[18px]">
+            자주 쓰는 항목을 고치려면 Supabase SQL Editor에서 <strong>migration_13_quick_tasks.sql</strong>을 실행해주세요.
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          {quickTasks.length === 0 ? (
+            <span className="text-[13px] text-foreground-muted">
+              {editingQuick ? '아래에 자주 쓰는 항목을 적어 추가해보세요.' : '자주 쓰는 항목이 없어요. "고치기"로 추가할 수 있어요.'}
+            </span>
+          ) : (
+            quickTasks.map((q) => (
+              <span
+                key={q.quick_task_id}
+                className="inline-flex items-center bg-surface border border-border rounded-full text-[14px] font-display font-bold overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => addTask(q.title)}
+                  disabled={editingQuick}
+                  className="inline-flex items-center gap-1.5 pl-3 pr-3 py-2 active:scale-95 transition duration-150 disabled:opacity-60"
+                >
+                  <i className="ph-bold ph-plus text-primary"></i>
+                  {q.title}
+                </button>
+                {editingQuick && (
+                  <button
+                    type="button"
+                    onClick={() => removeQuickTask(q)}
+                    className="pr-3 pl-1 py-2 text-foreground-muted active:scale-90 transition duration-150"
+                    aria-label={`${q.title} 항목 지우기`}
+                  >
+                    <i className="ph-bold ph-x text-[12px]"></i>
+                  </button>
+                )}
+              </span>
+            ))
+          )}
+        </div>
+
+        {editingQuick && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              addQuickTask(quickInput)
+              setQuickInput('')
+            }}
+            className="flex items-center gap-2 mb-3"
+          >
+            <input
+              type="text"
+              value={quickInput}
+              onChange={(e) => setQuickInput(e.target.value)}
+              placeholder="자주 쓰는 항목 추가 — 예: 분리수거"
+              maxLength={40}
+              className="flex-1 bg-surface rounded-md px-3 py-2 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="w-9 h-9 rounded-md bg-secondary-dark text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150"
+              aria-label="자주 쓰는 항목 추가"
+            >
+              <i className="ph-bold ph-plus text-base"></i>
+            </button>
+          </form>
+        )}
         <div className="mb-2">
           <select
             value={assigneeId}
@@ -257,9 +380,6 @@ function ParentTasksScreen() {
           }}
           className="bg-tape-yellow border-2 border-foreground rounded-md shadow-sticker px-4 py-3 flex items-center gap-3 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
         >
-          <span className="w-9 h-9 rounded-full bg-secondary-dark text-on-secondary flex items-center justify-center shrink-0" aria-hidden="true">
-            <i className="ph-bold ph-plus text-lg"></i>
-          </span>
           <input
             type="text"
             value={taskInput}
@@ -268,59 +388,80 @@ function ParentTasksScreen() {
             className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/60 outline-none"
             autoComplete="off"
           />
+          {/* 예전에는 이 자리가 장식용 span이라 엔터로만 등록됐다. 눌러서 등록되는 게
+              눈에 보이는 대로의 동작이고, 모바일 키보드에서 엔터를 찾는 수고도 없앤다. */}
+          <button
+            type="submit"
+            disabled={!taskInput.trim()}
+            className="w-9 h-9 rounded-full bg-secondary-dark text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150 disabled:opacity-40"
+            aria-label="할일 추가"
+          >
+            <i className="ph-bold ph-plus text-lg"></i>
+          </button>
         </form>
       </div>
 
-      {/* 카드에 뜨는 캐릭터를 여기서 바꾼다. members 쓰기는 부모만 가능하므로 이 화면이 제자리다. */}
-      <div className="bg-surface border-2 border-foreground rounded-md shadow-sticker px-4 py-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-display font-bold text-[15px] flex items-center gap-2">
-            <span className="text-[18px]" aria-hidden="true">🎭</span>가족 캐릭터
-          </p>
-          <div className="flex items-center -space-x-1.5">
-            {members.slice(0, 5).map((m) => (
-              <span
-                key={m.member_id}
-                title={m.name}
-                className="w-7 h-7 rounded-full bg-surface-muted ring-2 ring-surface flex items-center justify-center text-[15px]"
-                aria-hidden="true"
-              >
-                {characterOf(m)}
-              </span>
-            ))}
+      {/* 캐릭터를 바꾸는 일은 자주 있는 일이 아닌데 카드로 놓으니 할일 화면의 자리를
+          크게 먹었다. 평소엔 한 줄로 접어두고, 바꿀 때만 편다. 지우지 않는 이유는
+          온보딩 이후 캐릭터를 바꿀 수 있는 곳이 여기뿐이라서다. */}
+      <div className="bg-surface border border-border rounded-md px-3 py-2.5 mb-6">
+        <button
+          type="button"
+          onClick={() => setAvatarOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 active:scale-[0.99] transition duration-150"
+          aria-expanded={avatarOpen}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-[15px]" aria-hidden="true">🎭</span>
+            <span className="font-display font-bold text-[13px] text-foreground-muted">가족 캐릭터</span>
+            <span className="flex items-center -space-x-1" aria-hidden="true">
+              {members.slice(0, 5).map((m) => (
+                <span key={m.member_id} className="text-[15px]">
+                  {characterOf(m)}
+                </span>
+              ))}
+            </span>
+          </span>
+          <i
+            className={`ph-bold ${avatarOpen ? 'ph-caret-up' : 'ph-caret-down'} text-sm text-foreground-muted shrink-0`}
+            aria-hidden="true"
+          ></i>
+        </button>
+
+        {avatarOpen && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {members.map((m) => (
+                <button
+                  key={m.member_id}
+                  type="button"
+                  onClick={() => setAvatarTarget(avatarTarget === m.member_id ? null : m.member_id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full pl-2 pr-3 py-1.5 text-[13px] font-display font-bold border transition duration-150 ${
+                    avatarTarget === m.member_id
+                      ? 'bg-secondary-dark text-on-secondary border-foreground'
+                      : 'bg-surface-muted text-foreground border-border'
+                  }`}
+                  aria-expanded={avatarTarget === m.member_id}
+                >
+                  <span className="text-[15px]" aria-hidden="true">{characterOf(m)}</span>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+
+            {avatarMember ? (
+              <>
+                <p className="text-[12px] text-foreground-muted mb-2">{avatarMember.name}의 띠 캐릭터를 골라주세요.</p>
+                <CharacterPicker
+                  value={avatarMember.avatar || ''}
+                  onSelect={(emoji) => saveAvatar(avatarMember, emoji)}
+                  size="sm"
+                />
+              </>
+            ) : (
+              <p className="text-[12px] text-foreground-muted">이름을 누르면 캐릭터를 바꿀 수 있어요.</p>
+            )}
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {members.map((m) => (
-            <button
-              key={m.member_id}
-              type="button"
-              onClick={() => setAvatarTarget(avatarTarget === m.member_id ? null : m.member_id)}
-              className={`inline-flex items-center gap-1.5 rounded-full pl-2 pr-3 py-1.5 text-[13px] font-display font-bold border transition duration-150 ${
-                avatarTarget === m.member_id
-                  ? 'bg-secondary-dark text-on-secondary border-foreground'
-                  : 'bg-surface-muted text-foreground border-border'
-              }`}
-              aria-expanded={avatarTarget === m.member_id}
-            >
-              <span className="text-[15px]" aria-hidden="true">{characterOf(m)}</span>
-              {m.name}
-            </button>
-          ))}
-        </div>
-
-        {avatarMember ? (
-          <>
-            <p className="text-[12px] text-foreground-muted mb-2">{avatarMember.name}의 띠 캐릭터를 골라주세요.</p>
-            <CharacterPicker
-              value={avatarMember.avatar || ''}
-              onSelect={(emoji) => saveAvatar(avatarMember, emoji)}
-              size="sm"
-            />
-          </>
-        ) : (
-          <p className="text-[12px] text-foreground-muted">이름을 누르면 캐릭터를 바꿀 수 있어요.</p>
         )}
       </div>
 
