@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
+import TodaySchedule from '../components/TodaySchedule'
 
 function iconForTitle(title) {
   if (/세수|양치|씻/.test(title)) return 'ph-drop-half-bottom'
@@ -128,6 +129,8 @@ function ChildTodoScreen() {
         <div className="w-10"></div>
       </div>
 
+      <TodaySchedule memberId={memberId} memberName={childName} />
+
       <div className="bg-surface-muted rounded-lg shadow-soft px-5 py-5 mb-6 text-center">
         <h1 className="font-display font-extrabold text-[22px] leading-[28px] text-accent">{headingFor(total, filled)}</h1>
         <p className="font-doodle text-[18px] text-foreground-muted mt-1">
@@ -202,27 +205,6 @@ function ChildTodoScreen() {
         {total === 0 ? ' ' : remaining === 0 ? '다 했어요! 오늘도 최고예요!' : `${remaining}개 남았어요, 하나씩 눌러봐요!`}
       </p>
 
-      <div className="border-2 border-dashed border-border rounded-lg px-4 py-5 mt-6 mb-2 text-center">
-        <h2 className="font-display font-bold text-[15px] text-secondary">참 잘했어요! 스티커 판</h2>
-        <p className="font-doodle text-[17px] text-foreground-muted mt-0.5">Great Job! Sticker Board</p>
-        <div className="flex items-center justify-center gap-3 mt-4" aria-hidden="true">
-          <span className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
-            <i className="ph ph-heart text-lg"></i>
-          </span>
-          <span className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
-            <i className="ph ph-rocket text-lg"></i>
-          </span>
-          <span className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
-            <i className="ph ph-paw-print text-lg"></i>
-          </span>
-          <span className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
-            <i className="ph ph-sparkle text-lg"></i>
-          </span>
-          <span className="w-10 h-10 rounded-full bg-accent border-2 border-accent flex items-center justify-center text-on-accent shadow-sticker">
-            <i className="ph-fill ph-star text-lg"></i>
-          </span>
-        </div>
-      </div>
     </>
   )
 }

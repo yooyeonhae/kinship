@@ -26,6 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `migration_05_family_room.sql` — 아지트를 실데이터로. `chat_messages`(가족 채팅)와 `game_results`(미니게임 승패 = **가족 포인트의 유일한 근거**). 채팅·게임 결과는 **자녀도 INSERT할 수 있어야** 하므로 쓰기를 부모로 좁히지 않고, 삭제만 부모 전용이다. 포인트 값은 클라이언트가 정하면 얼마든지 부풀릴 수 있어 **CHECK로 못박았다**(승리 10p / 무승부 5p). `familyRoom.js`의 `pointsFor()`가 이 값과 어긋나면 INSERT가 제약에 걸려 통째로 실패한다.
 - `migration_06_updown_game.sql` — 미니게임 '숫자 맞히기(업다운)' 추가에 따른 `game_results.game_key` CHECK 확장. **게임을 추가할 때마다 이 CHECK를 넓혀야** 그 판의 결과가 저장된다(열거를 없애지 않은 이유는 파일 주석 참고 — 오타가 나면 전적이 조용히 사라진다).
 - `migration_07_recipes.sql` — 오늘의 추천 메뉴를 `recipes` 테이블로. `family_id`(nullable)와 `cook_minutes` 추가 + 기본 레시피 14개 시드. **PRD는 `recipes`를 "가족 구분 없는 공용 테이블"로 정의했지만 그대로 쓰기를 열면 한 가족이 다른 가족 것을 지울 수 있어**, `family_id is null` = 모두가 보는 기본 레시피(앱에서 수정 불가), 값이 있으면 그 가족 것으로 나눴다. 쓰기는 부모만. 시드는 제목 중복 검사를 하므로 여러 번 실행해도 쌓이지 않는다.
+- `migration_08_rewards.sql` — 가족 포인트 보상 목표(`rewards`). 조회는 가족 전체(아이도 목표를 봐야 동기가 된다), 등록·수정·**달성 처리는 부모만** — 아이가 스스로 소진 처리하면 협의가 아니라 선언이 된다.
+- `migration_09_schedules.sql` — 아이 요일별 스케줄(`schedules`). `repeat_type`이 `weekly`면 `day_of_week`만, `once`면 `schedule_date`만 차야 한다(`schedules_when_check`) — 둘 다 비면 언제인지 알 수 없고 둘 다 차면 어느 쪽을 따를지 알 수 없다. `alarm_minutes`는 "몇 분 전"이고 null이면 알림 없음. 쓰기는 부모만(todos·weekly_outfit_rules와 같은 규칙).
 
 앞으로 정책·스키마를 추가할 때는 `app/supabase/`에 `migration_NN_*.sql`로 파일을 만들고, Dashboard의 SQL Editor에서 실행해야 반영된다(anon 키로는 정책 생성이 불가능하고, 이 환경에는 Supabase CLI·psql이 설치되어 있지 않다).
 
@@ -73,6 +75,8 @@ The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, w
 **아지트의 게임판 자체는 아직 한 기기 안에서만 돈다.** 채팅·접속 표시·포인트는 기기 간에 동기화되지만, 합이 15/빙고/계단은 "선수1·선수2를 골라 한 화면에서 번갈아 하는" 핫시트 방식이다. 기기를 넘나드는 대전으로 만들려면 초대·참가·"지금 내 차례인가"까지 필요해서 화면 재설계가 따른다 — 발표에서 이 경계를 넘겨 말하지 말 것.
 
 **"오늘의" 메뉴는 무작위가 아니라 날짜로 정한다** (`app/src/lib/recipes.js`의 `pickTodayRecipes`). 무작위로 뽑으면 (a) 새로고침할 때마다 바뀌어 "오늘의"가 아니게 되고, (b) 같은 날 가족끼리 서로 다른 메뉴를 봐서 "오늘 카레래" 같은 대화가 어긋난다. `recipe_id`로 정렬을 고정한 뒤 날짜 숫자로 인덱스를 잡으므로, 회전의 기준이 흔들리지 않게 `sortRecipes()`를 거치지 않고 목록을 넘기면 안 된다. `description`은 `"재료, 재료 / 한 줄 설명"` 한 줄에 담고 화면에서 `parseDescription()`이 재료 칩과 설명으로 나눈다 — 손으로 입력하는 칸이라 이 형식을 안 지킨 값도 들어오며, 그때는 전체가 설명이 된다.
+
+**스케줄 알림은 앱이 열려 있는 동안에만 울린다** (`app/src/lib/schedules.js`, `TodaySchedule.jsx`). `setTimeout` + Notification API라, 앱을 닫으면 아무 일도 일어나지 않는다. 앱을 닫아둔 채 울리는 진짜 푸시는 서비스 워커 + 푸시 서버(VAPID)가 필요하고 "정적 SPA + 프록시 몇 개"라는 이 프로젝트의 기술 선택 밖이다. **이 한계를 화면에도 적어뒀다** — 울릴 거라 믿고 앱을 닫으면 알림을 놓치기 때문이다. 발표에서 "알림 기능이 있다"로 뭉뚱그리지 말 것.
 
 **외부 API는 `app/api/`의 서버리스 프록시를 거친다 (브라우저 직접 호출 금지).** 공공데이터포털·OpenWeatherMap 키를 번들에 노출시키지 않고 CORS도 피하기 위한 계층이다. Vercel이 `app/api/*.js`를 서버리스 함수로 자동 인식하고, `app/vite.config.js`의 `local-api-routes` 플러그인이 **같은 핸들러를 dev 미들웨어로도 마운트**해서 `npm run dev`와 배포본이 같은 `/api/*` 경로를 쓴다(`vercel dev` 불필요). 키는 `app/.env`에 **`VITE_` 접두사 없이** 둔다 — 접두사를 붙이면 클라이언트 번들에 박힌다. 배포 시 Vercel 프로젝트 환경변수에도 같은 이름으로 넣어야 한다.
 

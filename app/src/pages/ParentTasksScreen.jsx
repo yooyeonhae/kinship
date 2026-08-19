@@ -115,6 +115,13 @@ function ParentTasksScreen() {
             <i className="ph-duotone ph-t-shirt text-xl text-foreground-muted" aria-hidden="true"></i>
           </Link>
           <Link
+            to="/child-schedule"
+            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            aria-label="아이 요일별 스케줄"
+          >
+            <i className="ph-duotone ph-calendar-dots text-xl text-foreground-muted" aria-hidden="true"></i>
+          </Link>
+          <Link
             to="/parent-progress"
             className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
             aria-label="완료 현황 보기"
