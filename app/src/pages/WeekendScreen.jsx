@@ -1,13 +1,5 @@
-import { useState } from 'react'
-
-// 더미 데이터 — Supabase 연결 전 하드코딩 (screens/js/store.js DEFAULTS와 동일)
-// TourAPI 연동(js/tourapi.js)은 아직 React 쪽에 포팅하지 않음 — 프록시 없이 실 API 호출을 새로 연결하지 않기로 한 방침 유지
-const INITIAL_ACTIVITIES = [
-  { id: 'w1', title: '한강 불꽃 야시장', category: 'family', type: 'festival', region: '서울', date: '이번 주말', location: '여의도 한강공원' },
-  { id: 'w2', title: '연극 <봄날의 곰을 좋아하세요?>', category: 'family', type: 'play', region: '서울', date: '상시', location: '대학로' },
-  { id: 'w3', title: '어린이 과학관 체험전', category: 'family', type: 'sight', region: '경기', date: '이번 주말', location: '수원' },
-  { id: 'w4', title: '청소년 진로박람회', category: 'student', type: 'sight', region: '서울', date: '토요일', location: 'coex' },
-]
+import { useCallback, useEffect, useState } from 'react'
+import { fetchTourActivities, TOUR_REGIONS, TOUR_CONTENT_TYPES } from '../lib/tourapi'
 
 const FILTERS = [
   { key: 'all', label: '전체' },
@@ -25,10 +17,39 @@ const CATEGORY_STYLE = {
 let nextId = 100
 
 function WeekendScreen() {
-  const [activities, setActivities] = useState(INITIAL_ACTIVITIES)
+  const [manual, setManual] = useState([])
+  const [tourItems, setTourItems] = useState([])
+  const [tourLoading, setTourLoading] = useState(true)
+  const [tourError, setTourError] = useState('')
+  const [region, setRegion] = useState('서울')
+  const [contentTypeId, setContentTypeId] = useState('15')
   const [filter, setFilter] = useState('all')
   const [form, setForm] = useState({ title: '', category: 'family', type: 'festival', region: '', date: '', location: '' })
 
+  const loadTour = useCallback(() => {
+    let alive = true
+    setTourLoading(true)
+    setTourError('')
+    fetchTourActivities({ region, contentTypeId })
+      .then((list) => {
+        if (!alive) return
+        setTourItems(list)
+        setTourLoading(false)
+      })
+      .catch((err) => {
+        if (!alive) return
+        setTourError(err.message)
+        setTourItems([])
+        setTourLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [region, contentTypeId])
+
+  useEffect(loadTour, [loadTour])
+
+  const activities = [...tourItems, ...manual]
   const items = filter === 'all' ? activities : activities.filter((a) => a.category === filter)
 
   function updateForm(key, value) {
@@ -39,7 +60,7 @@ function WeekendScreen() {
     e.preventDefault()
     const title = form.title.trim()
     if (!title) return
-    setActivities((prev) => [
+    setManual((prev) => [
       ...prev,
       {
         id: `w${nextId++}`,
@@ -54,8 +75,10 @@ function WeekendScreen() {
     setForm({ title: '', category: 'family', type: 'festival', region: '', date: '', location: '' })
   }
 
+  // 관광공사에서 받아온 항목은 원본을 지울 수 없으니 목록에서만 감춘다.
   function removeActivity(id) {
-    setActivities((prev) => prev.filter((a) => a.id !== id))
+    setManual((prev) => prev.filter((a) => a.id !== id))
+    setTourItems((prev) => prev.filter((a) => a.id !== id))
   }
 
   return (
@@ -65,6 +88,42 @@ function WeekendScreen() {
         <h1 className="font-display font-extrabold text-[28px] leading-[34px]">주말에 뭐하지?</h1>
         <p className="text-foreground-muted text-[15px] leading-[22px] mt-2">우리 지역 축제·볼거리·공연을 골라봐요. 대상별로 자유롭게 추가·삭제할 수 있어요.</p>
       </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <select
+          value={region}
+          onChange={(e) => setRegion(e.target.value)}
+          className="bg-surface rounded-md px-3 py-2.5 text-[14px] font-display font-bold border border-border outline-none"
+          aria-label="지역 선택"
+        >
+          {TOUR_REGIONS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <select
+          value={contentTypeId}
+          onChange={(e) => setContentTypeId(e.target.value)}
+          className="bg-surface rounded-md px-3 py-2.5 text-[14px] font-display font-bold border border-border outline-none"
+          aria-label="종류 선택"
+        >
+          {TOUR_CONTENT_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {tourError && (
+        <div className="bg-surface-muted border border-border rounded-lg px-4 py-3 mb-4">
+          <p className="text-[13px] text-foreground-muted">{tourError}</p>
+          <button
+            type="button"
+            onClick={loadTour}
+            className="mt-2 text-[13px] font-display font-bold text-primary active:scale-95 transition duration-150"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-5">
         {FILTERS.map((f) => (
@@ -81,7 +140,9 @@ function WeekendScreen() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {items.length === 0 ? (
+        {tourLoading ? (
+          <p className="text-[14px] text-foreground-muted py-4 text-center">{region} 관광 정보를 불러오는 중...</p>
+        ) : items.length === 0 ? (
           <p className="text-[14px] text-foreground-muted py-4 text-center">아직 등록된 나들이가 없어요. 아래에서 추가해보세요.</p>
         ) : (
           items.map((a, i) => {
