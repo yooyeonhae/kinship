@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
+import FamilyRewards from '../components/FamilyRewards'
 import {
   CHAT_EVENT,
   POINTS_EVENT,
@@ -586,6 +587,8 @@ function FamilyRoomScreen() {
           턴제 게임으로 온 가족이 함께 놀아요. 한 판 이기면 10p, 비기면 5p가 쌓여요.
         </p>
       </div>
+
+      <FamilyRewards points={points} />
 
       <div className="relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding">
         <p className="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
