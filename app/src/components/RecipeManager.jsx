@@ -1,7 +1,15 @@
 import { useState } from 'react'
-import { parseDescription } from '../lib/recipes'
+import { parseDescription, parseSteps } from '../lib/recipes'
 
-const EMPTY = { title: '', ingredients: '', note: '', cookMinutes: '' }
+const EMPTY = { title: '', ingredients: '', note: '', cookMinutes: '', steps: '' }
+
+// 줄바꿈이 곧 단계라는 규칙은 말로만 설명하면 잘 안 읽힌다. 예시를 그 모양 그대로 보여준다.
+const STEPS_PLACEHOLDER = [
+  '한 줄에 한 단계씩 적어주세요. 예)',
+  '재료를 먹기 좋은 크기로 썰어요.',
+  '냄비에 물 2컵을 붓고 된장을 풀어요.',
+  '채소를 넣고 5분 끓여요.',
+].join('\n')
 
 // 저장할 때는 다시 "재료 / 설명" 한 줄로 합친다. description 컬럼 하나에 담기 위한
 // 규칙이고, parseDescription()이 읽는 형식과 같아야 한다.
@@ -19,6 +27,7 @@ function draftFrom(recipe) {
     ingredients: ingredients.join(', '),
     note,
     cookMinutes: recipe.cook_minutes ? String(recipe.cook_minutes) : '',
+    steps: recipe.steps || '',
   }
 }
 
@@ -63,6 +72,7 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
       title,
       description: joinDescription(draft),
       cook_minutes: minutes ? Number(minutes) : null,
+      steps: draft.steps.trim() || null,
     }
     const ok = editingId ? await onUpdate(editingId, payload) : await onCreate(payload)
     if (!ok) {
@@ -135,6 +145,23 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
           </div>
 
           <div>
+            <p className="font-display font-bold text-label tracking-wide text-foreground-muted mb-1.5">
+              만드는 법
+            </p>
+            <textarea
+              value={draft.steps}
+              onChange={(e) => setDraft({ ...draft, steps: e.target.value })}
+              placeholder={STEPS_PLACEHOLDER}
+              rows={6}
+              maxLength={4000}
+              className="w-full bg-surface-muted rounded-md px-3 py-2.5 text-[15px] leading-[22px] border border-border outline-none focus:border-foreground transition duration-150 resize-y"
+            />
+            <p className="text-[12px] text-foreground-muted mt-1">
+              줄바꿈이 곧 단계예요. 번호는 화면에서 자동으로 붙습니다.
+            </p>
+          </div>
+
+          <div>
             <p className="font-display font-bold text-label tracking-wide text-foreground-muted mb-1.5">조리 시간(분)</p>
             <input
               type="number"
@@ -193,6 +220,9 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
                       <p className="text-[12px] text-foreground-muted mt-0.5">{ingredients.join(' · ')}</p>
                     )}
                     {note && <p className="text-[13px] text-foreground-muted mt-1 leading-[19px]">{note}</p>}
+                    <p className="text-[12px] text-foreground-muted mt-1">
+                      {parseSteps(r.steps).length > 0 ? `만드는 법 ${parseSteps(r.steps).length}단계` : '만드는 법 없음'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button

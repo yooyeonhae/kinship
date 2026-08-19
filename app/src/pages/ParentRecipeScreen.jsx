@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import FavoriteLinks from '../components/FavoriteLinks'
 import RecipeManager from '../components/RecipeManager'
+import RecipeDetail from '../components/RecipeDetail'
 import { parseDescription, pickTodayRecipes, sortRecipes } from '../lib/recipes'
 
 // 카드가 두 장이라 장식도 두 벌이다. 목업의 기울기·스티커 위치를 그대로 쓴다.
@@ -11,11 +12,16 @@ const CARD_DECOR = [
   { rotate: 'rotate-2', icon: 'ph-cooking-pot', badge: 'absolute -top-3 left-3', badgeBg: 'bg-primary', badgeFg: 'text-on-primary', timeColor: 'text-secondary' },
 ]
 
-function RecipeCard({ recipe, decor }) {
+function RecipeCard({ recipe, decor, onOpen }) {
   const { ingredients, note } = parseDescription(recipe.description)
 
   return (
-    <div className={`${decor.rotate} bg-surface border-2 border-foreground rounded-md shadow-sticker`}>
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${recipe.title} 레시피 보기`}
+      className={`${decor.rotate} text-left bg-surface border-2 border-foreground rounded-md shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150`}
+    >
       <div className="relative">
         <div className="aspect-[4/3] rounded-t-[14px] overflow-hidden bg-surface-muted flex items-center justify-center">
           <i className={`ph-duotone ${decor.icon} text-6xl text-foreground-muted`} aria-hidden="true"></i>
@@ -39,16 +45,22 @@ function RecipeCard({ recipe, decor }) {
 
         {note && <p className="text-[12px] text-foreground-muted leading-[18px] mb-2">{note}</p>}
 
-        {recipe.cook_minutes ? (
-          <div className="border-t border-dashed border-border pt-2">
+        <div className="border-t border-dashed border-border pt-2 flex items-center justify-between">
+          {recipe.cook_minutes ? (
             <span className={`inline-flex items-center gap-1 text-[11px] font-display font-bold ${decor.timeColor}`}>
               <i className="ph-bold ph-clock"></i>
               {recipe.cook_minutes}분
             </span>
-          </div>
-        ) : null}
+          ) : (
+            <span></span>
+          )}
+          <span className="inline-flex items-center gap-0.5 text-[11px] font-display font-bold text-foreground-muted">
+            레시피
+            <i className="ph-bold ph-caret-right text-[10px]"></i>
+          </span>
+        </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -60,6 +72,7 @@ function ParentRecipeScreen() {
   const [errorMsg, setErrorMsg] = useState('')
   const [needsMigration, setNeedsMigration] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [openRecipe, setOpenRecipe] = useState(null)
 
   const load = useCallback(async () => {
     if (!familyId) return
@@ -108,6 +121,7 @@ function ParentRecipeScreen() {
     setBusy(false)
     if (error) return false
     setRecipes((prev) => sortRecipes(prev.map((r) => (r.recipe_id === recipeId ? data : r))))
+    setOpenRecipe((prev) => (prev && prev.recipe_id === recipeId ? data : prev))
     return true
   }
 
@@ -119,6 +133,7 @@ function ParentRecipeScreen() {
     }
     setErrorMsg('')
     setRecipes((prev) => prev.filter((r) => r.recipe_id !== recipe.recipe_id))
+    setOpenRecipe((prev) => (prev && prev.recipe_id === recipe.recipe_id ? null : prev))
   }
 
   return (
@@ -153,10 +168,17 @@ function ParentRecipeScreen() {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {todays.map((recipe, i) => (
-            <RecipeCard key={recipe.recipe_id} recipe={recipe} decor={CARD_DECOR[i % CARD_DECOR.length]} />
+            <RecipeCard
+              key={recipe.recipe_id}
+              recipe={recipe}
+              decor={CARD_DECOR[i % CARD_DECOR.length]}
+              onOpen={() => setOpenRecipe(recipe)}
+            />
           ))}
         </div>
       )}
+
+      {openRecipe && <RecipeDetail recipe={openRecipe} onClose={() => setOpenRecipe(null)} />}
 
       <RecipeManager
         recipes={recipes}

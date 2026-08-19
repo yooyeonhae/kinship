@@ -20,6 +20,17 @@ export function parseDescription(description) {
   return { ingredients, note: tail.trim() }
 }
 
+// 조리 순서는 여러 줄 텍스트 한 칸에 담긴다(migration_12). 화면에서 줄 단위로 나눠
+// 번호를 붙이므로, 사용자가 이미 "1." "1)" 같은 번호를 적어 넣었으면 지운다 —
+// 그대로 두면 "1. 1. 재료를 썰어요"가 된다.
+export function parseSteps(steps) {
+  if (!steps) return []
+  return steps
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\d+\s*[.)\]]?\s*/, '').trim())
+    .filter(Boolean)
+}
+
 // 같은 날이면 가족 모두가 같은 메뉴를 봐야 한다. 부모가 "오늘 카레래"라고 말했는데
 // 상대 화면에 다른 게 떠 있으면 대화가 어긋난다. 그래서 무작위가 아니라 날짜로 정한다.
 // 새로고침해도 바뀌지 않는다는 것도 "오늘의" 메뉴가 되기 위한 조건이다.
