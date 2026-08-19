@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
+import FamilyInvite from '../components/FamilyInvite'
 
 const CHILD_STYLES = [
   { icon: 'ph-baseball-cap', bg: 'bg-pastel-mint', avatarText: 'text-member-1', rotate: '-rotate-1' },
@@ -89,15 +90,12 @@ function EntryScreen() {
         </div>
       )}
 
-      {/* 다른 기기에서 이 가족을 이어서 쓰려면 이 코드가 필요하다 */}
+      {/* 다른 기기(특히 아이 휴대폰)를 이 가족에 연결하는 유일한 경로 */}
       <details className="mt-8 bg-surface border border-border rounded-md px-4 py-3">
         <summary className="font-display font-bold text-[13px] text-foreground-muted cursor-pointer">
-          가족 코드 보기
+          가족 초대하기 (QR · 링크)
         </summary>
-        <p className="font-mono text-[12px] break-all leading-[18px] mt-2">{familyId}</p>
-        <p className="text-foreground-muted text-[12px] leading-[18px] mt-2">
-          다른 기기에서 이 코드를 넣으면 구성원을 다시 입력하지 않고 이어서 쓸 수 있어요.
-        </p>
+        <FamilyInvite familyId={familyId} />
       </details>
 
       <button

@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
+import FamilyInvite from '../components/FamilyInvite'
 
 const TAB_GUIDE = [
   {
@@ -75,8 +76,10 @@ function TabGuide() {
 function OnboardingScreen() {
   const { createFamily, joinFamily } = useFamily()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteCode = searchParams.get('code')
 
-  const [mode, setMode] = useState('create')
+  const [mode, setMode] = useState(inviteCode ? 'join' : 'create')
   const [familyName, setFamilyName] = useState('')
   const [members, setMembers] = useState([])
   const [draftName, setDraftName] = useState('')
@@ -84,10 +87,23 @@ function OnboardingScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const [joinCode, setJoinCode] = useState('')
+  const [joinCode, setJoinCode] = useState(inviteCode || '')
+  // 초대 링크로 들어왔으면 아이가 아무것도 누르지 않아도 끝나야 한다
+  const [autoJoining, setAutoJoining] = useState(Boolean(inviteCode))
   // 만들어진 가족 코드를 보여주기 전에 화면을 넘기면, 다음 기기에서 이어 쓸 방법이 사라진다.
   const [createdId, setCreatedId] = useState(null)
-  const [copied, setCopied] = useState(false)
+
+  // StrictMode의 이중 실행과 리렌더로 join이 여러 번 나가지 않게 한 번만 시도한다
+  const autoJoinTried = useRef(false)
+  useEffect(() => {
+    if (!inviteCode || autoJoinTried.current) return
+    autoJoinTried.current = true
+    joinFamily(inviteCode).then((res) => {
+      setAutoJoining(false)
+      if (res.ok) navigate('/', { replace: true })
+      else setError(JOIN_ERROR[res.error] || JOIN_ERROR.network)
+    })
+  }, [inviteCode, joinFamily, navigate])
 
   function addMember() {
     const name = draftName.trim()
@@ -132,14 +148,12 @@ function OnboardingScreen() {
     navigate('/', { replace: true })
   }
 
-  async function copyCode() {
-    try {
-      await navigator.clipboard.writeText(createdId)
-      setCopied(true)
-    } catch {
-      // 클립보드가 막힌 환경(비 HTTPS 등)에서는 화면의 코드를 직접 옮겨 적으면 된다
-      setCopied(false)
-    }
+  if (autoJoining) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
+        <p className="font-display font-bold text-body-lg">우리 가족으로 들어가는 중이에요…</p>
+      </div>
+    )
   }
 
   if (createdId) {
@@ -149,20 +163,15 @@ function OnboardingScreen() {
           <span className="inline-block w-3 h-3 rounded-full bg-accent mb-3" aria-hidden="true"></span>
           <h1 className="font-display font-extrabold text-display">가족이 만들어졌어요</h1>
           <p className="text-foreground-muted text-body mt-2">
-            아래 <strong>가족 코드</strong>를 적어두세요. 다른 기기나 브라우저에서 이 코드를 넣으면 구성원을 다시 입력하지
-            않고 그대로 이어서 쓸 수 있어요.
+            아이 휴대폰에서는 아래 <strong>QR</strong>만 찍으면 바로 들어와요. 한 번 들어오면 그 기기에 저장돼서 다음부터는
+            아무것도 입력하지 않아도 돼요. 이 화면은 홈 아래 “가족 초대하기”에서 언제든 다시 열 수 있어요.
           </p>
 
-          <div className="mt-5 bg-surface border border-border rounded-md px-4 py-3.5">
-            <p className="font-display font-bold text-label tracking-wide text-foreground-muted mb-1.5">가족 코드</p>
-            <p className="font-mono text-[13px] break-all leading-[20px]">{createdId}</p>
-            <button
-              type="button"
-              onClick={copyCode}
-              className="mt-3 text-[13px] font-display font-bold text-primary active:scale-95 transition duration-150"
-            >
-              {copied ? '복사했어요' : '코드 복사하기'}
-            </button>
+          <div className="mt-5 bg-surface border border-border rounded-md px-4 py-4">
+            <p className="font-display font-bold text-label tracking-wide text-foreground-muted mb-3 text-center">
+              가족 초대
+            </p>
+            <FamilyInvite familyId={createdId} compact />
           </div>
 
           <button
@@ -229,7 +238,8 @@ function OnboardingScreen() {
                 spellCheck="false"
               />
               <p className="text-foreground-muted text-[12px] mt-2 leading-[18px]">
-                가족을 처음 만들 때 안내된 36자리 코드예요. 같은 가족의 다른 기기에서 확인할 수 있어요.
+                코드를 직접 칠 필요는 없어요. 부모님 앱 홈의 <strong>“가족 초대하기”</strong>에서 QR을 찍거나 초대 링크를
+                열면 이 단계가 저절로 끝나요.
               </p>
             </div>
 

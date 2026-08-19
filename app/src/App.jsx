@@ -43,8 +43,10 @@ function OnboardingRoute() {
   // 마운트 시점의 값으로만 판단한다. 화면 안에서 가족을 만들면 familyId가 생기는데,
   // 그때마다 리다이렉트하면 새로 발급된 가족 코드를 보여줄 틈이 없다.
   const [hadFamilyOnMount] = useState(() => Boolean(localStorage.getItem('kinship_family_id')))
+  // 초대 링크(?code=)는 이미 다른 가족이 저장된 기기에서도 열려야 한다.
+  const hasInviteCode = new URLSearchParams(window.location.search).has('code')
   if (loading) return null
-  if (familyId && hadFamilyOnMount) return <Navigate to="/" replace />
+  if (familyId && hadFamilyOnMount && !hasInviteCode) return <Navigate to="/" replace />
   return <OnboardingScreen />
 }
 
