@@ -28,6 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `migration_07_recipes.sql` — 오늘의 추천 메뉴를 `recipes` 테이블로. `family_id`(nullable)와 `cook_minutes` 추가 + 기본 레시피 14개 시드. **PRD는 `recipes`를 "가족 구분 없는 공용 테이블"로 정의했지만 그대로 쓰기를 열면 한 가족이 다른 가족 것을 지울 수 있어**, `family_id is null` = 모두가 보는 기본 레시피(앱에서 수정 불가), 값이 있으면 그 가족 것으로 나눴다. 쓰기는 부모만. 시드는 제목 중복 검사를 하므로 여러 번 실행해도 쌓이지 않는다.
 - `migration_08_rewards.sql` — 가족 포인트 보상 목표(`rewards`). 조회는 가족 전체(아이도 목표를 봐야 동기가 된다), 등록·수정·**달성 처리는 부모만** — 아이가 스스로 소진 처리하면 협의가 아니라 선언이 된다.
 - `migration_09_schedules.sql` — 아이 요일별 스케줄(`schedules`). `repeat_type`이 `weekly`면 `day_of_week`만, `once`면 `schedule_date`만 차야 한다(`schedules_when_check`) — 둘 다 비면 언제인지 알 수 없고 둘 다 차면 어느 쪽을 따를지 알 수 없다. `alarm_minutes`는 "몇 분 전"이고 null이면 알림 없음. 쓰기는 부모만(todos·weekly_outfit_rules와 같은 규칙).
+- `migration_10_family_name_unique.sql` — `families.name` 중복 금지. **`lower(btrim(name))` 기준**이라 대소문자·앞뒤 공백만 다른 이름도 같은 이름으로 본다(그러지 않으면 막는 의미가 없다). `create_family`를 다시 정의해 `unique_violation`을 잡아 `{ok:false, error:'name_taken'}`으로 돌려주고, `OnboardingScreen`이 이를 "이미 같은 이름의 가족이 있어요"로 보여준다. 중복 여부를 미리 select로 확인하지 않는 이유는 확인과 insert 사이에 다른 요청이 끼어들 수 있어서다. **이미 중복이 있으면 인덱스 생성이 실패하므로 파일 상단의 확인 질의를 먼저 돌릴 것** — 가족 데이터라 자동 정리는 넣지 않았다.
 
 앞으로 정책·스키마를 추가할 때는 `app/supabase/`에 `migration_NN_*.sql`로 파일을 만들고, Dashboard의 SQL Editor에서 실행해야 반영된다(anon 키로는 정책 생성이 불가능하고, 이 환경에는 Supabase CLI·psql이 설치되어 있지 않다).
 
@@ -73,6 +74,8 @@ The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, w
 **Realtime은 Broadcast/Presence만 쓴다 — `postgres_changes`는 이 앱에서 동작하지 않는다.** 신원이 PostgREST 요청 헤더(`x-family-id`)에만 실리는데, `postgres_changes`는 웹소켓 연결의 JWT로 RLS를 평가하므로 그 헤더가 존재하지 않는다. `current_family_id()`가 null이 되어 **에러 없이 아무 행도 전달되지 않는다**(조용히 안 되는 쪽이라 디버깅이 오래 걸린다). 그래서 `app/src/lib/familyRoom.js`는 "테이블 INSERT는 PostgREST로, 알림은 같은 내용을 Broadcast로" 조합한다 — PRD 3.8이 지정한 Broadcast/Presence와도 일치한다. 채널 이름(`family-room:<family_id>`)에 family_id가 들어가므로 family_id를 아는 사람은 채널에 들어올 수 있다(앱 전체와 같은 구조적 한계).
 
 **아지트의 게임판 자체는 아직 한 기기 안에서만 돈다.** 채팅·접속 표시·포인트는 기기 간에 동기화되지만, 합이 15/빙고/계단은 "선수1·선수2를 골라 한 화면에서 번갈아 하는" 핫시트 방식이다. 기기를 넘나드는 대전으로 만들려면 초대·참가·"지금 내 차례인가"까지 필요해서 화면 재설계가 따른다 — 발표에서 이 경계를 넘겨 말하지 말 것.
+
+**가족 포인트 = 게임 점수 + 끝낸 할일 수 × 10p.** 할일 점수는 적립 표에 쌓지 않고 **지금 완료 상태인 할일 수에서 매번 계산한다**(`loadTodoPoints`) — 완료 이벤트를 쌓으면 체크를 켰다 껐다 하는 것만으로 점수가 무한히 늘어난다. 상태에서 계산하면 체크를 풀 때 점수도 함께 돌아간다. 할일을 토글하면 `kinship:points` 이벤트가 나가고 아지트가 다시 읽는다(`kinship:change`가 아닌 이유: 그걸 쓰면 할일 화면 자신의 목록 새로고침까지 돌아 진행 애니메이션이 다시 튄다).
 
 **"오늘의" 메뉴는 무작위가 아니라 날짜로 정한다** (`app/src/lib/recipes.js`의 `pickTodayRecipes`). 무작위로 뽑으면 (a) 새로고침할 때마다 바뀌어 "오늘의"가 아니게 되고, (b) 같은 날 가족끼리 서로 다른 메뉴를 봐서 "오늘 카레래" 같은 대화가 어긋난다. `recipe_id`로 정렬을 고정한 뒤 날짜 숫자로 인덱스를 잡으므로, 회전의 기준이 흔들리지 않게 `sortRecipes()`를 거치지 않고 목록을 넘기면 안 된다. `description`은 `"재료, 재료 / 한 줄 설명"` 한 줄에 담고 화면에서 `parseDescription()`이 재료 칩과 설명으로 나눈다 — 손으로 입력하는 칸이라 이 형식을 안 지킨 값도 들어오며, 그때는 전체가 설명이 된다.
 

@@ -36,6 +36,14 @@ const TAB_GUIDE = [
   },
 ]
 
+const CREATE_ERROR = {
+  name_taken: '이미 같은 이름의 가족이 있어요. 다른 이름으로 만들어주세요.',
+  name_required: '가족 이름을 입력해주세요.',
+  members_required: '구성원을 한 명 이상 등록해주세요.',
+  member_name_required: '구성원 이름이 비어 있어요.',
+  member_role_invalid: '구성원 역할을 다시 선택해주세요.',
+}
+
 const JOIN_ERROR = {
   format: '가족 코드 형식이 올바르지 않아요. 36자리 코드를 그대로 붙여넣어 주세요.',
   not_found: '그 코드의 가족을 찾지 못했어요. 코드를 다시 확인해주세요.',
@@ -128,8 +136,10 @@ function OnboardingScreen() {
     try {
       const id = await createFamily(name, members)
       setCreatedId(id)
-    } catch {
-      setError('가족을 만드는 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.')
+    } catch (err) {
+      // create_family()가 돌려준 사유를 그대로 문장으로 바꾼다.
+      // 특히 이름 중복은 사용자가 바로 고칠 수 있는 문제라 뭉뚱그리면 안 된다.
+      setError(CREATE_ERROR[err?.message] || '가족을 만드는 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setSubmitting(false)
     }
