@@ -7,6 +7,12 @@ const FILTERS = [
   { key: 'family', label: '가족' },
 ]
 
+// 축제 이름만 검색하면 동명의 다른 지역 행사가 섞인다. 지역을 함께 넣어 좁힌다.
+function naverSearchUrl(activity) {
+  const query = [activity.title, activity.region].filter(Boolean).join(' ')
+  return `https://search.naver.com/search.naver?query=${encodeURIComponent(query)}`
+}
+
 const TYPE_ICON = { festival: 'ph-confetti', sight: 'ph-binoculars', play: 'ph-ticket' }
 
 const CATEGORY_STYLE = {
@@ -159,7 +165,14 @@ function WeekendScreen() {
                 <span className={`w-11 h-11 rounded-full ${style.iconBg} flex items-center justify-center shrink-0`}>
                   <i className={`ph-duotone ${TYPE_ICON[a.type] || 'ph-confetti'} text-xl ${style.iconText}`}></i>
                 </span>
-                <div className="flex-1 min-w-0">
+                {/* TourAPI는 축제 상세 URL을 주지 않는다. 이름만으로 찾아보게 하는 게
+                    가장 확실해서, 지역을 붙인 검색어로 네이버에 넘긴다. */}
+                <a
+                  href={naverSearchUrl(a)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-0 active:scale-[0.99] transition duration-150"
+                >
                   <div className="flex items-start flex-wrap gap-2 mb-1">
                     <span className="font-display font-bold text-[16px] flex-1 min-w-[120px]">{a.title}</span>
                     <span className={`text-[11px] font-display font-bold px-2 py-0.5 rounded-full ${style.badgeBg} ${style.badgeText} shrink-0`}>{style.label}</span>
@@ -168,7 +181,10 @@ function WeekendScreen() {
                     {a.region}
                     {a.location ? ` · ${a.location}` : ''} · {a.date}
                   </p>
-                </div>
+                  <span className="inline-flex items-center gap-1 text-[12px] font-display font-bold text-primary mt-1.5">
+                    <i className="ph-bold ph-magnifying-glass text-xs"></i>네이버에서 자세히 보기
+                  </span>
+                </a>
                 <button
                   type="button"
                   onClick={() => removeActivity(a.id)}
