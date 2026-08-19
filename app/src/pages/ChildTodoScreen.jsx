@@ -89,6 +89,10 @@ function ChildTodoScreen() {
 
     setErrorMsg('')
     setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data.todo : t)))
+    // 가족 포인트가 완료 개수에서 계산되므로 알린다. kinship:change를 쓰면
+    // 이 화면의 목록 새로고침까지 같이 돌아 진행 애니메이션이 다시 튄다.
+    window.dispatchEvent(new CustomEvent('kinship:points'))
+
     setPoppedId(todo.todo_id)
     // 축하 연출은 체크할 때만 — 해제할 때는 별이 튀지 않아야 한다
     if (nextDone) {

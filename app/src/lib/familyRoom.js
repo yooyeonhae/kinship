@@ -22,6 +22,21 @@ export function pointsFor(isDraw) {
   return isDraw ? 5 : 10
 }
 
+// 끝낸 할일 하나당 주는 점수.
+export const TODO_POINT = 10
+
+// 할일 점수는 별도 표에 쌓지 않고 "지금 완료 상태인 할일 수"에서 매번 계산한다.
+// 완료 이벤트를 적립식으로 쌓으면 체크를 켰다 껐다 반복하는 것만으로 점수가 무한히
+// 늘어난다. 상태에서 계산하면 체크를 풀 때 점수도 함께 돌아가므로 그럴 여지가 없다.
+export async function loadTodoPoints(supabase) {
+  const { count, error } = await supabase
+    .from('todos')
+    .select('todo_id', { count: 'exact', head: true })
+    .eq('is_done', true)
+  if (error) return { error }
+  return { data: (count || 0) * TODO_POINT }
+}
+
 export async function loadChat(supabase, limit = 50) {
   const { data, error } = await supabase
     .from('chat_messages')
@@ -42,10 +57,18 @@ export async function sendChat(supabase, { familyId, memberId, senderName, conte
   return { data, error }
 }
 
-export async function loadPoints(supabase) {
+export async function loadGamePoints(supabase) {
   const { data, error } = await supabase.from('game_results').select('points')
   if (error) return { error }
   return { data: (data || []).reduce((sum, r) => sum + (r.points || 0), 0) }
+}
+
+// 가족 포인트 = 게임에서 얻은 점수 + 끝낸 할일 점수
+export async function loadPoints(supabase) {
+  const [game, todo] = await Promise.all([loadGamePoints(supabase), loadTodoPoints(supabase)])
+  if (game.error) return { error: game.error }
+  if (todo.error) return { error: todo.error }
+  return { data: { total: game.data + todo.data, game: game.data, todo: todo.data } }
 }
 
 export async function recordGameResult(supabase, { familyId, gameKey, winnerId, opponentId, isDraw }) {

@@ -79,6 +79,10 @@ function ParentTasksScreen() {
     }
     setErrorMsg('')
     setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? data.todo : t)))
+    // 가족 포인트가 완료 개수에서 계산되므로 알린다. kinship:change를 쓰면
+    // 이 화면의 목록 새로고침까지 같이 돌아 진행 애니메이션이 다시 튄다.
+    window.dispatchEvent(new CustomEvent('kinship:points'))
+
   }
 
   async function removeTask(id) {

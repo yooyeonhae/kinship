@@ -10,6 +10,7 @@ import {
   isMissingTable,
   loadChat,
   loadPoints,
+  TODO_POINT,
   pointsFor,
   recordGameResult,
   sendChat,
@@ -234,6 +235,25 @@ function FamilyRoomScreen() {
     }
   }, [supabase, familyId])
 
+  // 할일 점수는 완료 상태에서 계산하므로, 할일이 바뀌면 여기서도 다시 읽어야 한다.
+  const refreshPoints = useCallback(async () => {
+    const pts = await loadPoints(supabase)
+    if (!pts.error) setPoints(pts.data)
+  }, [supabase])
+
+  useEffect(() => {
+    window.addEventListener('kinship:change', refreshPoints)
+    window.addEventListener('kinship:points', refreshPoints)
+    // 다른 화면에서 할일을 체크하고 이 탭으로 돌아왔을 때도 맞아야 한다
+    document.addEventListener('visibilitychange', refreshPoints)
+    return () => {
+      window.removeEventListener('kinship:change', refreshPoints)
+      window.removeEventListener('kinship:points', refreshPoints)
+      document.removeEventListener('visibilitychange', refreshPoints)
+    }
+  }, [refreshPoints])
+
+
   // Realtime — 같은 가족 채널에 붙어 메시지·포인트를 주고받고, 누가 접속해 있는지 본다
   useEffect(() => {
     if (!familyId || !currentMemberId) return
@@ -251,7 +271,8 @@ function FamilyRoomScreen() {
         )
       })
       .on('broadcast', { event: POINTS_EVENT }, ({ payload }) => {
-        setPoints((prev) => (prev === null ? prev : prev + (payload.points || 0)))
+        const gained = payload.points || 0
+        setPoints((prev) => (prev === null ? prev : { ...prev, total: prev.total + gained, game: prev.game + gained }))
       })
       .on('presence', { event: 'sync' }, () => {
         setOnlineIds(Object.keys(channel.presenceState()))
@@ -314,7 +335,7 @@ function FamilyRoomScreen() {
         return
       }
       const gained = pointsFor(isDraw)
-      setPoints((prev) => (prev === null ? gained : prev + gained))
+      setPoints((prev) => (prev === null ? prev : { ...prev, total: prev.total + gained, game: prev.game + gained }))
       channelRef.current?.send({ type: 'broadcast', event: POINTS_EVENT, payload: { points: gained } })
     },
     [supabase, familyId, player1Id, player2Id]
@@ -580,15 +601,20 @@ function FamilyRoomScreen() {
             <i className="ph-duotone ph-game-controller text-xl text-tape-yellow"></i>미니게임존
           </p>
           <span className="bg-tape-yellow text-foreground font-display font-bold text-[12px] rounded-full px-3 py-1 whitespace-nowrap">
-            가족 포인트: {points === null ? '-' : points.toLocaleString('ko-KR')}p
+            가족 포인트: {points === null ? '-' : points.total.toLocaleString('ko-KR')}p
           </span>
         </div>
         <p className="text-[13px] text-white/70 mt-2">
-          턴제 게임으로 온 가족이 함께 놀아요. 한 판 이기면 10p, 비기면 5p가 쌓여요.
+          한 판 이기면 10p, 비기면 5p, 할일을 하나 끝내면 {TODO_POINT}p가 쌓여요.
         </p>
+        {points !== null && (
+          <p className="text-[12px] text-white/60 mt-1">
+            게임 {points.game.toLocaleString('ko-KR')}p · 할일 {points.todo.toLocaleString('ko-KR')}p
+          </p>
+        )}
       </div>
 
-      <FamilyRewards points={points} />
+      <FamilyRewards points={points?.total ?? null} />
 
       <div className="relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding">
         <p className="font-display font-bold text-[15px] mb-3 flex items-center gap-2">
