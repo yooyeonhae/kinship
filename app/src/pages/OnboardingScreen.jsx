@@ -67,7 +67,7 @@ function TabGuide() {
         ))}
       </ul>
       <p className="text-foreground-muted text-[13px] leading-[20px] mt-4">
-        오른쪽 아래 💬 버튼을 누르면 챗봇이 열려요. “오늘 할일 뭐 있어?”, “오늘 18시 도서관 가야 된다”처럼 말하면 돼요.
+        오른쪽 아래 <strong>“챗봇”</strong> 스티커를 누르면 대화창이 열려요. “오늘 할일 뭐 있어?”, “오늘 18시 도서관 가야 된다”처럼 말하면 돼요.
       </p>
     </div>
   )

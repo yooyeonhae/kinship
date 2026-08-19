@@ -130,7 +130,7 @@ function ChildTodoScreen() {
 
       <div className="bg-surface-muted rounded-lg shadow-soft px-5 py-5 mb-6 text-center">
         <h1 className="font-display font-extrabold text-[22px] leading-[28px] text-accent">{headingFor(total, filled)}</h1>
-        <p className="font-doodle text-[14px] text-foreground-muted mt-1">
+        <p className="font-doodle text-[18px] text-foreground-muted mt-1">
           별 스티커 {filled}/{total}개 모았어요!
         </p>
         <div className="relative mt-4">
@@ -198,13 +198,13 @@ function ChildTodoScreen() {
         </div>
       )}
 
-      <p className={`remaining-msg font-doodle text-[15px] text-accent mt-5 text-center ${celebrate ? 'celebrate' : ''}`}>
+      <p className={`remaining-msg font-doodle text-[19px] text-accent mt-5 text-center ${celebrate ? 'celebrate' : ''}`}>
         {total === 0 ? ' ' : remaining === 0 ? '다 했어요! 오늘도 최고예요!' : `${remaining}개 남았어요, 하나씩 눌러봐요!`}
       </p>
 
       <div className="border-2 border-dashed border-border rounded-lg px-4 py-5 mt-6 mb-2 text-center">
         <h2 className="font-display font-bold text-[15px] text-secondary">참 잘했어요! 스티커 판</h2>
-        <p className="font-doodle text-[13px] text-foreground-muted mt-0.5">Great Job! Sticker Board</p>
+        <p className="font-doodle text-[17px] text-foreground-muted mt-0.5">Great Job! Sticker Board</p>
         <div className="flex items-center justify-center gap-3 mt-4" aria-hidden="true">
           <span className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center text-foreground-muted/60">
             <i className="ph ph-heart text-lg"></i>

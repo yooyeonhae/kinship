@@ -145,7 +145,7 @@ function ParentProgressScreen() {
       <div className="flex-1"></div>
       <div className="flex items-center justify-center gap-2 mb-1" aria-hidden="true">
         <i className="ph-duotone ph-coffee text-xl text-member-4 rotate-[-6deg]"></i>
-        <span className="font-doodle text-[14px] text-foreground-muted">오늘도 고생했어요</span>
+        <span className="font-doodle text-[18px] text-foreground-muted">오늘도 고생했어요</span>
       </div>
     </>
   )

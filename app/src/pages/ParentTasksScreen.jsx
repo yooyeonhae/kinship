@@ -3,18 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 
-// 냉장고 재료는 Supabase 스키마에 없는 화면 전용 더미 항목 — 이번 연동 범위(가족 할일)에서 제외
-const INITIAL_FRIDGE = [
-  { id: 'f1', name: '우유' },
-  { id: 'f2', name: '계란' },
-  { id: 'f3', name: '소세지' },
-  { id: 'f4', name: '두부' },
-  { id: 'f5', name: '애호박' },
-]
-
 const QUICK_CHIPS = ['우유 사기', '쓰레기 버리기', '준비물 확인']
-
-let nextFridgeId = 100
 
 function ParentTasksScreen() {
   const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout } = useFamily()
@@ -24,9 +13,6 @@ function ParentTasksScreen() {
   const [errorMsg, setErrorMsg] = useState('')
   const [taskInput, setTaskInput] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
-
-  const [fridge, setFridge] = useState(INITIAL_FRIDGE)
-  const [fridgeInput, setFridgeInput] = useState('')
 
   const parents = members.filter((m) => m.role === 'parent')
 
@@ -105,18 +91,7 @@ function ParentTasksScreen() {
     setTodos((prev) => prev.filter((t) => t.todo_id !== id))
   }
 
-  function addFridgeItem(name) {
-    const v = name.trim()
-    if (!v) return
-    setFridge((prev) => [...prev, { id: `f${nextFridgeId++}`, name: v }])
-  }
-
-  function removeFridgeItem(id) {
-    setFridge((prev) => prev.filter((f) => f.id !== id))
-  }
-
   const remainingTotal = parents.reduce((sum, p) => sum + todos.filter((t) => t.assignee_member_id === p.member_id && !t.is_done).length, 0)
-  const needsAttentionCount = todos.filter((t) => !t.is_done).length
 
   return (
     <>
@@ -213,7 +188,7 @@ function ParentTasksScreen() {
       </div>
 
       <div className="relative mb-5">
-        <span className="absolute -top-2 left-2 w-11 h-5 bg-tape-pink/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
+        <span className="absolute -top-2 right-2 w-11 h-5 bg-tape-pink/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
         <p className="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-2">자주 쓰는 항목 — 눌러서 바로 추가</p>
         <div className="flex flex-wrap gap-2 mb-3">
           {QUICK_CHIPS.map((title) => (
@@ -262,13 +237,6 @@ function ParentTasksScreen() {
             autoComplete="off"
           />
         </form>
-      </div>
-
-      <div className="relative bg-accent/10 border border-dashed border-accent rounded-md px-4 py-3 mb-3 flex items-center justify-between">
-        <span className="flex items-center gap-2 text-accent">
-          <i className="ph-fill ph-warning-circle text-lg"></i>
-          <span className="font-display font-bold text-[13px] tracking-wide">NEEDS ATTENTION ({needsAttentionCount})</span>
-        </span>
       </div>
 
       {loadingTodos ? (
@@ -321,56 +289,6 @@ function ParentTasksScreen() {
           })}
         </div>
       )}
-
-      <div className="relative bg-surface-muted border border-border rounded-lg px-4 py-4 mt-6 rotate-[-1deg]">
-        <span className="absolute -top-2 left-6 w-11 h-5 bg-tape-lime/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
-        <p className="font-display font-bold text-[13px] tracking-wide text-foreground-muted mb-3 flex items-center gap-1.5">
-          <i className="ph-duotone ph-refrigerator text-base"></i>냉장고 재료
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {fridge.length === 0 ? (
-            <span className="text-foreground-muted text-[14px]">냉장고가 비어있어요.</span>
-          ) : (
-            fridge.map((f) => (
-              <span key={f.id} className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-full pl-3 pr-2 py-1.5 text-[14px] font-body">
-                {f.name}
-                <button
-                  type="button"
-                  onClick={() => removeFridgeItem(f.id)}
-                  className="w-5 h-5 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
-                  aria-label={`${f.name} 삭제`}
-                >
-                  <i className="ph-bold ph-x text-[11px] text-foreground-muted"></i>
-                </button>
-              </span>
-            ))
-          )}
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            addFridgeItem(fridgeInput)
-            setFridgeInput('')
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            type="text"
-            value={fridgeInput}
-            onChange={(e) => setFridgeInput(e.target.value)}
-            placeholder="재료 이름 입력 후 추가"
-            className="flex-1 bg-surface rounded-md px-3 py-2 text-[14px] border border-border outline-none"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            className="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150"
-            aria-label="냉장고에 추가"
-          >
-            <i className="ph-bold ph-plus text-base"></i>
-          </button>
-        </form>
-      </div>
 
       <div className="flex-1"></div>
       <Link to="/parent-progress" className="mt-6 flex items-center justify-center gap-2 text-secondary font-display font-bold text-[15px] py-2">

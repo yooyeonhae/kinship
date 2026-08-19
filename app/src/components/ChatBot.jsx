@@ -169,7 +169,7 @@ function ChatBot() {
         })
         if (rpcError || res?.ok === false) return '내가 담당인 할일만 완료로 바꿀 수 있어요.'
         notifyChange()
-        return `✅ "${hit.title}" 할일을 완료했어요.`
+        return `"${hit.title}" 할일을 완료했어요.`
       }
 
       if (intent === 'delete') {
@@ -182,7 +182,7 @@ function ChatBot() {
         const { error: delError } = await supabase.from('todos').delete().eq('todo_id', hit.todo_id)
         if (delError) return '할일을 삭제하지 못했어요.'
         notifyChange()
-        return `🗑️ "${hit.title}" 할일을 삭제했어요.`
+        return `"${hit.title}" 할일을 삭제했어요.`
       }
 
       if (!isParentAuthed) return '할일 등록은 부모만 할 수 있어요. 홈에서 부모로 전환한 뒤 PIN을 입력해주세요.'
@@ -194,7 +194,7 @@ function ChatBot() {
         .insert({ family_id: familyId, title: fullTitle, assignee_member_id: target?.member_id || null })
       if (error) return '할일을 추가하지 못했어요.'
       notifyChange()
-      return `➕ "${fullTitle}" 할일을 ${target ? target.name + ' 담당으로 ' : ''}추가했어요.`
+      return `"${fullTitle}" 할일을 ${target ? target.name + ' 담당으로 ' : ''}추가했어요.`
     },
     [supabase, familyId, findMember, isParentAuthed, notifyChange]
   )
@@ -255,31 +255,48 @@ function ChatBot() {
 
   return (
     <>
+      {/* 파란 원 + 아이콘은 어느 앱에나 있는 모양이라 이 앱의 콜라주 언어와 겉돌았다.
+          오려 붙인 말풍선 스티커로 바꾼다 — 워시테이프 옐로우 + 하드 보더/그림자 + 손글씨. */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="가족 챗봇 열기"
-          className="fixed z-40 bottom-20 right-6 w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-90 transition duration-150"
-          style={{ boxShadow: '0 4px 14px rgba(0,85,255,0.35), 0 2px 8px rgba(43,42,40,0.12)' }}
+          className="fixed z-40 bottom-20 right-5 active:scale-95 transition duration-150"
         >
-          <i className="ph-fill ph-chat-circle-dots text-2xl"></i>
+          <span className="relative inline-block -rotate-3">
+            {/* 꼬리를 먼저 깔고 말풍선이 그 위를 덮어 이음매를 가린다 */}
+            <span
+              className="absolute right-5 -bottom-1.5 w-3.5 h-3.5 bg-tape-yellow border-2 border-foreground rotate-45"
+              aria-hidden="true"
+            ></span>
+            <span className="relative block bg-tape-yellow text-foreground border-2 border-foreground rounded-md shadow-sticker px-3.5 py-2.5">
+              <span className="font-doodle font-bold text-[17px] leading-none block whitespace-nowrap">
+                챗봇
+              </span>
+            </span>
+          </span>
         </button>
       )}
 
       {open && (
         <div className="fixed inset-x-0 bottom-0 z-50">
           <div
-            className="max-w-md mx-auto bg-surface border border-border rounded-t-lg shadow-soft flex flex-col"
+            className="max-w-md mx-auto bg-surface border-x-2 border-t-2 border-foreground rounded-t-lg shadow-soft flex flex-col overflow-hidden"
             style={{ height: 'min(70vh, 560px)' }}
           >
+            {/* 스크랩북 상단에 붙인 워시테이프 */}
+            <div className="flex shrink-0" aria-hidden="true">
+              <span className="h-1.5 flex-1 bg-tape-blue"></span>
+              <span className="h-1.5 flex-1 bg-tape-yellow"></span>
+              <span className="h-1.5 flex-1 bg-tape-pink"></span>
+              <span className="h-1.5 flex-1 bg-tape-lime"></span>
+            </div>
+
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <i className="ph-duotone ph-robot text-lg text-primary"></i>
-                </span>
-                <span className="font-display font-bold text-[15px]">우리가족 챗봇</span>
-              </div>
+              <span className="font-display font-bold text-[16px] bg-tape-yellow/70 px-1.5 -rotate-1 inline-block">
+                우리집 도우미
+              </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -313,13 +330,13 @@ function ChatBot() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="예: 오늘 18시 도서관 가야 된다"
-                className="flex-1 bg-surface-muted rounded-md px-3 py-2.5 text-[15px] border border-border outline-none"
+                className="flex-1 bg-surface-muted rounded-md px-3 py-2.5 text-[15px] border border-border outline-none focus:border-foreground transition duration-150"
                 autoComplete="off"
               />
               <button
                 type="submit"
                 aria-label="보내기"
-                className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 active:scale-90 transition duration-150"
+                className="w-11 h-11 rounded-md bg-primary text-on-primary border-2 border-foreground shadow-sticker flex items-center justify-center shrink-0 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
               >
                 <i className="ph-bold ph-paper-plane-right text-lg"></i>
               </button>
