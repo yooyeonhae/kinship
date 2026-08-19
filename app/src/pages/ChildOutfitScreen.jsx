@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
-
-// 날씨는 이번 연동 범위 밖 — 실제 기상청 API 연동 전 임시 데이터
-const WEATHER = {
-  dateLabel: '10월 27일',
-  tempC: 22,
-  description: '맑음',
-  sourceNote: '실제 기상청 API 연동 전 · 임시 데이터',
-}
+import { fetchWeather, buildRecommendation } from '../lib/weather'
 
 // schema.sql의 day_of_week CHECK 제약과 같은 값('월'..'일')
 const DAY_CHARS = ['일', '월', '화', '수', '목', '금', '토']
@@ -41,6 +34,8 @@ function ChildOutfitScreen() {
   const [outfitType, setOutfitType] = useState(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [weather, setWeather] = useState(null)
+  const [weatherError, setWeatherError] = useState('')
 
   const reqIdRef = useRef(0)
 
@@ -69,10 +64,28 @@ function ChildOutfitScreen() {
     loadRule()
   }, [loadRule])
 
+  useEffect(() => {
+    let alive = true
+    fetchWeather()
+      .then((data) => {
+        if (alive) setWeather(data)
+      })
+      .catch((err) => {
+        if (alive) setWeatherError(err.message)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const recommendation = outfitType && weather ? buildRecommendation(outfitType, weather) : null
+
   const outfitItems = outfitType
     ? [
         { label: outfitType, icon: 'ph-shirt-folded', rotate: '-rotate-3', offset: '-translate-y-1' },
-        { label: '겉옷', icon: 'ph-jacket', rotate: 'rotate-3', offset: 'translate-y-2' },
+        ...(recommendation?.extra
+          ? [{ label: recommendation.extra.name, icon: 'ph-jacket', rotate: 'rotate-3', offset: 'translate-y-2' }]
+          : []),
       ]
     : []
 
@@ -80,13 +93,36 @@ function ChildOutfitScreen() {
     <>
       <div className="bg-surface-muted rounded-lg p-5 mb-6 flex items-center justify-between gap-4">
         <div>
-          <p className="font-display font-bold text-[19px] leading-snug">오늘 날씨 · {WEATHER.dateLabel}</p>
-          <p className="text-[15px] text-foreground-muted mt-1">{WEATHER.tempC}°C</p>
-          <p className="text-[11px] text-foreground-muted/70 mt-2">{WEATHER.sourceNote}</p>
+          <p className="font-display font-bold text-[19px] leading-snug">
+            오늘 날씨{weather ? ` · ${weather.dateLabel}` : ''}
+          </p>
+          {weather ? (
+            <>
+              <p className="text-[15px] text-foreground-muted mt-1">
+                {weather.tempC}°C
+                {weather.minTempC !== null && weather.maxTempC !== null
+                  ? ` (${weather.minTempC}° / ${weather.maxTempC}°)`
+                  : ''}
+              </p>
+              <p className="text-[11px] text-foreground-muted/70 mt-2">
+                {weather.region} · OpenWeatherMap
+                {weather.rainProb !== null ? ` · 강수확률 ${weather.rainProb}%` : ''}
+              </p>
+            </>
+          ) : (
+            <p className="text-[15px] text-foreground-muted mt-1">
+              {weatherError || '날씨를 불러오는 중...'}
+            </p>
+          )}
         </div>
         <div className="text-center shrink-0">
-          <i className="ph-duotone ph-cloud-sun text-5xl text-primary icon-sway" aria-hidden="true"></i>
-          <p className="text-[13px] font-display font-bold text-foreground-muted mt-1">{WEATHER.description}</p>
+          <i
+            className={`ph-duotone ${weather?.icon || 'ph-cloud-sun'} text-5xl text-primary icon-sway`}
+            aria-hidden="true"
+          ></i>
+          <p className="text-[13px] font-display font-bold text-foreground-muted mt-1">
+            {weather?.description || '—'}
+          </p>
         </div>
       </div>
 
@@ -134,9 +170,11 @@ function ChildOutfitScreen() {
                   <OutfitCard key={item.label} {...item} />
                 ))}
               </div>
-              <p className="font-display font-bold text-[17px] mb-1 text-center mt-4">{childName}, 오늘은 이렇게 입어요!</p>
+              <p className="font-display font-bold text-[17px] mb-1 text-center mt-4">
+                {childName}, 오늘은 이렇게 입어요!
+              </p>
               <p className="text-[15px] text-foreground-muted leading-[22px] text-center px-2">
-                {outfitType} 위에 겉옷을 챙기면 아침저녁 쌀쌀한 날씨에도 든든해요.
+                {recommendation ? recommendation.note : `오늘은 ${outfitType} 입는 날이에요.`}
               </p>
             </>
           ) : (
