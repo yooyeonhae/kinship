@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **확정된 기술스택** (8단계, 경량 버전 선택 — 로그인 없는 가족 내부용 웹앱이라 SSR/Edge Functions 불필요):
 - 프론트엔드: React + Vite (정적 SPA)
 - 백엔드/DB: Supabase (기본 테이블 + RLS. 워크시트 단계에서는 "RLS만"이었지만, 열 단위 제한과 원자성이 RLS로 불가능한 지점에 한해 `security definer` RPC를 쓴다 — 아래 "부모 권한" 항목)
-- 배포: Vercel 무료 티어
+- 배포: Vercel 무료 티어 (+ `app/api/`의 서버리스 함수 몇 개. 워크시트의 "SSR/Edge Functions 불필요"에서 벗어난 유일한 지점으로, **외부 API 키를 브라우저에 노출하지 않기 위한 프록시 용도로만** 쓴다 — 렌더링은 여전히 정적 SPA다)
 
 ## Project
 
@@ -45,9 +45,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `screens/` is still **static HTML + vanilla JS + Tailwind CDN, with no build step, no bundler**, and runs client-side against `localStorage` — treat that as intentional for those files, not a shortcut to "fix".
 
-The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, with explicit user confirmation at each step. **`app/` is now a working React SPA, not just a scaffold:** a single `app/index.html` entry + `react-router-dom`, with all 9 screens ported from `screens/*.html` into `app/src/pages/*.jsx` and the shared chrome (`Layout` / `Header` / `BottomNav`) in `app/src/components/`. `app/.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, gitignored) points at the dedicated `kinship` Supabase project.
+The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, with explicit user confirmation at each step. **`app/` is now a working React SPA, not just a scaffold:** a single `app/index.html` entry + `react-router-dom`, with all 9 screens ported from `screens/*.html` into `app/src/pages/*.jsx` and the shared chrome (`Layout` / `Header` / `BottomNav`) in `app/src/components/`. `app/.env` (gitignored) holds `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` for the dedicated `kinship` Supabase project, plus the server-only `TOUR_API_KEY`, `TOUR_API_SERVICE`, `WEATHER_API_KEY` (외부 API 항목 참고).
 
-**Supabase is wired for the 가족 할일 domain only.** `families` / `members` / `todos` are live (entry, child-outfit name lookup, child-todo, parent-tasks, parent-progress). Everything else is still hardcoded dummy data on purpose: 요일별 지정복(`weekly_outfit_rules`), 냉장고 재료(스키마에 테이블 자체가 없음), 레시피, 정보 피드, 주말 나들이, 아지트 채팅·게임. Don't assume a screen is connected just because it renders real-looking data.
+**Supabase is wired for the 가족 할일 domain only.** `families` / `members` / `todos` are live (entry, child-outfit name lookup, child-todo, parent-tasks, parent-progress). Everything else is still hardcoded dummy data on purpose: 냉장고 재료(스키마에 테이블 자체가 없음), 레시피, 정보 피드, 아지트 채팅·게임. Don't assume a screen is connected just because it renders real-looking data. 요일별 지정복(`weekly_outfit_rules`)은 Supabase에 붙어 있고, 주말 나들이(`WeekendScreen`)와 옷차림 날씨(`ChildOutfitScreen`)는 **Supabase가 아니라 외부 API**를 쓴다 — 아래 "외부 API" 항목 참고.
 
 **No login — `family_id` is the whole auth model.** `app/src/context/FamilyContext.jsx` owns it: stored in `localStorage` under `kinship_family_id`, sent as the `x-family-id` header by the client factory in `app/src/lib/supabaseClient.js`. `OnboardingScreen` creates the family; `App.jsx` gates every other route behind it and redirects to `/onboarding` when absent. `FamilyContext` also verifies the stored id still resolves to a real `families` row and self-clears if it doesn't (a stale id otherwise leaves the user stuck in an empty shell, because RLS returns `[]` rather than an error for a family that doesn't exist).
 
@@ -64,6 +64,13 @@ The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, w
 
 **Non-obvious RLS constraint — don't "simplify" `createFamily()`.** Inserting into `families` must (a) supply a client-generated `family_id` (`crypto.randomUUID()`), (b) use a client whose `x-family-id` header already equals that id, and (c) **not** chain `.select()`. Reason: `.select()` makes PostgREST send `Prefer: return=representation`, and Postgres applies the SELECT policy to the `INSERT ... RETURNING` row. `families_select_own` requires `family_id = current_family_id()`, so a DB-generated id can never match the header and the entire INSERT is rolled back with `42501`. This was verified empirically (`return=minimal` → 201, `return=representation` → 42501). `todos` and `members` are immune because their policies are `FOR ALL`, which covers the returning-select too.
 
+**외부 API는 `app/api/`의 서버리스 프록시를 거친다 (브라우저 직접 호출 금지).** 공공데이터포털·OpenWeatherMap 키를 번들에 노출시키지 않고 CORS도 피하기 위한 계층이다. Vercel이 `app/api/*.js`를 서버리스 함수로 자동 인식하고, `app/vite.config.js`의 `local-api-routes` 플러그인이 **같은 핸들러를 dev 미들웨어로도 마운트**해서 `npm run dev`와 배포본이 같은 `/api/*` 경로를 쓴다(`vercel dev` 불필요). 키는 `app/.env`에 **`VITE_` 접두사 없이** 둔다 — 접두사를 붙이면 클라이언트 번들에 박힌다. 배포 시 Vercel 프로젝트 환경변수에도 같은 이름으로 넣어야 한다.
+
+- `app/api/tour.js` — 한국관광공사 관광정보서비스_GW. **`KorService2`(국문)를 쓴다.** `RusService2`(노어)는 `resultCode 0000`으로 정상 응답하지만 `totalCount`가 모든 질의에서 0이라 사실상 비어 있다(같은 키로 두 서비스 모두 호출된다). `*Service1`은 폐기됨.
+  - `searchFestival2`의 `eventStartDate`는 **시작일이 그 날짜 이후인** 행사만 준다. 오늘 날짜를 넣으면 이미 진행 중인 축제가 전부 빠지므로, 180일 전부터 받아 **종료일이 지난 것을 직접 걸러낸다**.
+  - `searchFestival2`는 **`areacode`를 빈 문자열로 반환**한다. `areaCode` 파라미터를 붙이면 결과가 거의 0건이 되므로 전국을 받아 `addr1`에서 지역을 유도한다(`_area.js`의 `regionFromAddr`). 주소에 시/도 접두어가 없는 건(예: `포항시 북구 …`)은 **요청 지역으로 떨어뜨리지 말고 제외**할 것 — 떨어뜨리면 모든 지역에 동시에 노출된다. `areaBasedList2`는 `areacode`가 정상이라 이 처리가 필요 없다.
+- `app/api/weather.js` — OpenWeatherMap(기상청이 아니다). `/weather`와 `/forecast`를 병렬 호출한다: 현재 기온·상태는 실황에서, **오늘 최저/최고와 강수확률은 예보에만 있다**. `_grid.js`는 시/도 대표 **위경도**(기상청 격자 nx/ny가 아니다). `condition` 문자열의 `rain` 접두사로 `buildRecommendation()`이 우비를 판단하므로, **눈(6xx)에는 `rain` 접두사를 붙이지 않는다** — 눈에는 우비가 아니라 기온 기반 겉옷 추천이 맞다.
+
 `screens/` has **not** been migrated or connected to Supabase — it's still the standalone localStorage version, and both versions now coexist. Don't wire real backend calls into `screens/` without confirming with the user first.
 
 There is no test suite anywhere. Available verification:
@@ -76,6 +83,8 @@ For `app/` (React version) — run these from `app/`:
 - `npm run build` (Vite; catches syntax/import errors) and `npm run lint` (oxlint). A pre-existing non-blocking `react(only-export-components)` warning on `FamilyContext.jsx` is expected — it's the `useFamily` hook exported alongside the provider.
 - `npm run dev` (port 5173). Vite serves the SPA fallback for deep links; production needs the rewrite in `app/vercel.json` instead.
 - **RLS / backend behavior is best verified with `curl` against the REST API**, which is much faster than clicking through the UI and is the only way to confirm policy behavior directly. Pattern: `curl "$VITE_SUPABASE_URL/rest/v1/<table>?select=*" -H "apikey: $VITE_SUPABASE_ANON_KEY" -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" -H "x-family-id: <uuid>"`. Add `-H "Prefer: return=representation"` to reproduce what supabase-js's `.select()` does after a write. Note that a *wrong* `x-family-id` yields `200 []` and a delete affecting 0 rows still returns `204` — absence of an error does **not** mean the operation did anything, so assert on the resulting row state, not the status code.
+- **`/api/*` 프록시도 `curl`로 검증한다**: `curl "http://localhost:5173/api/tour?region=%EC%84%9C%EC%9A%B8&contentTypeId=15"`. 공공데이터포털은 장애·키 문제도 **HTTP 200 + XML 에러 문서**로 돌려주므로 상태 코드가 아니라 본문을 봐야 한다(`_serviceKey.js`의 `fetchJson`이 파싱 실패 시 본문을 실어 올린다). 프록시를 건너뛰고 상류를 직접 치면 원인 구분이 빠르다.
+- **`npm run dev`를 백그라운드로 띄웠으면 반드시 죽일 것.** 좀비 서버가 5173을 물고 있으면 새 인스턴스가 5174, 5175…로 밀려나고, `curl localhost:5173`은 **수정 전 코드**에 계속 붙는다. 코드가 멀쩡한데 고쳐도 안 고쳐지는 것처럼 보이는 전형적인 함정이다. `netstat -ano | grep ':517'`로 확인하고 `taskkill //F //PID <pid>`로 정리한다.
 - Anything visual (animations, the child-todo progress marker, layout) can only be verified by actually driving a browser; build/lint/curl will not catch it.
 
 ## Architecture
@@ -88,7 +97,7 @@ For `app/` (React version) — run these from `app/`:
 
 **Bottom nav (`js/bottomnav.js`), included on every page:** injects a fixed 5-tab bar (홈/할일/정보/주말/아지트). The "할일" tab target is context-sensitive — `child-outfit.html`/`child-todo.html` route to `child-todo.html`, everything else routes to `parent-tasks.html`. Active-tab highlighting matches on `location.pathname`'s filename. The chatbot's floating button is deliberately positioned at `bottom-20` (not `bottom-6`) to clear this bar — keep that offset if either component's height changes.
 
-**Mock external-API layer (`js/weather.js`, `js/tourapi.js`, `js/config.js`):** `config.js` defines `window.OF_CONFIG = { weatherApiKey, tourApiKey }`, currently both `null`. Each module branches on whether its key is set: `null` → resolves a mock Promise shaped like the real API's expected response; a key present → calls a `fetchReal()` stub that currently just rejects with an explanatory message. This is intentional scaffolding for 기상청 (weather) and 한국관광공사 TourAPI, chosen because real calls from a browser would hit CORS/key-exposure issues and need a server proxy that doesn't exist yet — don't wire real `fetch()` calls into these without first setting up that proxy and discussing it with the user.
+**Mock external-API layer (`js/weather.js`, `js/tourapi.js`, `js/config.js`):** `config.js` defines `window.OF_CONFIG = { weatherApiKey, tourApiKey }`, currently both `null`. Each module branches on whether its key is set: `null` → resolves a mock Promise shaped like the real API's expected response; a key present → calls a `fetchReal()` stub that currently just rejects with an explanatory message. This is intentional scaffolding for 기상청 (weather) and 한국관광공사 TourAPI, chosen because real calls from a browser would hit CORS/key-exposure issues and need a server proxy that doesn't exist yet — don't wire real `fetch()` calls into these without first setting up that proxy and discussing it with the user. **이 문단은 `screens/`에만 해당한다** — `app/`은 그 프록시(`app/api/`)를 실제로 갖췄고 실 API에 붙어 있다.
 
 **Page-specific game logic lives inline in `family-room.html`** (합이 15 / 계산 빙고 / 계단 오르기 — all turn-based; the PRD explicitly excludes reaction-speed/action games), rather than in a shared JS file, since it's not reused elsewhere.
 
