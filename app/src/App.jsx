@@ -46,8 +46,15 @@ function OnboardingRoute() {
   const [hadFamilyOnMount] = useState(() => Boolean(localStorage.getItem('kinship_family_id')))
   // 초대 링크(?code=)는 이미 다른 가족이 저장된 기기에서도 열려야 한다.
   const hasInviteCode = new URLSearchParams(window.location.search).has('code')
-  if (loading) return null
+
   if (familyId && hadFamilyOnMount && !hasInviteCode) return <Navigate to="/" replace />
+
+  // loading일 때 null을 돌려주면 OnboardingScreen이 통째로 언마운트된다. 가족을 만들면
+  // familyId가 생기고 FamilyContext가 곧바로 reload()에 들어가 loading이 잠깐 true가 되는데,
+  // 그 사이에 화면이 사라지면서 방금 발급된 가족 코드(createdId)까지 함께 날아가고,
+  // 다시 마운트됐을 때는 빈 "새로 만들기" 폼으로 돌아온다.
+  // 저장된 가족이 없으면 확인할 것도 없으므로 기다릴 이유가 없다.
+  if (loading && hadFamilyOnMount) return null
   return <OnboardingScreen />
 }
 
