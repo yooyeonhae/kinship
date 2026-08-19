@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import FavoriteLinks from '../components/FavoriteLinks'
 
 function ParentRecipeScreen() {
   return (
@@ -55,13 +56,7 @@ function ParentRecipeScreen() {
         </div>
       </div>
 
-      <a
-        href="#"
-        className="mt-5 flex items-center justify-center gap-2 bg-surface border border-border rounded-full shadow-soft py-3 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150"
-      >
-        <i className="ph-fill ph-play-circle text-lg"></i>
-        즐겨찾기 영상 (Recipe Video)
-      </a>
+      <FavoriteLinks />
 
       <div className="flex-1"></div>
 

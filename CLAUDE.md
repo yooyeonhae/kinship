@@ -22,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `migration_01_families_delete.sql` — `families_delete_own_empty`. **구성원이 하나도 없는 가족만** 삭제 허용. 온보딩이 members 단계에서 실패했을 때 이미 커밋된 빈 families 행을 되돌리는 용도다. 조건 없이 열면 FK의 `on delete cascade` 때문에 앱에서 가장 파괴적인 권한이 되므로, 정식 "가족 삭제" 기능이 필요해지면 이 정책을 넓히지 말고 부모 확인이 들어간 별도 정책을 만들 것. 양방향 REST 검증 완료(빈 가족 → 삭제됨 / 구성원 있는 가족 → 보호됨, **둘 다 `204`를 반환**한다).
 - `migration_02_roles_and_parent_pin.sql` — 역할 기반 정책 + 부모 PIN + RPC(`create_family`, `set_parent_pin`, `parent_login`, `parent_logout`, `toggle_my_todo`). 아래 "부모 권한" 항목 참고.
 - `migration_03_fix_pin_bruteforce.sql` — `set_parent_pin`을 통한 PIN 무제한 추측 차단.
+- `migration_04_favorite_links.sql` — `favorite_links`를 PRD 3.7에 맞춤. `link_type`(`video`/`shopping`)·`title`·`thumbnail_url` 추가, `platform` CHECK를 넓혀 쇼핑몰 허용(영상일 때만 유튜브/쇼츠/인스타로 제한), 정책을 "조회는 가족·쓰기는 부모"로 교체. **아직 적용 전이면 저장이 실패한다** — `FavoriteLinks.jsx`가 그 에러를 알아보고 안내 문구로 바꿔준다.
 
 앞으로 정책·스키마를 추가할 때는 `app/supabase/`에 `migration_NN_*.sql`로 파일을 만들고, Dashboard의 SQL Editor에서 실행해야 반영된다(anon 키로는 정책 생성이 불가능하고, 이 환경에는 Supabase CLI·psql이 설치되어 있지 않다).
 
@@ -69,6 +70,7 @@ The PRD's target stack (React/Vite/Supabase) has since been adopted in `app/`, w
 - `app/api/tour.js` — 한국관광공사 관광정보서비스_GW. **`KorService2`(국문)를 쓴다.** `RusService2`(노어)는 `resultCode 0000`으로 정상 응답하지만 `totalCount`가 모든 질의에서 0이라 사실상 비어 있다(같은 키로 두 서비스 모두 호출된다). `*Service1`은 폐기됨.
   - `searchFestival2`의 `eventStartDate`는 **시작일이 그 날짜 이후인** 행사만 준다. 오늘 날짜를 넣으면 이미 진행 중인 축제가 전부 빠지므로, 180일 전부터 받아 **종료일이 지난 것을 직접 걸러낸다**.
   - `searchFestival2`는 **`areacode`를 빈 문자열로 반환**한다. `areaCode` 파라미터를 붙이면 결과가 거의 0건이 되므로 전국을 받아 `addr1`에서 지역을 유도한다(`_area.js`의 `regionFromAddr`). 주소에 시/도 접두어가 없는 건(예: `포항시 북구 …`)은 **요청 지역으로 떨어뜨리지 말고 제외**할 것 — 떨어뜨리면 모든 지역에 동시에 노출된다. `areaBasedList2`는 `areacode`가 정상이라 이 처리가 필요 없다.
+- `app/api/linkmeta.js` — 붙여넣은 URL의 제목·썸네일 조회(퇴근길 저장함). **키가 필요 없는데도 프록시를 쓰는 유일한 경우** — 브라우저에서 유튜브/쇼핑몰을 직접 fetch하면 CORS에 막힌다. 유튜브는 oEmbed(키 불필요)로 제목을, 썸네일은 `img.youtube.com/vi/<id>/hqdefault.jpg`로 주소만 조합해 얻는다. 그 외 사이트는 OG 태그를 긁는데, **쿠팡·마켓컬리·SSG는 봇 요청을 막아 제목이 `null`로 온다** — 실패로 취급하지 말고 사용자가 직접 제목을 적게 두는 것이 정상 경로다.
 - `app/api/weather.js` — OpenWeatherMap(기상청이 아니다). `/weather`와 `/forecast`를 병렬 호출한다: 현재 기온·상태는 실황에서, **오늘 최저/최고와 강수확률은 예보에만 있다**. `_grid.js`는 시/도 대표 **위경도**(기상청 격자 nx/ny가 아니다). `condition` 문자열의 `rain` 접두사로 `buildRecommendation()`이 우비를 판단하므로, **눈(6xx)에는 `rain` 접두사를 붙이지 않는다** — 눈에는 우비가 아니라 기온 기반 겉옷 추천이 맞다.
 
 `screens/` has **not** been migrated or connected to Supabase — it's still the standalone localStorage version, and both versions now coexist. Don't wire real backend calls into `screens/` without confirming with the user first.
