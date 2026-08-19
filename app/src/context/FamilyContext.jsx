@@ -126,9 +126,18 @@ export function FamilyProvider({ children }) {
   const createFamily = useCallback(async (name, memberDrafts) => {
     const { data, error } = await supabase.rpc('create_family', {
       p_name: name,
-      p_members: memberDrafts.map((m) => ({ name: m.name, role: m.role })),
+      p_members: memberDrafts.map((m) => ({ name: m.name, role: m.role, avatar: m.avatar || null })),
     })
-    if (error) throw error
+    // 이름 중복은 두 가지 모양으로 올라온다. create_family가 unique_violation을 잡으면
+    // {ok:false, error:'name_taken'}으로 오지만, 그 함수 정의가 아직 갱신되지 않았거나
+    // 다른 경로로 제약에 걸리면 Postgres 오류(23505)가 그대로 온다. 어느 쪽이든
+    // 화면에서는 같은 안내가 나와야 하므로 여기서 하나의 코드로 정리한다.
+    if (error) {
+      if (error.code === '23505' || /families_name_unique_idx|duplicate key/i.test(error.message || '')) {
+        throw new Error('name_taken')
+      }
+      throw error
+    }
     if (!data?.ok) throw new Error(data?.error || 'create_family_failed')
 
     localStorage.setItem(FAMILY_ID_KEY, data.family_id)

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import FamilyRewards from '../components/FamilyRewards'
+import { characterOf } from '../lib/avatars'
 import {
   CHAT_EVENT,
   POINTS_EVENT,
@@ -517,11 +518,11 @@ function FamilyRoomScreen() {
                 <span
                   key={m.member_id}
                   title={`${m.name}${online ? ' · 접속 중' : ''}`}
-                  className={`w-7 h-7 rounded-full ${MEMBER_BG_CLASS[colorTokenForMember(members, m.member_id)]} ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary ${
+                  className={`w-7 h-7 rounded-full ${MEMBER_BG_CLASS[colorTokenForMember(members, m.member_id)]} ring-2 ring-surface shadow-soft flex items-center justify-center text-[14px] ${
                     online ? '' : 'opacity-35 grayscale'
                   }`}
                 >
-                  {m.name.charAt(0)}
+                  <span aria-hidden="true">{characterOf(m)}</span>
                 </span>
               )
             })}
@@ -545,9 +546,11 @@ function FamilyRoomScreen() {
               return (
                 <div key={m.message_id} className="flex items-start gap-2">
                   <span
-                    className={`w-7 h-7 rounded-full ${MEMBER_BG_CLASS[token]} ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold text-on-primary shrink-0`}
+                    className={`w-7 h-7 rounded-full ${MEMBER_BG_CLASS[token]} ring-2 ring-surface shadow-soft flex items-center justify-center text-[14px] shrink-0`}
                   >
-                    {(m.sender_name || '가').charAt(0)}
+                    <span aria-hidden="true">
+                      {characterOf(members.find((x) => x.member_id === m.member_id)) }
+                    </span>
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-display font-bold text-foreground-muted mb-1">{m.sender_name}</p>

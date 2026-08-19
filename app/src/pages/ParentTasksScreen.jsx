@@ -2,17 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
+import { characterOf } from '../lib/avatars'
+import CharacterPicker from '../components/CharacterPicker'
 
 const QUICK_CHIPS = ['우유 사기', '쓰레기 버리기', '준비물 확인']
 
 function ParentTasksScreen() {
-  const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout } = useFamily()
+  const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout, reload } = useFamily()
   const navigate = useNavigate()
   const [todos, setTodos] = useState([])
   const [loadingTodos, setLoadingTodos] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [taskInput, setTaskInput] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  const [avatarTarget, setAvatarTarget] = useState(null)
 
   const parents = members.filter((m) => m.role === 'parent')
 
@@ -95,6 +98,24 @@ function ParentTasksScreen() {
     setTodos((prev) => prev.filter((t) => t.todo_id !== id))
   }
 
+  const avatarMember = members.find((m) => m.member_id === avatarTarget) || null
+
+  async function saveAvatar(member, emoji) {
+    const { error } = await supabase.from('members').update({ avatar: emoji }).eq('member_id', member.member_id)
+    if (error) {
+      // avatar 열이 없으면 migration_11을 아직 실행하지 않은 것이다
+      setErrorMsg(
+        /column|schema cache/i.test(`${error.message} ${error.details}`)
+          ? '캐릭터 기능은 migration_11을 실행한 뒤에 쓸 수 있어요.'
+          : '캐릭터를 저장하지 못했어요.'
+      )
+      return
+    }
+    setErrorMsg('')
+    // members는 FamilyContext가 들고 있으므로 그쪽을 다시 읽어야 다른 화면에도 반영된다
+    await reload()
+  }
+
   const remainingTotal = parents.reduce((sum, p) => sum + todos.filter((t) => t.assignee_member_id === p.member_id && !t.is_done).length, 0)
 
   return (
@@ -113,24 +134,24 @@ function ParentTasksScreen() {
         <div className="flex items-center gap-1">
           <Link
             to="/outfit-settings"
-            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            className="w-10 h-10 flex items-center justify-center text-[22px] active:scale-90 transition duration-150"
             aria-label="요일별 지정복 설정"
           >
-            <i className="ph-duotone ph-t-shirt text-xl text-foreground-muted" aria-hidden="true"></i>
+            <span aria-hidden="true">👕</span>
           </Link>
           <Link
             to="/child-schedule"
-            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            className="w-10 h-10 flex items-center justify-center text-[22px] active:scale-90 transition duration-150"
             aria-label="아이 요일별 스케줄"
           >
-            <i className="ph-duotone ph-calendar-dots text-xl text-foreground-muted" aria-hidden="true"></i>
+            <span aria-hidden="true">📅</span>
           </Link>
           <Link
             to="/parent-progress"
-            className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition duration-150"
+            className="w-10 h-10 flex items-center justify-center text-[22px] active:scale-90 transition duration-150"
             aria-label="완료 현황 보기"
           >
-            <i className="ph-duotone ph-users-three text-xl text-foreground-muted" aria-hidden="true"></i>
+            <span aria-hidden="true">👨‍👩‍👧</span>
           </Link>
         </div>
       </div>
@@ -169,8 +190,8 @@ function ParentTasksScreen() {
               return (
                 <div key={m.member_id} className="relative border border-dashed border-border rounded-lg py-4 px-2 flex flex-col items-center gap-2.5">
                   <div className="relative">
-                    <div className="w-16 h-16 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center">
-                      <i className="ph-fill ph-user text-2xl text-foreground-muted" aria-hidden="true"></i>
+                    <div className="w-16 h-16 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center text-[30px]">
+                      <span aria-hidden="true">{characterOf(m)}</span>
                     </div>
                     <span
                       className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-surface flex items-center justify-center ${
@@ -250,6 +271,59 @@ function ParentTasksScreen() {
         </form>
       </div>
 
+      {/* 카드에 뜨는 캐릭터를 여기서 바꾼다. members 쓰기는 부모만 가능하므로 이 화면이 제자리다. */}
+      <div className="bg-surface border-2 border-foreground rounded-md shadow-sticker px-4 py-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-display font-bold text-[15px] flex items-center gap-2">
+            <span className="text-[18px]" aria-hidden="true">🎭</span>가족 캐릭터
+          </p>
+          <div className="flex items-center -space-x-1.5">
+            {members.slice(0, 5).map((m) => (
+              <span
+                key={m.member_id}
+                title={m.name}
+                className="w-7 h-7 rounded-full bg-surface-muted ring-2 ring-surface flex items-center justify-center text-[15px]"
+                aria-hidden="true"
+              >
+                {characterOf(m)}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {members.map((m) => (
+            <button
+              key={m.member_id}
+              type="button"
+              onClick={() => setAvatarTarget(avatarTarget === m.member_id ? null : m.member_id)}
+              className={`inline-flex items-center gap-1.5 rounded-full pl-2 pr-3 py-1.5 text-[13px] font-display font-bold border transition duration-150 ${
+                avatarTarget === m.member_id
+                  ? 'bg-secondary-dark text-on-secondary border-foreground'
+                  : 'bg-surface-muted text-foreground border-border'
+              }`}
+              aria-expanded={avatarTarget === m.member_id}
+            >
+              <span className="text-[15px]" aria-hidden="true">{characterOf(m)}</span>
+              {m.name}
+            </button>
+          ))}
+        </div>
+
+        {avatarMember ? (
+          <>
+            <p className="text-[12px] text-foreground-muted mb-2">{avatarMember.name}의 띠 캐릭터를 골라주세요.</p>
+            <CharacterPicker
+              value={avatarMember.avatar || ''}
+              onSelect={(emoji) => saveAvatar(avatarMember, emoji)}
+              size="sm"
+            />
+          </>
+        ) : (
+          <p className="text-[12px] text-foreground-muted">이름을 누르면 캐릭터를 바꿀 수 있어요.</p>
+        )}
+      </div>
+
       {loadingTodos ? (
         <p className="text-foreground-muted text-center py-4">불러오는 중...</p>
       ) : (
@@ -257,6 +331,7 @@ function ParentTasksScreen() {
           {todos.map((t) => {
             const name = memberName(t.assignee_member_id)
             const token = t.assignee_member_id ? colorTokenForMember(members, t.assignee_member_id) : null
+            const assignee = members.find((m) => m.member_id === t.assignee_member_id) || null
             return (
               <div
                 key={t.todo_id}
@@ -282,10 +357,10 @@ function ParentTasksScreen() {
                   )}
                 </div>
                 <span
-                  className={`w-8 h-8 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[11px] font-display font-bold ${token ? 'text-on-primary' : 'text-foreground-muted'} shrink-0`}
+                  className={`w-9 h-9 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[17px] shrink-0`}
                   title={name ? `${name}${t.is_done ? ' 완료' : ', 아직 완료 안 함'}` : '담당자 미정'}
                 >
-                  {name ? name.charAt(0) : '?'}
+                  <span aria-hidden="true">{assignee ? characterOf(assignee) : '❓'}</span>
                 </span>
                 <button
                   type="button"
@@ -315,7 +390,7 @@ function ParentTasksScreen() {
         }}
         className="mt-2 mx-auto flex items-center gap-1.5 text-foreground-muted text-label py-2 px-3 active:scale-95 transition duration-150"
       >
-        <i className="ph ph-lock-simple text-sm" aria-hidden="true"></i>
+        <span className="text-[13px]" aria-hidden="true">🔒</span>
         부모 모드 끝내기
       </button>
     </>

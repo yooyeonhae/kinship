@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import FamilyInvite from '../components/FamilyInvite'
+import CharacterPicker from '../components/CharacterPicker'
+import { charactersFor } from '../lib/avatars'
 
 const TAB_GUIDE = [
   {
@@ -92,8 +94,11 @@ function OnboardingScreen() {
   const [members, setMembers] = useState([])
   const [draftName, setDraftName] = useState('')
   const [draftRole, setDraftRole] = useState('child')
+  const [draftAvatar, setDraftAvatar] = useState(charactersFor()[0])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // 이름 중복은 "다시 시도"로 풀리지 않는다. 어떻게 해야 하는지 따로 안내해야 한다.
+  const [nameTaken, setNameTaken] = useState(false)
 
   const [joinCode, setJoinCode] = useState(inviteCode || '')
   // 초대 링크로 들어왔으면 아이가 아무것도 누르지 않아도 끝나야 한다
@@ -116,8 +121,12 @@ function OnboardingScreen() {
   function addMember() {
     const name = draftName.trim()
     if (!name) return
-    setMembers((prev) => [...prev, { name, role: draftRole }])
+    setMembers((prev) => [...prev, { name, role: draftRole, avatar: draftAvatar }])
     setDraftName('')
+    // 다음 사람은 다른 캐릭터를 고르게 비워두지 않고, 아직 안 쓴 것 중 첫 번째를 미리 잡아둔다
+    const pool = charactersFor()
+    const used = new Set([...members.map((m) => m.avatar), draftAvatar])
+    setDraftAvatar(pool.find((c) => !used.has(c)) || pool[0])
   }
 
   function removeMember(idx) {
@@ -132,11 +141,13 @@ function OnboardingScreen() {
       return
     }
     setError('')
+    setNameTaken(false)
     setSubmitting(true)
     try {
       const id = await createFamily(name, members)
       setCreatedId(id)
     } catch (err) {
+      if (err?.message === 'name_taken') setNameTaken(true)
       // create_family()가 돌려준 사유를 그대로 문장으로 바꾼다.
       // 특히 이름 중복은 사용자가 바로 고칠 수 있는 문제라 뭉뚱그리면 안 된다.
       setError(CREATE_ERROR[err?.message] || '가족을 만드는 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.')
@@ -271,7 +282,10 @@ function OnboardingScreen() {
               <input
                 type="text"
                 value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
+                onChange={(e) => {
+                  setFamilyName(e.target.value)
+                  if (nameTaken) setNameTaken(false)
+                }}
                 placeholder="예: 우리집"
                 className="w-full bg-surface rounded-md px-4 py-3 text-[15px] border border-border outline-none"
                 autoComplete="off"
@@ -284,7 +298,8 @@ function OnboardingScreen() {
                 <div className="flex flex-col gap-2 mb-3">
                   {members.map((m, idx) => (
                     <div key={idx} className="flex items-center justify-between bg-surface-muted rounded-md px-3 py-2">
-                      <span className="font-display font-bold text-[14px]">
+                      <span className="font-display font-bold text-[14px] flex items-center gap-2">
+                        <span className="text-[18px]" aria-hidden="true">{m.avatar}</span>
                         {m.name}{' '}
                         <span className="text-foreground-muted font-body font-normal text-[13px]">
                           · {m.role === 'parent' ? '부모' : '자녀'}
@@ -334,9 +349,37 @@ function OnboardingScreen() {
                   <i className="ph-bold ph-plus text-lg"></i>
                 </button>
               </div>
+
+              <p className="font-display font-bold text-label tracking-wide text-foreground-muted mt-3 mb-1.5">띠 캐릭터 고르기</p>
+              <CharacterPicker value={draftAvatar} onSelect={setDraftAvatar} size="sm" />
             </div>
 
             {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+            {nameTaken && (
+              <div className="bg-surface border border-border rounded-md px-4 py-3">
+                <p className="font-display font-bold text-[14px] mb-1.5">이미 만든 가족에 들어가려면</p>
+                <p className="text-foreground-muted text-[13px] leading-[20px]">
+                  같은 이름을 다시 넣어도 그 가족으로 들어갈 수는 없어요. 이름은 누구나 짐작할 수 있어서, 들어가는
+                  열쇠는 <strong>가족 코드</strong>뿐이에요.
+                </p>
+                <ul className="text-foreground-muted text-[13px] leading-[20px] mt-2 flex flex-col gap-1">
+                  <li>· 이미 쓰고 있는 기기가 있다면 그 기기의 <strong>홈 → 가족 초대하기</strong>에서 QR을 찍으세요.</li>
+                  <li>· 코드를 완전히 잃어버렸다면 새 이름으로 가족을 다시 만들어야 해요.</li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('join')
+                    setError('')
+                    setNameTaken(false)
+                  }}
+                  className="mt-3 text-[13px] font-display font-bold text-primary active:scale-95 transition duration-150"
+                >
+                  가족 코드로 참여하기
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"

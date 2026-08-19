@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
+import { characterOf } from '../lib/avatars'
 
 function formatLockedUntil(iso) {
   if (!iso) return ''
@@ -135,7 +136,11 @@ function ParentUnlockScreen() {
         </Link>
 
         <div className="mb-8">
-          <i className="ph-duotone ph-lock-key text-5xl text-secondary" aria-hidden="true"></i>
+          {/* 로그인 화면에 자물쇠만 있으면 누구로 들어가는 중인지 이름을 읽어야 안다.
+              캐릭터를 크게 놓으면 그 자리가 누구 자리인지 바로 보인다. */}
+          <span className="w-16 h-16 rounded-full bg-pastel-mint border-2 border-foreground shadow-sticker flex items-center justify-center text-[32px]" aria-hidden="true">
+            {characterOf(parent)}
+          </span>
           <h1 className="font-display font-extrabold text-heading mt-3">
             {mode === 'create' ? `${parent.name}의 PIN 만들기` : `${parent.name}, PIN을 입력해주세요`}
           </h1>

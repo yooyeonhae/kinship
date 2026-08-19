@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import FamilyInvite from '../components/FamilyInvite'
+import { characterOf } from '../lib/avatars'
 
 const CHILD_STYLES = [
   { icon: 'ph-baseball-cap', bg: 'bg-pastel-mint', avatarText: 'text-member-1', rotate: '-rotate-1' },
@@ -50,8 +51,8 @@ function EntryScreen() {
                   onClick={() => setCurrentMember(child.member_id)}
                   className={`relative ${style.bg} text-foreground border-2 border-foreground rounded-md shadow-sticker p-5 pt-8 flex flex-col items-center gap-3 overflow-hidden aspect-square justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 ${style.rotate}`}
                 >
-                  <div className="w-20 h-20 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center">
-                    <i className={`ph-duotone ${style.icon} text-4xl ${style.avatarText}`} aria-hidden="true"></i>
+                  <div className="w-20 h-20 rounded-full bg-surface ring-4 ring-surface shadow-soft flex items-center justify-center text-[38px]">
+                    <span aria-hidden="true">{characterOf(child)}</span>
                   </div>
                   <span className="font-display font-bold text-[18px] self-start">{child.name}</span>
                 </Link>
@@ -79,7 +80,9 @@ function EntryScreen() {
               className="bg-secondary-dark text-on-secondary border-2 border-foreground rounded-md shadow-sticker px-5 py-4 flex items-center justify-between active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150"
             >
               <span className="flex items-center gap-3">
-                <i className="ph-duotone ph-lock-key text-2xl" aria-hidden="true"></i>
+                <span className="w-9 h-9 rounded-full bg-surface/25 flex items-center justify-center text-[20px]" aria-hidden="true">
+                  {characterOf(parent)}
+                </span>
                 <span className="font-display font-bold text-body-lg">
                   {parents.length === 1 ? '부모로 시작하기' : `${parent.name}으로 시작하기`}
                 </span>
