@@ -58,6 +58,12 @@ function ChildTodoScreen() {
     loadTodos()
   }, [loadTodos])
 
+  // 챗봇이 할일을 바꾸면 이 화면은 다시 마운트되지 않으므로 직접 다시 읽는다
+  useEffect(() => {
+    window.addEventListener('kinship:change', loadTodos)
+    return () => window.removeEventListener('kinship:change', loadTodos)
+  }, [loadTodos])
+
   const total = todos.length
   const filled = todos.filter((t) => t.is_done).length
   const remaining = total - filled

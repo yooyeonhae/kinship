@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { supabase, setIdentity } from '../lib/supabaseClient'
+import { supabase, setIdentity, familyExists } from '../lib/supabaseClient'
 
 const FAMILY_ID_KEY = 'kinship_family_id'
 const MEMBER_ID_KEY = 'kinship_member_id'
@@ -136,6 +136,27 @@ export function FamilyProvider({ children }) {
     return data.family_id
   }, [])
 
+  // 이미 만들어진 가족을 다른 기기/브라우저에서 이어서 쓰기 위한 경로.
+  // 이게 없으면 localStorage가 비워질 때마다 온보딩을 처음부터 다시 해야 한다.
+  const joinFamily = useCallback(async (rawId) => {
+    const id = (rawId || '').trim()
+    if (!/^[0-9a-fA-F-]{36}$/.test(id)) return { ok: false, error: 'format' }
+    let family
+    try {
+      family = await familyExists(id)
+    } catch {
+      return { ok: false, error: 'network' }
+    }
+    if (!family) return { ok: false, error: 'not_found' }
+    localStorage.setItem(FAMILY_ID_KEY, id)
+    localStorage.removeItem(MEMBER_ID_KEY)
+    localStorage.removeItem(PARENT_AUTH_KEY)
+    setCurrentMemberId(null)
+    setParentAuth(null)
+    setFamilyId(id)
+    return { ok: true, name: family.name }
+  }, [])
+
   const parentLogin = useCallback(async (memberId, pin) => {
     const { data, error } = await supabase.rpc('parent_login', { p_member_id: memberId, p_pin: pin })
     if (error) return { ok: false, error: 'network' }
@@ -183,6 +204,7 @@ export function FamilyProvider({ children }) {
       supabase,
       reload,
       createFamily,
+      joinFamily,
       resetFamily: clearFamily,
       currentMemberId,
       currentMember,
@@ -205,6 +227,7 @@ export function FamilyProvider({ children }) {
       loadError,
       reload,
       createFamily,
+      joinFamily,
       clearFamily,
       currentMemberId,
       currentMember,

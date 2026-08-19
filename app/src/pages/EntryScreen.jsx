@@ -9,7 +9,7 @@ const CHILD_STYLES = [
 ]
 
 function EntryScreen() {
-  const { members, loading, resetFamily, setCurrentMember } = useFamily()
+  const { members, loading, resetFamily, setCurrentMember, familyId } = useFamily()
   const children = members.filter((m) => m.role === 'child')
   const parents = members.filter((m) => m.role === 'parent')
 
@@ -88,6 +88,17 @@ function EntryScreen() {
           ))}
         </div>
       )}
+
+      {/* 다른 기기에서 이 가족을 이어서 쓰려면 이 코드가 필요하다 */}
+      <details className="mt-8 bg-surface border border-border rounded-md px-4 py-3">
+        <summary className="font-display font-bold text-[13px] text-foreground-muted cursor-pointer">
+          가족 코드 보기
+        </summary>
+        <p className="font-mono text-[12px] break-all leading-[18px] mt-2">{familyId}</p>
+        <p className="text-foreground-muted text-[12px] leading-[18px] mt-2">
+          다른 기기에서 이 코드를 넣으면 구성원을 다시 입력하지 않고 이어서 쓸 수 있어요.
+        </p>
+      </details>
 
       <button
         type="button"

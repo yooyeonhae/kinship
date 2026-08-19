@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Routes, Route, useParams } from 'react-router-dom'
 import { FamilyProvider, useFamily } from './context/FamilyContext'
 import Layout from './components/Layout'
@@ -39,8 +40,11 @@ function ProtectedLayout() {
 // localStorage가 덮어써져 기존 데이터가 고아가 되므로 홈으로 되돌린다.
 function OnboardingRoute() {
   const { familyId, loading } = useFamily()
+  // 마운트 시점의 값으로만 판단한다. 화면 안에서 가족을 만들면 familyId가 생기는데,
+  // 그때마다 리다이렉트하면 새로 발급된 가족 코드를 보여줄 틈이 없다.
+  const [hadFamilyOnMount] = useState(() => Boolean(localStorage.getItem('kinship_family_id')))
   if (loading) return null
-  if (familyId) return <Navigate to="/" replace />
+  if (familyId && hadFamilyOnMount) return <Navigate to="/" replace />
   return <OnboardingScreen />
 }
 

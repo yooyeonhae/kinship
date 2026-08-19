@@ -1,5 +1,6 @@
 import Header from './Header'
 import BottomNav from './BottomNav'
+import ChatBot from './ChatBot'
 
 function Layout({ children }) {
   return (
@@ -14,6 +15,7 @@ function Layout({ children }) {
         <Header />
         {children}
       </div>
+      <ChatBot />
       <BottomNav />
     </div>
   )

@@ -35,3 +35,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { persistSession: false, autoRefreshToken: false },
   global: { fetch: identityFetch },
 })
+
+// 가족 코드 확인은 아직 신원이 확정되기 전에 일어나므로, 싱글톤의 identity를
+// 건드리지 않고 그 코드만 헤더에 실어 직접 조회한다.
+export async function familyExists(familyId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/families?select=family_id,name&family_id=eq.${encodeURIComponent(familyId)}`,
+    {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        'x-family-id': familyId,
+      },
+    }
+  )
+  if (!res.ok) throw new Error('network')
+  const rows = await res.json()
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+}
