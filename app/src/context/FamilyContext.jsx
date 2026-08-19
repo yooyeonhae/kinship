@@ -26,6 +26,7 @@ export function FamilyProvider({ children }) {
   // parent_login()이 발급한 토큰. 부모 권한의 유일한 근거.
   const [parentAuth, setParentAuth] = useState(readParentAuth)
   const [members, setMembers] = useState([])
+  const [familyName, setFamilyName] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
 
@@ -63,6 +64,7 @@ export function FamilyProvider({ children }) {
     setCurrentMemberId(null)
     setParentAuth(null)
     setMembers([])
+    setFamilyName(null)
     setLoadError(null)
   }, [])
 
@@ -74,6 +76,7 @@ export function FamilyProvider({ children }) {
   const reload = useCallback(async () => {
     if (!familyId) {
       setMembers([])
+      setFamilyName(null)
       setLoadError(null)
       setLoading(false)
       return
@@ -86,7 +89,7 @@ export function FamilyProvider({ children }) {
     // 확인하지 않으면 빠져나갈 수 없는 빈 화면에 갇힌다.
     const { data: family, error: familyError } = await supabase
       .from('families')
-      .select('family_id')
+      .select('family_id, name')
       .eq('family_id', familyId)
       .maybeSingle()
 
@@ -99,6 +102,7 @@ export function FamilyProvider({ children }) {
       clearFamily()
       return
     }
+    setFamilyName(family.name || null)
 
     const { data, error } = await supabase.from('members').select('*').order('created_at').order('member_id')
     if (error) {
@@ -172,6 +176,7 @@ export function FamilyProvider({ children }) {
   const value = useMemo(
     () => ({
       familyId,
+      familyName,
       members,
       loading,
       loadError,
@@ -194,6 +199,7 @@ export function FamilyProvider({ children }) {
     }),
     [
       familyId,
+      familyName,
       members,
       loading,
       loadError,
