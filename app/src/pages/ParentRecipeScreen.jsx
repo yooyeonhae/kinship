@@ -1,7 +1,126 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useFamily } from '../context/FamilyContext'
 import FavoriteLinks from '../components/FavoriteLinks'
+import RecipeManager from '../components/RecipeManager'
+import { parseDescription, pickTodayRecipes, sortRecipes } from '../lib/recipes'
+
+// 카드가 두 장이라 장식도 두 벌이다. 목업의 기울기·스티커 위치를 그대로 쓴다.
+const CARD_DECOR = [
+  { rotate: '-rotate-1', icon: 'ph-bowl-food', badge: 'absolute -bottom-3 right-3', badgeBg: 'bg-accent', badgeFg: 'text-on-accent', timeColor: 'text-primary' },
+  { rotate: 'rotate-2', icon: 'ph-cooking-pot', badge: 'absolute -top-3 left-3', badgeBg: 'bg-primary', badgeFg: 'text-on-primary', timeColor: 'text-secondary' },
+]
+
+function RecipeCard({ recipe, decor }) {
+  const { ingredients, note } = parseDescription(recipe.description)
+
+  return (
+    <div className={`${decor.rotate} bg-surface border-2 border-foreground rounded-md shadow-sticker`}>
+      <div className="relative">
+        <div className="aspect-[4/3] rounded-t-[14px] overflow-hidden bg-surface-muted flex items-center justify-center">
+          <i className={`ph-duotone ${decor.icon} text-6xl text-foreground-muted`} aria-hidden="true"></i>
+        </div>
+        <span className={`${decor.badge} w-8 h-8 rounded-full ${decor.badgeBg} ring-4 ring-surface shadow-soft flex items-center justify-center`} aria-hidden="true">
+          <i className={`ph-fill ph-star ${decor.badgeFg} text-xs`}></i>
+        </span>
+      </div>
+      <div className="p-3 pt-4">
+        <h2 className="font-display font-extrabold text-[17px] leading-tight mb-2">{recipe.title}</h2>
+
+        {ingredients.length > 0 && (
+          <ul className="flex flex-wrap gap-1 mb-2">
+            {ingredients.map((item) => (
+              <li key={item} className="bg-surface-muted rounded-full px-2 py-0.5 text-[11px] text-foreground-muted">
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {note && <p className="text-[12px] text-foreground-muted leading-[18px] mb-2">{note}</p>}
+
+        {recipe.cook_minutes ? (
+          <div className="border-t border-dashed border-border pt-2">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-display font-bold ${decor.timeColor}`}>
+              <i className="ph-bold ph-clock"></i>
+              {recipe.cook_minutes}분
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 function ParentRecipeScreen() {
+  const { supabase, familyId } = useFamily()
+
+  const [recipes, setRecipes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [needsMigration, setNeedsMigration] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!familyId) return
+    setLoading(true)
+    const { data, error } = await supabase.from('recipes').select('*')
+    if (error) {
+      // family_id/cook_minutes 열이 없으면 migration_07을 아직 실행하지 않은 것이다
+      if (/column|schema cache/i.test(`${error.message} ${error.details}`)) setNeedsMigration(true)
+      else setErrorMsg('메뉴를 불러오지 못했어요.')
+      setLoading(false)
+      return
+    }
+    setErrorMsg('')
+    setRecipes(sortRecipes(data || []))
+    setLoading(false)
+  }, [supabase, familyId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // 오늘 날짜로 정한다 — 무작위로 뽑으면 새로고침마다 바뀌고, 가족끼리 다른 메뉴를 본다.
+  const todays = useMemo(() => pickTodayRecipes(recipes, 2), [recipes])
+
+  async function createRecipe(payload) {
+    setBusy(true)
+    const { data, error } = await supabase
+      .from('recipes')
+      .insert({ ...payload, family_id: familyId })
+      .select()
+      .single()
+    setBusy(false)
+    if (error) return false
+    setRecipes((prev) => sortRecipes([...prev, data]))
+    return true
+  }
+
+  async function updateRecipe(recipeId, payload) {
+    setBusy(true)
+    const { data, error } = await supabase
+      .from('recipes')
+      .update(payload)
+      .eq('recipe_id', recipeId)
+      .select()
+      .single()
+    setBusy(false)
+    if (error) return false
+    setRecipes((prev) => sortRecipes(prev.map((r) => (r.recipe_id === recipeId ? data : r))))
+    return true
+  }
+
+  async function deleteRecipe(recipe) {
+    const { error } = await supabase.from('recipes').delete().eq('recipe_id', recipe.recipe_id)
+    if (error) {
+      setErrorMsg('메뉴를 삭제하지 못했어요.')
+      return
+    }
+    setErrorMsg('')
+    setRecipes((prev) => prev.filter((r) => r.recipe_id !== recipe.recipe_id))
+  }
+
   return (
     <>
       <div className="mb-6">
@@ -12,49 +131,40 @@ function ParentRecipeScreen() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="-rotate-1 bg-surface border-2 border-foreground rounded-md shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
-          <div className="relative">
-            <div className="aspect-[4/3] rounded-t-[14px] overflow-hidden bg-surface-muted flex items-center justify-center">
-              <i className="ph-duotone ph-bowl-food text-6xl text-foreground-muted" aria-hidden="true"></i>
-            </div>
-            <span className="absolute -bottom-3 right-3 w-8 h-8 rounded-full bg-accent ring-4 ring-surface shadow-soft flex items-center justify-center" aria-hidden="true">
-              <i className="ph-fill ph-star text-on-accent text-xs"></i>
-            </span>
-          </div>
-          <div className="p-3 pt-4">
-            <h2 className="font-display font-extrabold text-[15px] leading-tight mb-1">된장찌개 정식</h2>
-            <p className="text-[12px] text-foreground-muted leading-snug mb-2 line-clamp-2">두부, 애호박, 감자만 있으면 충분해요.</p>
-            <div className="border-t border-dashed border-border pt-2 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 text-[11px] font-display font-bold text-primary">
-                <i className="ph-bold ph-clock"></i>15분
-              </span>
-              <i className="ph ph-heart text-foreground-muted text-base" aria-hidden="true"></i>
-            </div>
-          </div>
+      {needsMigration && (
+        <div className="bg-destructive/10 border border-destructive rounded-md px-4 py-3 mb-4">
+          <p className="text-[13px] text-destructive leading-[19px]">
+            메뉴 테이블이 아직 준비되지 않았어요. Supabase SQL Editor에서 <strong>migration_07_recipes.sql</strong>을 실행해주세요.
+          </p>
         </div>
+      )}
+      {errorMsg && !needsMigration && <p className="text-[13px] text-destructive mb-4">{errorMsg}</p>}
 
-        <div className="rotate-2 bg-surface border-2 border-foreground rounded-md shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150">
-          <div className="relative">
-            <div className="aspect-[4/3] rounded-t-[14px] overflow-hidden bg-surface-muted flex items-center justify-center">
-              <i className="ph-duotone ph-cooking-pot text-6xl text-foreground-muted" aria-hidden="true"></i>
-            </div>
-            <span className="absolute -top-3 left-3 w-8 h-8 rounded-full bg-primary ring-4 ring-surface shadow-soft flex items-center justify-center" aria-hidden="true">
-              <i className="ph-fill ph-star text-on-primary text-xs"></i>
-            </span>
-          </div>
-          <div className="p-3 pt-4">
-            <h2 className="font-display font-extrabold text-[15px] leading-tight mb-1">소불고기 덮밥</h2>
-            <p className="text-[12px] text-foreground-muted leading-snug mb-2 line-clamp-2">양파, 당근을 잘게 썰어 함께 볶기만 하면 돼요.</p>
-            <div className="border-t border-dashed border-border pt-2 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 text-[11px] font-display font-bold text-secondary">
-                <i className="ph-bold ph-clock"></i>20분
-              </span>
-              <i className="ph ph-heart text-foreground-muted text-base" aria-hidden="true"></i>
-            </div>
-          </div>
+      {loading ? (
+        <p className="text-foreground-muted text-[14px] py-4">메뉴를 불러오는 중...</p>
+      ) : todays.length === 0 ? (
+        <div className="bg-surface border border-dashed border-border rounded-md px-4 py-6 text-center">
+          <p className="text-foreground-muted text-[14px] leading-[21px]">
+            등록된 메뉴가 없어요.
+            <br />
+            아래 &quot;메뉴 관리&quot;에서 오늘 해먹을 메뉴를 추가해보세요.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          {todays.map((recipe, i) => (
+            <RecipeCard key={recipe.recipe_id} recipe={recipe} decor={CARD_DECOR[i % CARD_DECOR.length]} />
+          ))}
+        </div>
+      )}
+
+      <RecipeManager
+        recipes={recipes}
+        onCreate={createRecipe}
+        onUpdate={updateRecipe}
+        onDelete={deleteRecipe}
+        busy={busy}
+      />
 
       <FavoriteLinks />
 
