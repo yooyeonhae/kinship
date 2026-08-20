@@ -264,6 +264,12 @@ function ParentTasksScreen() {
             })}
           </div>
         )}
+        {/* 자주 쓰는 항목 제목 위에 있던 워시테이프. 거기서는 글자를 가려서 이 카드 아래로 옮겼다. */}
+        <span
+          className="absolute -bottom-2 right-5 w-12 h-5 bg-tape-pink/90 rotate-[4deg] rounded-sm shadow-sm"
+          aria-hidden="true"
+        ></span>
+
         <div className="flex items-center justify-between border-t border-border pt-3">
           <span className="flex items-center gap-1.5 text-[13px] font-display font-bold text-accent">
             <i className="ph-fill ph-bell text-base"></i>
@@ -273,7 +279,6 @@ function ParentTasksScreen() {
       </div>
 
       <div className="relative mb-5">
-        <span className="absolute -top-2 right-2 w-11 h-5 bg-tape-pink/90 rotate-[-5deg] rounded-sm shadow-sm" aria-hidden="true"></span>
         <div className="flex items-center justify-between mb-2">
           <p className="font-display font-bold text-[13px] tracking-wide text-foreground-muted">
             자주 쓰는 항목 — 눌러서 바로 추가
