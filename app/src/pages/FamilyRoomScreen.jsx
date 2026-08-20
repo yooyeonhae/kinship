@@ -4,6 +4,18 @@ import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import FamilyRewards from '../components/FamilyRewards'
 import { characterOf } from '../lib/avatars'
+import { currentSubscription, disablePush, enablePush, notifyFamily, pushSupported } from '../lib/push'
+import {
+  GAME_EVENT,
+  createSession,
+  fetchSession,
+  isMyTurn,
+  joinSession,
+  leaveSession,
+  loadSessions,
+  pushState,
+  roleOf,
+} from '../lib/gameSession'
 import {
   CHAT_EVENT,
   POINTS_EVENT,
@@ -160,7 +172,7 @@ function newUpdownState() {
 }
 
 function FamilyRoomScreen() {
-  const { supabase, familyId, members, currentMemberId, loading: membersLoading } = useFamily()
+  const { supabase, familyId, members, currentMemberId } = useFamily()
 
   const [messages, setMessages] = useState([])
   const [chatLoading, setChatLoading] = useState(true)
@@ -168,6 +180,9 @@ function FamilyRoomScreen() {
   const [chatInput, setChatInput] = useState('')
   const [sending, setSending] = useState(false)
   const [onlineIds, setOnlineIds] = useState([])
+  const [pushOn, setPushOn] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMsg, setPushMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [needsMigration, setNeedsMigration] = useState(false)
   const chatLogRef = useRef(null)
@@ -186,6 +201,18 @@ function FamilyRoomScreen() {
   const [updownGuess, setUpdownGuess] = useState('')
   const [rolling, setRolling] = useState(false)
 
+  // 원격 대전. null이면 예전처럼 한 기기에서 번갈아 한다.
+  const [session, setSession] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [remoteMsg, setRemoteMsg] = useState('')
+  const [remoteBusy, setRemoteBusy] = useState(false)
+  // 받은 판을 다시 서버로 되쏘지 않기 위한 표시. 없으면 두 기기가 서로 밀어내며 무한히 돈다.
+  const applyingRemote = useRef(false)
+  // 채널 구독은 한 번만 만들어지므로, 콜백이 최신 값을 보게 ref로 들고 있는다.
+  const sessionRef = useRef(null)
+  const applySessionRef = useRef(null)
+  const refreshSessionsRef = useRef(null)
+
   const recordedRounds = useRef(new Set())
 
   const memberName = useCallback(
@@ -197,7 +224,8 @@ function FamilyRoomScreen() {
   // 화면에 박혀 있어서, 누가 이겨도 저장할 member_id가 없었다.
   useEffect(() => {
     if (!members.length) return
-    setChatSenderId((prev) => (members.some((m) => m.member_id === prev) ? prev : currentMemberId || members[0].member_id))
+    // 발신자는 고르는 값이 아니라 지금 앱을 쓰는 사람이다
+    setChatSenderId(currentMemberId || members[0].member_id)
     setPlayer1Id((prev) => (members.some((m) => m.member_id === prev) ? prev : members[0].member_id))
     setPlayer2Id((prev) =>
       members.some((m) => m.member_id === prev) ? prev : (members[1] || members[0]).member_id
@@ -207,6 +235,10 @@ function FamilyRoomScreen() {
   useEffect(() => {
     if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    currentSubscription().then((sub) => setPushOn(Boolean(sub)))
+  }, [])
 
   useEffect(() => {
     if (!rolling) return
@@ -275,6 +307,16 @@ function FamilyRoomScreen() {
         const gained = payload.points || 0
         setPoints((prev) => (prev === null ? prev : { ...prev, total: prev.total + gained, game: prev.game + gained }))
       })
+      .on('broadcast', { event: GAME_EVENT }, async ({ payload }) => {
+        // 판이 바뀌었다는 신호만 오고 내용은 DB에서 읽는다. 브로드캐스트는 순서를
+        // 보장하지 않아서, 판 자체를 실어 보내면 오래된 판이 새 판을 덮을 수 있다.
+        refreshSessionsRef.current?.()
+        const active = sessionRef.current
+        if (!active || active.session_id !== payload.sessionId) return
+        const { data } = await fetchSession(supabase, payload.sessionId)
+        if (data) applySessionRef.current?.(data)
+        else setSession(null)
+      })
       .on('presence', { event: 'sync' }, () => {
         setOnlineIds(Object.keys(channel.presenceState()))
       })
@@ -287,6 +329,29 @@ function FamilyRoomScreen() {
       supabase.removeChannel(channel)
     }
   }, [supabase, familyId, currentMemberId])
+
+  async function togglePush() {
+    if (pushBusy) return
+    setPushBusy(true)
+    setPushMsg('')
+    if (pushOn) {
+      await disablePush(supabase)
+      setPushOn(false)
+      setPushBusy(false)
+      return
+    }
+    const res = await enablePush(supabase, { familyId, memberId: currentMemberId })
+    setPushBusy(false)
+    if (res.ok) {
+      setPushOn(true)
+      return
+    }
+    if (res.error === 'unsupported') setPushMsg('이 브라우저는 휴대폰 알림을 지원하지 않아요.')
+    else if (res.error === 'denied') setPushMsg('브라우저에서 알림이 차단되어 있어요. 주소창 옆 자물쇠에서 허용으로 바꿔주세요.')
+    else if (res.error === 'no_key') setPushMsg('서버에 푸시 키가 설정되지 않았어요.')
+    else if (res.error === 'save_failed') setPushMsg('알림 등록을 저장하지 못했어요. migration_14를 실행했는지 확인해주세요.')
+    else setPushMsg('알림을 켜지 못했어요.')
+  }
 
   async function handleChatSubmit(e) {
     e.preventDefault()
@@ -309,17 +374,24 @@ function FamilyRoomScreen() {
     setChatInput('')
     setMessages((prev) => [...prev, data])
     channelRef.current?.send({ type: 'broadcast', event: CHAT_EVENT, payload: data })
+    // 앱을 닫아둔 가족은 Broadcast로는 알 수 없다. 휴대폰 알림창은 푸시로만 뜬다.
+    notifyFamily({ familyId, senderName: memberName(chatSenderId), excludeMemberId: chatSenderId })
   }
 
   // 한 판이 끝나면 결과를 남긴다. 이게 "가족 포인트"의 유일한 근거다.
   const finishRound = useCallback(
     async (gameKey, roundId, winnerKey) => {
       if (!familyId || recordedRounds.current.has(roundId)) return
+      // 원격 대전은 두 기기가 같은 판을 보고 있어서, 둘 다 기록하면 포인트가 두 번 쌓인다.
+      // 방을 만든 쪽에서만 남긴다.
+      if (session && roleOf(session, currentMemberId) !== 'p1') return
       recordedRounds.current.add(roundId)
 
       const isDraw = winnerKey === 'draw'
-      const winnerId = isDraw ? null : winnerKey === 'p1' ? player1Id : player2Id
-      const opponentId = isDraw ? player2Id : winnerKey === 'p1' ? player2Id : player1Id
+      const oneId = session ? session.p1_member_id : player1Id
+      const twoId = session ? session.p2_member_id : player2Id
+      const winnerId = isDraw ? null : winnerKey === 'p1' ? oneId : twoId
+      const opponentId = isDraw ? twoId : winnerKey === 'p1' ? twoId : oneId
 
       const { error } = await recordGameResult(supabase, {
         familyId,
@@ -339,7 +411,7 @@ function FamilyRoomScreen() {
       setPoints((prev) => (prev === null ? prev : { ...prev, total: prev.total + gained, game: prev.game + gained }))
       channelRef.current?.send({ type: 'broadcast', event: POINTS_EVENT, payload: { points: gained } })
     },
-    [supabase, familyId, player1Id, player2Id]
+    [supabase, familyId, player1Id, player2Id, session, currentMemberId]
   )
 
   useEffect(() => {
@@ -357,6 +429,133 @@ function FamilyRoomScreen() {
   useEffect(() => {
     if (updown.winner) finishRound('updown', updown.roundId, updown.winner)
   }, [updown.winner, updown.roundId, finishRound])
+
+  const stateFor = useCallback(
+    (key) => (key === 'sum15' ? sum15 : key === 'bingo' ? bingo : key === 'stairs' ? stairs : updown),
+    [sum15, bingo, stairs, updown]
+  )
+
+  const setStateFor = useCallback((key, value) => {
+    if (key === 'sum15') setSum15(value)
+    else if (key === 'bingo') setBingo(value)
+    else if (key === 'stairs') setStairs(value)
+    else setUpdown(value)
+  }, [])
+
+  function newStateFor(key) {
+    if (key === 'sum15') return newSum15State()
+    if (key === 'bingo') return newBingoState()
+    if (key === 'stairs') return newStairsState()
+    return newUpdownState()
+  }
+
+  const refreshSessions = useCallback(async () => {
+    const res = await loadSessions(supabase)
+    if (res.error) {
+      if (isMissingTable(res.error)) setRemoteMsg('원격 대전은 migration_16을 실행한 뒤에 쓸 수 있어요.')
+      return
+    }
+    setSessions(res.data)
+  }, [supabase])
+
+  useEffect(() => {
+    if (familyId) refreshSessions()
+  }, [familyId, refreshSessions])
+
+  // 상대가 둔 판을 받아 그대로 반영한다. 규칙은 이미 상대 화면에서 적용된 뒤라
+  // 여기서는 판을 다시 계산하지 않는다.
+  const applySession = useCallback(
+    (row) => {
+      if (!row) return
+      applyingRemote.current = true
+      setSession(row)
+      setActiveGame(row.game_key)
+      setStateFor(row.game_key, row.state)
+    },
+    [setStateFor]
+  )
+
+  async function startRemote(gameKey) {
+    if (!currentMemberId) return
+    setRemoteBusy(true)
+    const state = newStateFor(gameKey)
+    const { data, error } = await createSession(supabase, {
+      familyId,
+      gameKey,
+      memberId: currentMemberId,
+      state,
+    })
+    setRemoteBusy(false)
+    if (error) {
+      setRemoteMsg(isMissingTable(error) ? '원격 대전은 migration_16을 실행한 뒤에 쓸 수 있어요.' : '방을 만들지 못했어요.')
+      return
+    }
+    setRemoteMsg('')
+    setSession(data)
+    setActiveGame(gameKey)
+    setStateFor(gameKey, state)
+    channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: data.session_id } })
+    refreshSessions()
+  }
+
+  async function joinRemote(row) {
+    setRemoteBusy(true)
+    const { data, error } = await joinSession(supabase, row, currentMemberId)
+    setRemoteBusy(false)
+    if (error || !data) {
+      setRemoteMsg('이미 다른 사람이 들어간 방이에요.')
+      refreshSessions()
+      return
+    }
+    setRemoteMsg('')
+    applySession(data)
+    channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: data.session_id } })
+  }
+
+  async function exitRemote() {
+    if (!session) return
+    const role = roleOf(session, currentMemberId)
+    // 방을 만든 사람이 나가면 판 자체가 없어진다. 참가자만 나가면 방은 남는다.
+    if (role === 'p1') await leaveSession(supabase, session.session_id)
+    const id = session.session_id
+    setSession(null)
+    channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: id } })
+    refreshSessions()
+  }
+
+  // 내 화면에서 판이 바뀌면 서버에 올리고 상대에게 알린다.
+  useEffect(() => {
+    if (!session) return
+    if (applyingRemote.current) {
+      applyingRemote.current = false
+      return
+    }
+    const local = stateFor(session.game_key)
+    if (!local || local === session.state) return
+    let alive = true
+    ;(async () => {
+      const { data } = await pushState(supabase, session.session_id, {
+        state: local,
+        turn: local.turn,
+        winner: local.winner,
+      })
+      if (!alive || !data) return
+      setSession(data)
+      channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: data.session_id } })
+    })()
+    return () => {
+      alive = false
+    }
+  }, [sum15, bingo, stairs, updown, session, supabase, stateFor])
+
+  useEffect(() => {
+    sessionRef.current = session
+    applySessionRef.current = applySession
+    refreshSessionsRef.current = refreshSessions
+  }, [session, applySession, refreshSessions])
+
+  const myTurn = !session || isMyTurn(session, currentMemberId)
+  const remoteRole = roleOf(session, currentMemberId)
 
   function handleSum15Pick(n) {
     setSum15((prev) => {
@@ -463,8 +662,14 @@ function FamilyRoomScreen() {
     setUpdownGuess('')
   }
 
-  const player1 = memberName(player1Id)
-  const player2 = memberName(player2Id)
+  // 원격 대전 중에는 선수가 세션에 박혀 있다. 화면의 선수 선택은 같은 기기에서
+  // 번갈아 할 때만 쓰인다.
+  const player1 = memberName(session ? session.p1_member_id : player1Id)
+  const player2 = session
+    ? session.p2_member_id
+      ? memberName(session.p2_member_id)
+      : '대기 중'
+    : memberName(player2Id)
 
   const activeState =
     activeGame === 'sum15' ? sum15 : activeGame === 'bingo' ? bingo : activeGame === 'stairs' ? stairs : updown
@@ -528,12 +733,33 @@ function FamilyRoomScreen() {
             })}
           </div>
         </div>
-        <p className="text-[12px] text-foreground-muted mb-3">
-          {onlineMembers.length > 0
-            ? `지금 ${onlineMembers.map((m) => m.name).join(', ')} 접속 중`
-            : '지금 접속 중인 가족이 없어요'}
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <p className="text-[12px] text-foreground-muted min-w-0">
+            {onlineMembers.length > 0
+              ? `지금 ${onlineMembers.map((m) => m.name).join(', ')} 접속 중`
+              : '지금 접속 중인 가족이 없어요'}
+          </p>
+          {pushSupported() && currentMemberId && (
+            <button
+              type="button"
+              onClick={togglePush}
+              disabled={pushBusy}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-display font-bold border shrink-0 transition duration-150 active:scale-95 disabled:opacity-60 ${
+                pushOn
+                  ? 'bg-secondary-dark text-on-secondary border-foreground'
+                  : 'bg-surface-muted text-foreground-muted border-border'
+              }`}
+              aria-pressed={pushOn}
+            >
+              <i className={`ph-bold ${pushOn ? 'ph-bell-ringing' : 'ph-bell-slash'} text-xs`} aria-hidden="true"></i>
+              {pushBusy ? '...' : pushOn ? '알림 켜짐' : '휴대폰 알림'}
+            </button>
+          )}
+        </div>
+        {pushMsg && <p className="text-[12px] text-destructive mb-3 leading-[18px]">{pushMsg}</p>}
         <div className="border-t border-dashed border-border mb-3" aria-hidden="true"></div>
+        {/* 지워지는 규칙을 적어두지 않으면 "어제 얘기가 왜 없지"가 된다 */}
+        <p className="text-[11px] text-foreground-muted mb-2">대화는 7일이 지나면 자동으로 지워져요.</p>
         <div ref={chatLogRef} className="flex flex-col gap-3 max-h-64 overflow-y-auto mb-3 pr-1">
           {chatLoading ? (
             <p className="text-foreground-muted text-[14px]">대화를 불러오는 중...</p>
@@ -565,18 +791,17 @@ function FamilyRoomScreen() {
           )}
         </div>
         <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
-          <select
-            value={chatSenderId}
-            onChange={(e) => setChatSenderId(e.target.value)}
-            className="bg-surface-muted rounded-full px-3 py-2.5 text-[13px] font-display font-bold border border-border outline-none shrink-0"
-            disabled={membersLoading || members.length === 0}
+          {/* 예전에는 아무나 발신자를 골라 다른 사람 이름으로 말할 수 있었다.
+              지금 앱을 쓰는 사람으로 고정한다 — 홈에서 누구로 들어왔는지가 곧 발신자다. */}
+          <span
+            className="flex items-center gap-1.5 bg-surface-muted rounded-full pl-2 pr-3 py-2 text-[13px] font-display font-bold border border-border shrink-0"
+            title="홈에서 고른 사람으로 보내요"
           >
-            {members.map((m) => (
-              <option key={m.member_id} value={m.member_id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            <span className="text-[15px]" aria-hidden="true">
+              {characterOf(members.find((m) => m.member_id === chatSenderId))}
+            </span>
+            {memberName(chatSenderId)}
+          </span>
           <input
             type="text"
             value={chatInput}
@@ -624,10 +849,86 @@ function FamilyRoomScreen() {
           <i className="ph-duotone ph-users-three text-xl text-accent"></i>선수 선택 · 턴제 대전
         </p>
 
+        {/* 원격 대전. 방을 만들면 상대가 자기 기기에서 참가한다. */}
+        <div className="bg-surface-muted rounded-md px-3 py-3 mb-4">
+          {session ? (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <p className="font-display font-bold text-[13px]">
+                  원격 대전 · {GAME_TABS.find((t) => t.key === session.game_key)?.label}
+                </p>
+                <button
+                  type="button"
+                  onClick={exitRemote}
+                  className="text-[12px] font-display font-bold text-foreground-muted shrink-0 active:scale-95 transition duration-150"
+                >
+                  나가기
+                </button>
+              </div>
+              <p className="text-[12px] text-foreground-muted leading-[18px]">
+                {!session.p2_member_id
+                  ? '상대가 참가하기를 누르면 시작해요.'
+                  : session.winner
+                    ? '판이 끝났어요. 새 게임을 누르면 다시 시작해요.'
+                    : myTurn
+                      ? '내 차례예요.'
+                      : `${memberName(session.turn === 'p1' ? session.p1_member_id : session.p2_member_id)}의 차례예요.`}
+              </p>
+              <p className="text-[12px] text-foreground-muted mt-1">
+                {memberName(session.p1_member_id)}
+                {session.p2_member_id ? ` vs ${memberName(session.p2_member_id)}` : ' vs 대기 중'}
+                {remoteRole ? '' : ' · 구경 중'}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-display font-bold text-[13px] mb-1.5">따로 있는 가족과 하기</p>
+              <p className="text-[12px] text-foreground-muted leading-[18px] mb-2">
+                방을 만들면 다른 기기에서 참가할 수 있어요. 아무것도 만들지 않으면 지금처럼 한 기기에서 번갈아 해요.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {GAME_TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => startRemote(t.key)}
+                    disabled={remoteBusy || !currentMemberId}
+                    className="bg-surface border border-border rounded-full px-3 py-1.5 text-[12px] font-display font-bold active:scale-95 transition duration-150 disabled:opacity-60"
+                  >
+                    {t.label} 방 만들기
+                  </button>
+                ))}
+              </div>
+              {sessions.length > 0 && (
+                <ul className="flex flex-col gap-1.5">
+                  {sessions.map((row) => (
+                    <li key={row.session_id} className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] text-foreground-muted min-w-0">
+                        {memberName(row.p1_member_id)}의 {GAME_TABS.find((t) => t.key === row.game_key)?.label}
+                        {row.p2_member_id ? ` · ${memberName(row.p2_member_id)} 참가함` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (row.p2_member_id ? applySession(row) : joinRemote(row))}
+                        disabled={remoteBusy}
+                        className="text-[12px] font-display font-bold text-primary shrink-0 active:scale-95 transition duration-150 disabled:opacity-60"
+                      >
+                        {row.p2_member_id ? '보기' : '참가하기'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {remoteMsg && <p className="text-[12px] text-destructive mt-2 leading-[18px]">{remoteMsg}</p>}
+        </div>
+
         <div className="grid grid-cols-2 gap-2 mb-4">
           <select
             value={player1Id}
             onChange={(e) => setPlayer1Id(e.target.value)}
+            disabled={Boolean(session)}
             className="bg-surface-muted rounded-md px-2 py-2 text-[13px] border border-border outline-none"
           >
             {members.map((m) => (
@@ -639,6 +940,7 @@ function FamilyRoomScreen() {
           <select
             value={player2Id}
             onChange={(e) => setPlayer2Id(e.target.value)}
+            disabled={Boolean(session)}
             className="bg-surface-muted rounded-md px-2 py-2 text-[13px] border border-border outline-none"
           >
             {members.map((m) => (
@@ -654,7 +956,8 @@ function FamilyRoomScreen() {
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveGame(tab.key)}
+              onClick={() => !session && setActiveGame(tab.key)}
+              disabled={Boolean(session) && session.game_key !== tab.key}
               className={`game-tab relative flex flex-col items-start gap-1 ${tab.bgClass} border border-border rounded-md p-3 text-left transition duration-150`}
               data-active={activeGame === tab.key}
             >
@@ -666,7 +969,14 @@ function FamilyRoomScreen() {
           ))}
         </div>
 
-        <p className="text-[14px] font-display font-bold mb-3">{turnIndicatorText}</p>
+        <p className="text-[14px] font-display font-bold mb-3">
+          {turnIndicatorText}
+          {session && !myTurn && !session.winner && (
+            <span className="ml-2 font-body font-normal text-[13px] text-foreground-muted">
+              {session.p2_member_id ? '(상대 차례를 기다리는 중)' : '(상대를 기다리는 중)'}
+            </span>
+          )}
+        </p>
 
         {activeGame === 'sum15' && (
           <div>
@@ -679,7 +989,7 @@ function FamilyRoomScreen() {
                     key={n}
                     type="button"
                     onClick={() => handleSum15Pick(n)}
-                    disabled={!!owner || !!sum15.winner}
+                    disabled={!!owner || !!sum15.winner || !myTurn}
                     data-owner={owner}
                     className="num-cell bg-surface-muted border border-border rounded-md py-3 font-display font-bold text-[18px] active:scale-95 transition duration-150"
                   >
@@ -736,7 +1046,7 @@ function FamilyRoomScreen() {
                         key={idx}
                         type="button"
                         onClick={() => handleBingoClick(key, idx)}
-                        disabled={!!bingo.winner || key !== bingo.turn || cell.marked}
+                        disabled={!!bingo.winner || key !== bingo.turn || cell.marked || !myTurn}
                         data-marked={cell.marked}
                         className="bingo-cell bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-95 transition duration-150 disabled:opacity-50"
                       >
@@ -822,7 +1132,7 @@ function FamilyRoomScreen() {
               <button
                 type="button"
                 onClick={handleStairsRoll}
-                disabled={!!stairs.winner || stairs.pot >= STAIRS_MAX_POT}
+                disabled={!!stairs.winner || stairs.pot >= STAIRS_MAX_POT || !myTurn}
                 className="bg-primary text-on-primary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150 disabled:opacity-60"
               >
                 <i className="ph-bold ph-dice-five"></i>한 번 더
@@ -830,7 +1140,7 @@ function FamilyRoomScreen() {
               <button
                 type="button"
                 onClick={handleStairsBank}
-                disabled={!!stairs.winner || stairs.pot === 0}
+                disabled={!!stairs.winner || stairs.pot === 0 || !myTurn}
                 className="bg-secondary-dark text-on-secondary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150 disabled:opacity-40"
               >
                 <i className="ph-bold ph-hand-palm"></i>멈추기
@@ -874,14 +1184,14 @@ function FamilyRoomScreen() {
                 onChange={(e) => setUpdownGuess(e.target.value)}
                 min={updown.low}
                 max={updown.high}
-                disabled={!!updown.winner}
+                disabled={!!updown.winner || !myTurn}
                 placeholder={`${updown.low}~${updown.high} 사이의 숫자`}
                 className="flex-1 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none focus:border-foreground transition duration-150 min-w-0"
                 autoComplete="off"
               />
               <button
                 type="submit"
-                disabled={!!updown.winner}
+                disabled={!!updown.winner || !myTurn}
                 className="px-4 h-11 rounded-md bg-primary text-on-primary border-2 border-foreground shadow-sticker font-display font-bold text-[14px] shrink-0 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 disabled:opacity-60"
               >
                 말하기
