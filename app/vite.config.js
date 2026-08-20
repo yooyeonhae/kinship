@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // Vercel은 app/api/*.js를 서버리스 함수로 자동 인식하지만 vite dev는 그렇지 않다.
 // 같은 핸들러를 dev 서버 미들웨어로도 걸어 두 환경의 /api 경로를 하나로 유지한다.
-const API_ROUTES = new Set(['/api/weather', '/api/tour', '/api/news', '/api/linkmeta'])
+const API_ROUTES = new Set(['/api/weather', '/api/tour', '/api/news', '/api/linkmeta', '/api/push'])
 
 function apiRoutes() {
   return {
