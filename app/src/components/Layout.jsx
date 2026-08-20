@@ -4,7 +4,7 @@ import ChatBot from './ChatBot'
 
 function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div
         className="max-w-md mx-auto px-6"
         style={{

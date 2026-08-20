@@ -204,13 +204,13 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
         <p className="text-foreground-muted text-[14px]">아직 우리 가족이 추가한 메뉴가 없어요.</p>
       ) : (
         /* 세로로 쌓으면 메뉴를 넣을수록 화면이 끝없이 길어져 아래 항목이 묻힌다 */
-        <ul className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+        <ul className="flex gap-3 overflow-x-auto pb-2 snap-x">
           {mine.map((r) => {
             const { ingredients, note } = parseDescription(r.description)
             return (
               <li
                 key={r.recipe_id}
-                className="bg-surface border border-border rounded-md shadow-soft px-3.5 py-3 shrink-0 w-[248px] snap-start"
+                className="bg-surface border border-border rounded-md shadow-soft px-3.5 py-3 shrink-0 w-[min(248px,68vw)] snap-start"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

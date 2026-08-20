@@ -28,12 +28,14 @@ function ItemAddForm({ onAdd }) {
       }}
       className="item-add-form flex items-center gap-2"
     >
+      {/* input은 기본 intrinsic min-width(size=20) 때문에 flex-1만으로는 줄어들지 않는다.
+          min-w-0이 없으면 좁은 카드 안에서 옆 버튼을 밀어내며 카드 밖으로 삐져나간다. */}
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="새 소식 제목 추가"
-        className="flex-1 bg-surface-muted rounded-md px-3 py-2 text-[14px] border border-border outline-none"
+        className="flex-1 min-w-0 bg-surface-muted rounded-md px-3 py-2 text-[14px] border border-border outline-none"
         autoComplete="off"
       />
       <button type="submit" className="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="소식 추가">
@@ -107,14 +109,16 @@ function InfoFeedScreen() {
 
       {/* 카테고리가 늘어날수록 아래로만 길어져 뒤쪽 카테고리는 스크롤해야 보였다.
           가로로 넘기면 몇 개가 있는지도 한눈에 들어온다. */}
-      <div className="flex gap-4 overflow-x-auto pb-3 -mx-6 px-6 snap-x">
+      {/* -mx-6로 화면 끝까지 흘리면 부모(max-w-md px-6)보다 48px 넓어져 문서 자체가
+          가로로 넘친다. 그러면 하단 고정 탭바까지 잘려 보인다. 안쪽에서만 스크롤한다. */}
+      <div className="flex gap-4 overflow-x-auto pb-3 snap-x">
         {categories.map((cat, idx) => {
           const feed = feeds[cat.id] || { loading: true, error: '', items: [] }
           const manualItems = cat.items || []
           return (
           <div
             key={cat.id}
-            className={`shrink-0 w-[300px] snap-start ${
+            className={`shrink-0 w-[min(300px,72vw)] snap-start ${
               idx === 0
                 ? 'relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding'
                 : 'relative bg-surface border border-border rounded-lg shadow-soft p-card-padding'
