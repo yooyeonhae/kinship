@@ -329,7 +329,7 @@ function OnboardingScreen() {
                     }
                   }}
                   placeholder="이름"
-                  className="flex-1 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none"
+                  className="flex-1 min-w-0 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none"
                   autoComplete="off"
                 />
                 <select

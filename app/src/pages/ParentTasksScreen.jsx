@@ -351,7 +351,7 @@ function ParentTasksScreen() {
               onChange={(e) => setQuickInput(e.target.value)}
               placeholder="자주 쓰는 항목 추가 — 예: 분리수거"
               maxLength={40}
-              className="flex-1 bg-surface rounded-md px-3 py-2 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
+              className="flex-1 min-w-0 bg-surface rounded-md px-3 py-2 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
               autoComplete="off"
             />
             <button
@@ -390,7 +390,7 @@ function ParentTasksScreen() {
             value={taskInput}
             onChange={(e) => setTaskInput(e.target.value)}
             placeholder="목록에 없으면 직접 입력하기"
-            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/60 outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[15px] text-foreground placeholder:text-foreground/60 outline-none"
             autoComplete="off"
           />
           {/* 예전에는 이 자리가 장식용 span이라 엔터로만 등록됐다. 눌러서 등록되는 게

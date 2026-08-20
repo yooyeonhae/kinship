@@ -165,7 +165,7 @@ function FavoriteLinks() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder={active.placeholder}
-            className="flex-1 bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
+            className="flex-1 min-w-0 bg-surface rounded-md px-3 py-2.5 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
             autoComplete="off"
             inputMode="url"
           />

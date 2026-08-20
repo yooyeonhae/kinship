@@ -218,7 +218,7 @@ function InfoFeedScreen() {
             value={categoryInput}
             onChange={(e) => setCategoryInput(e.target.value)}
             placeholder="예: 날씨, 부동산, IT 뉴스"
-            className="flex-1 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none"
+            className="flex-1 min-w-0 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none"
             autoComplete="off"
           />
           <button type="submit" className="w-11 h-11 rounded-full bg-secondary-dark text-on-secondary flex items-center justify-center shrink-0 active:scale-90 transition duration-150" aria-label="카테고리 추가">

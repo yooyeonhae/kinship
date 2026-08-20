@@ -330,7 +330,7 @@ function ChatBot() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="예: 오늘 18시 도서관 가야 된다"
-                className="flex-1 bg-surface-muted rounded-md px-3 py-2.5 text-[15px] border border-border outline-none focus:border-foreground transition duration-150"
+                className="flex-1 min-w-0 bg-surface-muted rounded-md px-3 py-2.5 text-[15px] border border-border outline-none focus:border-foreground transition duration-150"
                 autoComplete="off"
               />
               <button
