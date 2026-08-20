@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchTourActivities, TOUR_REGIONS, TOUR_CONTENT_TYPES } from '../lib/tourapi'
 
+// 예전 필터는 '초중고 학생' / '가족'이었는데, TourAPI가 대상 연령을 구분해주지 않아
+// 불러온 항목이 전부 'family'로 들어온다. 그래서 '초중고 학생'을 누르면 결과가 늘 0건이고
+// 새 나들이 추가 폼만 남았다. 데이터가 실제로 갖고 있는 값(종류)으로 거른다.
 const FILTERS = [
   { key: 'all', label: '전체' },
-  { key: 'student', label: '초중고 학생' },
-  { key: 'family', label: '가족' },
+  { key: 'festival', label: '축제·행사' },
+  { key: 'sight', label: '관광지' },
+  { key: 'culture', label: '문화시설' },
 ]
 
 // 축제 이름만 검색하면 동명의 다른 지역 행사가 섞인다. 지역을 함께 넣어 좁힌다.
@@ -56,7 +60,7 @@ function WeekendScreen() {
   useEffect(loadTour, [loadTour])
 
   const activities = [...tourItems, ...manual]
-  const items = filter === 'all' ? activities : activities.filter((a) => a.category === filter)
+  const items = filter === 'all' ? activities : activities.filter((a) => a.type === filter)
 
   function updateForm(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -149,7 +153,11 @@ function WeekendScreen() {
         {tourLoading ? (
           <p className="text-[14px] text-foreground-muted py-4 text-center">{region} 관광 정보를 불러오는 중...</p>
         ) : items.length === 0 ? (
-          <p className="text-[14px] text-foreground-muted py-4 text-center">아직 등록된 나들이가 없어요. 아래에서 추가해보세요.</p>
+          <p className="text-[14px] text-foreground-muted py-4 text-center">
+            {filter === 'all'
+              ? '아직 등록된 나들이가 없어요. 아래에서 추가해보세요.'
+              : `${FILTERS.find((f) => f.key === filter)?.label} 항목이 없어요. 다른 종류를 눌러보세요.`}
+          </p>
         ) : (
           items.map((a, i) => {
             const style = CATEGORY_STYLE[a.category] || CATEGORY_STYLE.family
