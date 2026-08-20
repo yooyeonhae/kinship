@@ -11,6 +11,8 @@ const INITIAL_CATEGORIES = [
   { id: 'c4', label: '스포츠', icon: 'ph-basketball', query: '프로야구' },
 ]
 
+const ITEMS_PER_CATEGORY = 3
+
 let nextId = 100
 
 function ItemAddForm({ onAdd }) {
@@ -51,7 +53,8 @@ function InfoFeedScreen() {
   const loadFeed = useCallback(async (cat) => {
     setFeeds((prev) => ({ ...prev, [cat.id]: { loading: true, error: '', items: prev[cat.id]?.items || [] } }))
     try {
-      const items = await fetchNews(cat.query || cat.label)
+      // 한 카테고리에 3건. 그 이상은 카드가 길어져 다음 카테고리가 화면 밖으로 밀린다.
+      const items = await fetchNews(cat.query || cat.label, ITEMS_PER_CATEGORY)
       setFeeds((prev) => ({ ...prev, [cat.id]: { loading: false, error: '', items } }))
     } catch (err) {
       setFeeds((prev) => ({ ...prev, [cat.id]: { loading: false, error: err.message, items: [] } }))
@@ -94,20 +97,28 @@ function InfoFeedScreen() {
         <span className="absolute -top-2 left-0 w-12 h-5 bg-tape-blue/90 rotate-[-4deg] rounded-sm shadow-sm" aria-hidden="true"></span>
         <h1 className="font-display font-extrabold text-[28px] leading-[34px]">오늘의 정보</h1>
         <p className="text-foreground-muted text-[15px] leading-[22px] mt-2">관심 있는 소식만 골라 카테고리를 자유롭게 추가·삭제할 수 있어요.</p>
+        {/* 네이버는 x-frame-options: SAMEORIGIN을 보내서 기사를 이 앱 안에 끼워 넣을 수 없다.
+            그래서 새 탭으로 연다 — 앱 화면은 그대로 남아 있으니 탭만 닫으면 돌아온다.
+            이걸 적어두지 않으면 "왜 앱 밖으로 나가지?"로만 보인다. */}
+        <p className="text-foreground-muted text-[13px] leading-[19px] mt-1">
+          기사는 새 탭에서 열려요. 다 읽고 탭을 닫으면 보던 자리로 그대로 돌아와요.
+        </p>
       </div>
 
-      <div className="flex flex-col gap-5">
+      {/* 카테고리가 늘어날수록 아래로만 길어져 뒤쪽 카테고리는 스크롤해야 보였다.
+          가로로 넘기면 몇 개가 있는지도 한눈에 들어온다. */}
+      <div className="flex gap-4 overflow-x-auto pb-3 -mx-6 px-6 snap-x">
         {categories.map((cat, idx) => {
           const feed = feeds[cat.id] || { loading: true, error: '', items: [] }
           const manualItems = cat.items || []
           return (
           <div
             key={cat.id}
-            className={
+            className={`shrink-0 w-[300px] snap-start ${
               idx === 0
-                ? 'relative bg-surface border-2 border-foreground rounded-md shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 p-card-padding'
+                ? 'relative bg-surface border-2 border-foreground rounded-md shadow-sticker p-card-padding'
                 : 'relative bg-surface border border-border rounded-lg shadow-soft p-card-padding'
-            }
+            }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="flex items-center gap-2">
