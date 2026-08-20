@@ -159,16 +159,14 @@ function WeekendScreen() {
               : `${FILTERS.find((f) => f.key === filter)?.label} 항목이 없어요. 다른 종류를 눌러보세요.`}
           </p>
         ) : (
-          items.map((a, i) => {
+          items.map((a) => {
             const style = CATEGORY_STYLE[a.category] || CATEGORY_STYLE.family
+            // 예전에는 첫 카드만 스티커 스타일(굵은 테두리+기울기)이었다. 목록이 API에서
+            // 오는 순서일 뿐 첫 항목이 더 중요한 게 아니라, 강조가 뜻 없는 차이로 읽혔다.
             return (
               <div
                 key={a.id}
-                className={
-                  i === 0
-                    ? 'bg-surface border-2 border-foreground rounded-md shadow-sticker rotate-[-1deg] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 px-4 py-4 flex items-start gap-3'
-                    : 'bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-start gap-3'
-                }
+                className="bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-start gap-3"
               >
                 <span className={`w-11 h-11 rounded-full ${style.iconBg} flex items-center justify-center shrink-0`}>
                   <i className={`ph-duotone ${TYPE_ICON[a.type] || 'ph-confetti'} text-xl ${style.iconText}`}></i>
