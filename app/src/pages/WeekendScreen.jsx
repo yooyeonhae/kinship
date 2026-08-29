@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchTourActivities, TOUR_REGIONS, TOUR_CONTENT_TYPES } from '../lib/tourapi'
+import { useFamily } from '../context/FamilyContext'
+import { DEFAULT_SETTINGS, SETTINGS_EVENT, loadSettings } from '../lib/settings'
 
 // 예전 필터는 '초중고 학생' / '가족'이었는데, TourAPI가 대상 연령을 구분해주지 않아
 // 불러온 항목이 전부 'family'로 들어온다. 그래서 '초중고 학생'을 누르면 결과가 늘 0건이고
@@ -31,7 +33,13 @@ function WeekendScreen() {
   const [tourItems, setTourItems] = useState([])
   const [tourLoading, setTourLoading] = useState(true)
   const [tourError, setTourError] = useState('')
-  const [region, setRegion] = useState('서울')
+  // 처음 보이는 지역은 가족 설정에서 온다. 화면에서 바꾸면 이번만 바뀌고,
+  // 늘 쓰는 지역은 설정에서 정한다.
+  const { supabase, familyId } = useFamily()
+  const [region, setRegion] = useState(DEFAULT_SETTINGS.default_region)
+  // 사람이 지역을 고른 뒤에는 설정값으로 되돌리지 않는다 — 보고 있던 지역이
+  // 설정을 읽어오는 순간 튀면 "왜 바뀌지"가 된다.
+  const pickedRef = useRef(false)
   const [contentTypeId, setContentTypeId] = useState('15')
   const [filter, setFilter] = useState('all')
   const [form, setForm] = useState({ title: '', category: 'family', type: 'festival', region: '', date: '', location: '' })
@@ -56,6 +64,23 @@ function WeekendScreen() {
       alive = false
     }
   }, [region, contentTypeId])
+
+  // 기본 지역을 설정에서 읽어온다. 사람이 이미 고른 뒤라면 건드리지 않는다 —
+  // 보고 있던 지역이 설정 응답이 도착하는 순간 튀면 "왜 바뀌지"가 된다.
+  useEffect(() => {
+    if (!familyId) return
+    let alive = true
+    const read = async () => {
+      const res = await loadSettings(supabase)
+      if (alive && !pickedRef.current) setRegion(res.data.default_region)
+    }
+    read()
+    window.addEventListener(SETTINGS_EVENT, read)
+    return () => {
+      alive = false
+      window.removeEventListener(SETTINGS_EVENT, read)
+    }
+  }, [supabase, familyId])
 
   useEffect(loadTour, [loadTour])
 
@@ -102,7 +127,10 @@ function WeekendScreen() {
       <div className="grid grid-cols-2 gap-2 mb-4">
         <select
           value={region}
-          onChange={(e) => setRegion(e.target.value)}
+          onChange={(e) => {
+            pickedRef.current = true
+            setRegion(e.target.value)
+          }}
           className="bg-surface rounded-md px-3 py-2.5 text-[14px] font-display font-bold border border-border outline-none"
           aria-label="지역 선택"
         >

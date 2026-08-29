@@ -87,8 +87,6 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .filter-chip[data-active="true"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
 .game-tab[data-active="true"] { border-color: #0055FF; border-width: 2px; box-shadow: 0 0 0 2px rgba(0,85,255,0.25); }
 .game-tab[data-active="true"] .game-tab-dot { background-color: #2E7D32; }
-.num-cell[data-owner="p1"] { background-color: #0055FF; color: #FFFFFF; border-color: #0055FF; }
-.num-cell[data-owner="p2"] { background-color: #C2185B; color: #FFFFFF; border-color: #C2185B; }
 .bingo-cell[data-marked="true"] { background-color: #2E7D32; color: #FFFFFF; border-color: #2E7D32; }
 
 .task-row[data-done="true"] { background-color: #F1ECE4; }

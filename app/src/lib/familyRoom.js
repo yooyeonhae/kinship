@@ -28,13 +28,18 @@ export const TODO_POINT = 10
 // 할일 점수는 별도 표에 쌓지 않고 "지금 완료 상태인 할일 수"에서 매번 계산한다.
 // 완료 이벤트를 적립식으로 쌓으면 체크를 켰다 껐다 반복하는 것만으로 점수가 무한히
 // 늘어난다. 상태에서 계산하면 체크를 풀 때 점수도 함께 돌아가므로 그럴 여지가 없다.
-export async function loadTodoPoints(supabase) {
+//
+// 아이가 스스로 만든 할일(self_made)은 세지 않는다. 완료 하나가 10p인데 아이가
+// 할일을 만들 수 있으면 "물 마시기" 스무 개로 200p가 되기 때문이다. 그 할일은
+// 아이의 '별'로만 간다(migration_18).
+export async function loadTodoPoints(supabase, pointPerTodo = TODO_POINT) {
   const { count, error } = await supabase
     .from('todos')
     .select('todo_id', { count: 'exact', head: true })
     .eq('is_done', true)
+    .eq('self_made', false)
   if (error) return { error }
-  return { data: (count || 0) * TODO_POINT }
+  return { data: (count || 0) * pointPerTodo }
 }
 
 export async function loadChat(supabase, limit = 50) {
@@ -64,8 +69,11 @@ export async function loadGamePoints(supabase) {
 }
 
 // 가족 포인트 = 게임에서 얻은 점수 + 끝낸 할일 점수
-export async function loadPoints(supabase) {
-  const [game, todo] = await Promise.all([loadGamePoints(supabase), loadTodoPoints(supabase)])
+export async function loadPoints(supabase, pointPerTodo = TODO_POINT) {
+  const [game, todo] = await Promise.all([
+    loadGamePoints(supabase),
+    loadTodoPoints(supabase, pointPerTodo),
+  ])
   if (game.error) return { error: game.error }
   if (todo.error) return { error: todo.error }
   return { data: { total: game.data + todo.data, game: game.data, todo: todo.data } }
@@ -89,6 +97,13 @@ export async function recordGameResult(supabase, { familyId, gameKey, winnerId, 
 }
 
 // 아직 마이그레이션을 실행하지 않았을 때 "왜 안 되는지"를 화면에서 구분할 수 있게 한다.
+// game_key CHECK에 없는 값을 넣으면 23514로 막힌다. 테이블이 없는 것과 원인이 달라서
+// (마이그레이션 하나만 덜 돌린 상태) 안내 문구를 따로 준다.
+export function isUnknownGameKey(error) {
+  const text = `${error?.message || ''} ${error?.details || ''}`
+  return error?.code === '23514' && /game_key/i.test(text)
+}
+
 export function isMissingTable(error) {
   const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`
   return error?.code === '42P01' || /does not exist|schema cache/i.test(text)

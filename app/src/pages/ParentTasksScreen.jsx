@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { approveTodo, dueLabel, todayValue, tomorrowValue } from '../lib/todos'
+import { DEFAULT_SETTINGS, SETTINGS_EVENT, loadSettings } from '../lib/settings'
+import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import { characterOf } from '../lib/avatars'
 import CharacterPicker from '../components/CharacterPicker'
 
 function ParentTasksScreen() {
-  const { supabase, familyId, members, loading: membersLoading, currentMember, parentLogout, reload } = useFamily()
-  const navigate = useNavigate()
+  const {
+    supabase,
+    familyId,
+    members,
+    loading: membersLoading,
+    currentMember,
+    isParentAuthed,
+    reload,
+  } = useFamily()
   const [todos, setTodos] = useState([])
   const [loadingTodos, setLoadingTodos] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [taskInput, setTaskInput] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  // 언제까지 할 일인지. 기본은 오늘 — 대부분이 오늘 것이고, 아이 화면의 "오늘 할일"이
+  // 이 값으로 걸러진다(migration_18). 날짜가 없던 때는 며칠 치가 한 화면에 섞였다.
+  const [dueDate, setDueDate] = useState(todayValue)
   const [avatarTarget, setAvatarTarget] = useState(null)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [quickTasks, setQuickTasks] = useState([])
   const [editingQuick, setEditingQuick] = useState(false)
   const [quickInput, setQuickInput] = useState('')
   const [quickMigrationNeeded, setQuickMigrationNeeded] = useState(false)
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
 
   const parents = members.filter((m) => m.role === 'parent')
 
@@ -44,6 +57,22 @@ function ParentTasksScreen() {
   useEffect(() => {
     loadTodos()
   }, [loadTodos])
+
+  // 별 승인 규칙은 가족 설정에서 온다(migration_21).
+  useEffect(() => {
+    if (!familyId) return
+    let alive = true
+    const read = async () => {
+      const res = await loadSettings(supabase)
+      if (alive) setSettings(res.data)
+    }
+    read()
+    window.addEventListener(SETTINGS_EVENT, read)
+    return () => {
+      alive = false
+      window.removeEventListener(SETTINGS_EVENT, read)
+    }
+  }, [supabase, familyId])
 
   // 챗봇이 할일을 바꾸면 이 화면은 다시 마운트되지 않으므로 직접 다시 읽는다
   useEffect(() => {
@@ -110,15 +139,40 @@ function ParentTasksScreen() {
     if (!v) return
     const { data, error } = await supabase
       .from('todos')
-      .insert({ family_id: familyId, title: v, assignee_member_id: assigneeId || null })
+      .insert({ family_id: familyId, title: v, assignee_member_id: assigneeId || null, due_date: dueDate })
       .select()
       .single()
     if (error) {
-      setErrorMsg('할일을 추가하지 못했어요.')
+      setErrorMsg(
+        /does not exist|schema cache/i.test(error.message || '')
+          ? '할일에 날짜를 쓰려면 migration_18_todo_due_and_stars.sql을 실행해주세요.'
+          : '할일을 추가하지 못했어요.'
+      )
       return
     }
     setErrorMsg('')
     setTodos((prev) => [...prev, data])
+  }
+
+  // 아이가 끝낸 할일을 부모가 확인해 주는 도장. **이 도장을 찍어야 아이의 별에
+  // 합산된다** — 체크는 아이가 혼자 누르는 것이라, 별이 보상으로 바뀌는 값이라면
+  // 확인하는 사람이 있어야 한다. 한 번 더 누르면 떼진다(잘못 찍었을 때 되돌릴 길).
+  async function toggleApprove(todo) {
+    const res = await approveTodo(supabase, todo.todo_id)
+    if (res.error || res.reason) {
+      setErrorMsg(
+        res.reason === 'parent_only'
+          ? '인정 도장은 부모만 찍을 수 있어요.'
+          : res.reason === 'not_done'
+            ? '아직 끝나지 않은 할일이에요.'
+            : '도장을 찍지 못했어요. migration_19를 실행했는지 확인해주세요.'
+      )
+      return
+    }
+    setErrorMsg('')
+    setTodos((prev) => prev.map((t) => (t.todo_id === todo.todo_id ? res.data : t)))
+    // 아이의 별이 바뀌었으니 보상 카드가 다시 읽어야 한다
+    window.dispatchEvent(new CustomEvent('kinship:points'))
   }
 
   async function toggleTask(todo) {
@@ -363,7 +417,9 @@ function ParentTasksScreen() {
             </button>
           </form>
         )}
-        <div className="mb-2">
+        {/* 담당자와 언제까지. 마감일 기본값은 오늘이라 평소에는 손댈 일이 없고,
+            내일 준비물처럼 미리 넣어둘 때만 바꾼다. */}
+        <div className="flex flex-wrap items-center gap-2 mb-2">
           <select
             value={assigneeId}
             onChange={(e) => setAssigneeId(e.target.value)}
@@ -376,6 +432,31 @@ function ParentTasksScreen() {
               </option>
             ))}
           </select>
+          {[
+            { label: '오늘', value: todayValue() },
+            { label: '내일', value: tomorrowValue() },
+          ].map((opt) => (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => setDueDate(opt.value)}
+              className={`rounded-full px-3 py-2 text-[13px] font-display font-bold border transition duration-150 ${
+                dueDate === opt.value
+                  ? 'bg-secondary-dark text-on-secondary border-foreground'
+                  : 'bg-surface-muted text-foreground-muted border-border'
+              }`}
+              aria-pressed={dueDate === opt.value}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value || todayValue())}
+            className="bg-surface-muted rounded-full px-3 py-2 text-[13px] font-display font-bold border border-border outline-none"
+            aria-label="마감 날짜"
+          />
         </div>
         <form
           onSubmit={(e) => {
@@ -496,11 +577,36 @@ function ParentTasksScreen() {
                 </button>
                 <div className="flex-1 min-w-0">
                   <span className="task-label font-display font-bold text-[16px]">{t.title}</span>
-                  {t.is_done && (
-                    <p className="text-[13px] text-foreground-muted mt-0.5">
-                      완료: {memberName(t.completed_by) || name || '가족'}
-                    </p>
-                  )}
+                  {/* 오늘 것이 대부분이라 오늘은 굳이 적지 않는다. 다른 날짜일 때만
+                      눈에 띄어야 "내일 준비물을 오늘 목록에서 봤다"가 안 생긴다. */}
+                  <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    {t.due_date && t.due_date !== todayValue() && (
+                      <span
+                        className={`text-[12px] font-display font-bold px-1.5 py-0.5 rounded ${
+                          t.due_date < todayValue() && !t.is_done
+                            ? 'bg-destructive/15 text-destructive'
+                            : 'bg-surface-muted text-foreground-muted'
+                        }`}
+                      >
+                        {dueLabel(t.due_date)}
+                      </span>
+                    )}
+                    {t.self_made && (
+                      <span className="text-[12px] font-display font-bold px-1.5 py-0.5 rounded bg-tape-yellow/40 text-foreground">
+                        스스로 정함
+                      </span>
+                    )}
+                    {t.approved_by ? (
+                      <span className="text-[12px] font-display font-bold text-accent">🏅 확인함 · 별 +1</span>
+                    ) : t.is_done && t.assignee_member_id && settings.require_approval ? (
+                      <span className="text-[12px] font-display font-bold text-destructive">확인 기다림 · 별 아직 0</span>
+                    ) : null}
+                    {t.is_done && (
+                      <span className="text-[13px] text-foreground-muted">
+                        완료: {memberName(t.completed_by) || name || '가족'}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <span
                   className={`w-9 h-9 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[17px] shrink-0`}
@@ -508,6 +614,26 @@ function ParentTasksScreen() {
                 >
                   <span aria-hidden="true">{assignee ? characterOf(assignee) : '❓'}</span>
                 </span>
+                {t.is_done && isParentAuthed && settings.require_approval && (
+                  <button
+                    type="button"
+                    onClick={() => toggleApprove(t)}
+                    className={`shrink-0 rounded-full flex items-center justify-center gap-1 border-2 active:scale-90 transition duration-150 ${
+                      t.approved_by
+                        ? 'w-8 h-8 bg-tape-yellow border-foreground'
+                        : 'px-2.5 h-8 bg-primary text-on-primary border-foreground shadow-sticker'
+                    }`}
+                    aria-label={t.approved_by ? `${t.title} 확인 취소` : `${t.title} 확인하고 별 주기`}
+                    title={
+                      t.approved_by
+                        ? '확인했어요 — 별 +1 (다시 누르면 취소)'
+                        : '확인하면 아이 별에 합산돼요'
+                    }
+                  >
+                    <span aria-hidden="true">🏅</span>
+                    {!t.approved_by && <span className="font-display font-bold text-[12px]">별 주기</span>}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => removeTask(t.todo_id)}
@@ -528,17 +654,6 @@ function ParentTasksScreen() {
         <i className="ph-bold ph-arrow-right"></i>
       </Link>
 
-      <button
-        type="button"
-        onClick={async () => {
-          await parentLogout()
-          navigate('/', { replace: true })
-        }}
-        className="mt-2 mx-auto flex items-center gap-1.5 text-foreground-muted text-label py-2 px-3 active:scale-95 transition duration-150"
-      >
-        <span className="text-[13px]" aria-hidden="true">🔒</span>
-        부모 모드 끝내기
-      </button>
     </>
   )
 }

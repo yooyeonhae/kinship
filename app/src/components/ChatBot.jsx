@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFamily } from '../context/FamilyContext'
+import { addMyTodo, addTodoMessage } from '../lib/todos'
 
 const LOG_KEY = 'kinship_chat_log_v1'
 
@@ -95,7 +96,7 @@ function findDay(text) {
 }
 
 function ChatBot() {
-  const { supabase, familyId, members, currentMember, isParentAuthed } = useFamily()
+  const { supabase, familyId, members, currentMember, currentMemberId, isParentAuthed } = useFamily()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -185,10 +186,23 @@ function ChatBot() {
         return `"${hit.title}" 할일을 삭제했어요.`
       }
 
-      if (!isParentAuthed) return '할일 등록은 부모만 할 수 있어요. 홈에서 부모로 전환한 뒤 PIN을 입력해주세요.'
       const time = times[0] || null
       const title = extractQuoted(text) || buildTodoTitle(text)
       const fullTitle = time ? `${time} ${title}` : title
+
+      // 부모가 아니면 자기 자신에게만 넣을 수 있다(add_my_todo). 담당자·마감일을
+      // 서버가 정하므로 아이가 남에게 할일을 떠넘길 수 없다. 예전에는 이 경로가
+      // 통째로 막혀 있어서 아이는 챗봇으로 할일을 하나도 넣을 수 없었다.
+      if (!isParentAuthed) {
+        if (target && target.member_id !== currentMemberId) {
+          return `${target.name}에게 주는 할일은 부모만 넣을 수 있어요. 내가 할 일은 그냥 "OO하기 추가"라고 말해줘요.`
+        }
+        const res = await addMyTodo(supabase, fullTitle)
+        if (res.error || res.reason) return addTodoMessage(res.reason)
+        notifyChange()
+        return `"${fullTitle}" 내 할일에 넣었어요. 다 하면 별을 받아요!`
+      }
+
       const { error } = await supabase
         .from('todos')
         .insert({ family_id: familyId, title: fullTitle, assignee_member_id: target?.member_id || null })
@@ -196,7 +210,7 @@ function ChatBot() {
       notifyChange()
       return `"${fullTitle}" 할일을 ${target ? target.name + ' 담당으로 ' : ''}추가했어요.`
     },
-    [supabase, familyId, findMember, isParentAuthed, notifyChange]
+    [supabase, familyId, findMember, isParentAuthed, currentMemberId, notifyChange]
   )
 
   const handleOutfit = useCallback(

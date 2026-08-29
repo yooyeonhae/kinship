@@ -1,0 +1,827 @@
+<title>우리가족 올인원 정비 매뉴얼</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Gothic:wght@400;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper: #FAF8F5;
+    --surface: #FFFFFF;
+    --sunk: #F1ECE4;
+    --ink: #2B2A28;
+    --ink-soft: #5C5852;
+    --line: #E7DFD3;
+    --blue: #0055FF;
+    --rose: #C2185B;
+    --green: #2E7D32;
+    --amber: #B98900;
+    --amber-fill: #FFD100;
+    --shadow: 3px 3px 0 0 var(--ink);
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #1A1917;
+      --surface: #232120;
+      --sunk: #2C2926;
+      --ink: #EDE8E0;
+      --ink-soft: #A9A29A;
+      --line: #3C3733;
+      --blue: #7FA6FF;
+      --rose: #FF8FB1;
+      --green: #86C98A;
+      --amber: #F0C64A;
+      --amber-fill: #F0C64A;
+      --shadow: 3px 3px 0 0 #000000;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #1A1917;
+    --surface: #232120;
+    --sunk: #2C2926;
+    --ink: #EDE8E0;
+    --ink-soft: #A9A29A;
+    --line: #3C3733;
+    --blue: #7FA6FF;
+    --rose: #FF8FB1;
+    --green: #86C98A;
+    --amber: #F0C64A;
+    --amber-fill: #F0C64A;
+    --shadow: 3px 3px 0 0 #000000;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Nanum Gothic', 'Malgun Gothic', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code, kbd, .mono { font-family: 'IBM Plex Mono', 'Consolas', monospace; }
+
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar-inner {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 10px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .bar strong {
+    font-family: 'Gowun Dodum', serif;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .bar nav { display: flex; gap: 14px; flex-wrap: wrap; }
+  .bar nav a {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 1px;
+  }
+  .bar nav a:hover, .bar nav a:focus-visible { color: var(--ink); border-bottom-color: var(--ink); }
+
+  main { max-width: 1040px; margin: 0 auto; padding: 0 24px 96px; }
+
+  header.hero { padding: 56px 0 40px; border-bottom: 3px solid var(--ink); }
+  header.hero .kicker {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  header.hero h1 {
+    font-family: 'Gowun Dodum', serif;
+    font-size: clamp(30px, 5.2vw, 46px);
+    line-height: 1.24;
+    margin: 12px 0 14px;
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  header.hero p { max-width: 64ch; margin: 0; color: var(--ink-soft); }
+
+  section { padding: 48px 0 8px; scroll-margin-top: 64px; }
+  section > h2 {
+    font-family: 'Gowun Dodum', serif;
+    font-size: 25px;
+    margin: 0 0 6px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  section > h2 .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  section > .lede { max-width: 68ch; color: var(--ink-soft); margin: 0 0 26px; }
+
+  h3 {
+    font-family: 'Gowun Dodum', serif;
+    font-size: 18px;
+    margin: 30px 0 8px;
+  }
+  p { max-width: 72ch; }
+
+  .card {
+    background: var(--surface);
+    border: 1.5px solid var(--ink);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+  }
+  .grid { display: grid; gap: 16px; }
+  @media (min-width: 720px) { .cols-2 { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 860px) { .cols-3 { grid-template-columns: repeat(3, 1fr); } }
+
+  .card h4 {
+    font-family: 'Gowun Dodum', serif;
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+  .card p, .card ul { margin: 0; font-size: 14.5px; }
+  .card p + p, .card p + ul { margin-top: 8px; }
+
+  figure { margin: 26px 0; }
+  .scroller { overflow-x: auto; padding-bottom: 6px; }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 560px; }
+  figcaption {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+    max-width: 72ch;
+    border-left: 2px solid var(--line);
+    padding-left: 12px;
+  }
+
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    background: var(--sunk);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono, th.mono { font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+
+  .pill {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.all { color: var(--ink-soft); }
+  .pill.child { color: var(--green); }
+  .pill.parent { color: var(--rose); }
+
+  code {
+    background: var(--sunk);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 13.5px;
+  }
+
+  .note {
+    border-left: 3px solid var(--blue);
+    background: var(--sunk);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 20px 0;
+  }
+  .note.warn { border-left-color: var(--rose); }
+  .note strong { display: block; margin-bottom: 3px; }
+  .note p { margin: 0; font-size: 14.5px; max-width: 70ch; }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 18px 0; }
+  ol.steps li {
+    counter-increment: s;
+    position: relative;
+    padding-left: 42px;
+    margin-bottom: 16px;
+    max-width: 72ch;
+  }
+  ol.steps li::before {
+    content: counter(s);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  ul.plain { padding-left: 20px; }
+  ul.plain li { margin-bottom: 6px; max-width: 72ch; }
+
+  .trap { border-top: 1px solid var(--line); padding: 16px 0; }
+  .trap:last-child { border-bottom: 1px solid var(--line); }
+  .trap h4 { font-family: 'Gowun Dodum', serif; font-size: 16.5px; margin: 0 0 4px; }
+  .trap .sym { color: var(--rose); font-size: 14px; margin: 0 0 4px; max-width: 72ch; }
+  .trap .fix { font-size: 14.5px; margin: 0; max-width: 72ch; }
+
+  footer {
+    border-top: 3px solid var(--ink);
+    margin-top: 56px;
+    padding-top: 20px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="bar">
+  <div class="bar-inner">
+    <strong>우리가족 올인원 · 정비 매뉴얼</strong>
+    <nav>
+      <a href="#map">전체 구조</a>
+      <a href="#screens">화면 지도</a>
+      <a href="#auth">신원과 권한</a>
+      <a href="#data">데이터 모델</a>
+      <a href="#stars">할일과 별</a>
+      <a href="#room">아지트</a>
+      <a href="#external">외부 API</a>
+      <a href="#howto">고치는 순서</a>
+      <a href="#traps">함정 모음</a>
+      <a href="#migrations">마이그레이션</a>
+    </nav>
+  </div>
+</div>
+
+<main>
+  <header class="hero">
+    <p class="kicker">maintenance manual · 2026.08</p>
+    <h1>이 앱을 처음 여는 사람을 위한 정비 매뉴얼</h1>
+    <p>
+      맞벌이 가족의 아침을 돕는 웹앱입니다. 이 문서는 <strong>어떤 화면이 있고, 그 화면이 무엇을 건드리며,
+      고칠 때 무엇을 조심해야 하는지</strong>를 그림으로 먼저 보여줍니다. 코드를 한 줄도 읽지 않은 사람이
+      이 문서만 보고 “어디를 열어야 하는지” 찾을 수 있는 것이 목표입니다.
+    </p>
+  </header>
+
+  <section id="map">
+    <h2>전체 구조 <span class="tag">3개의 조각</span></h2>
+    <p class="lede">
+      움직이는 부품은 세 개뿐입니다. 브라우저에서 도는 <strong>화면</strong>, 데이터를 지키는
+      <strong>Supabase</strong>, 그리고 외부 API 키를 감추기 위한 <strong>작은 서버 함수</strong>.
+      서버에서 돌아가는 우리 코드는 마지막 하나가 전부입니다.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 330" role="img" aria-label="브라우저의 React 화면이 Supabase에는 REST와 Realtime으로, 외부 API에는 Vercel 서버리스 프록시를 거쳐 연결되는 구조도">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+            </marker>
+            <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#0055FF"></path>
+            </marker>
+          </defs>
+
+          <rect x="12" y="60" width="228" height="210" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="26" y="86" font-size="13" font-weight="700" fill="currentColor">브라우저 (정적 SPA)</text>
+          <text x="26" y="108" font-size="11.5" fill="currentColor" opacity="0.75">app/src · React + Vite</text>
+          <rect x="26" y="122" width="200" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="36" y="142" font-size="11.5" fill="currentColor">pages/ — 화면 14개</text>
+          <rect x="26" y="158" width="200" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="36" y="178" font-size="11.5" fill="currentColor">lib/ — 규칙과 질의</text>
+          <rect x="26" y="194" width="200" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="36" y="214" font-size="11.5" fill="currentColor">context/ — 지금 누구인가</text>
+          <text x="26" y="248" font-size="11" fill="#0055FF">요청마다 헤더 3개를 싣는다</text>
+
+          <rect x="360" y="18" width="250" height="150" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="374" y="42" font-size="13" font-weight="700" fill="currentColor">Supabase (Postgres)</text>
+          <rect x="374" y="56" width="222" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="384" y="76" font-size="11.5" fill="currentColor">테이블 + RLS 정책</text>
+          <rect x="374" y="92" width="222" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="384" y="112" font-size="11.5" fill="currentColor">RPC — 규칙을 서버가 강제</text>
+          <rect x="374" y="128" width="222" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.55"></rect>
+          <text x="384" y="148" font-size="11.5" fill="currentColor">Realtime — Broadcast/Presence</text>
+
+          <rect x="360" y="196" width="250" height="74" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="374" y="220" font-size="13" font-weight="700" fill="currentColor">Vercel 서버리스 함수</text>
+          <text x="374" y="240" font-size="11.5" fill="currentColor" opacity="0.75">app/api/*.js — 키를 감추는 프록시</text>
+          <text x="374" y="258" font-size="11.5" fill="currentColor" opacity="0.75">dev에서도 같은 경로로 뜬다</text>
+
+          <rect x="700" y="196" width="188" height="74" rx="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+          <text x="714" y="220" font-size="13" font-weight="700" fill="currentColor">외부 API</text>
+          <text x="714" y="240" font-size="11.5" fill="currentColor" opacity="0.75">관광공사 · 날씨 · 뉴스</text>
+          <text x="714" y="258" font-size="11.5" fill="currentColor" opacity="0.75">웹푸시 · 링크 미리보기</text>
+
+          <line x1="240" y1="110" x2="356" y2="80" stroke="#0055FF" stroke-width="1.6" marker-end="url(#ahb)"></line>
+          <text x="246" y="82" font-size="11" fill="#0055FF">읽기·쓰기 (REST)</text>
+
+          <line x1="240" y1="150" x2="356" y2="146" stroke="#0055FF" stroke-width="1.6" marker-end="url(#ahb)"></line>
+          <text x="246" y="140" font-size="11" fill="#0055FF">채팅·게임 알림</text>
+
+          <line x1="240" y1="228" x2="356" y2="230" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"></line>
+          <text x="248" y="222" font-size="11" fill="currentColor">/api/…</text>
+
+          <line x1="610" y1="233" x2="696" y2="233" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"></line>
+          <text x="618" y="226" font-size="11" fill="currentColor">키 첨부</text>
+
+          <text x="12" y="304" font-size="11.5" fill="currentColor" opacity="0.7">브라우저는 외부 API를 직접 부르지 않는다 — 키가 번들에 박히고 CORS에도 막힌다.</text>
+        </svg>
+      </div>
+      <figcaption>
+        화면은 Supabase에 직접 말을 걸지만, 외부 API에는 반드시 <code>app/api/</code>의 프록시를 거칩니다.
+        이 갈림길이 “왜 어떤 건 바로 되고 어떤 건 서버 함수를 거치나”의 답입니다.
+      </figcaption>
+    </figure>
+
+    <div class="note warn">
+      <strong>먼저 알아야 할 것 — 이 저장소에는 앱이 두 벌 있습니다</strong>
+      <p>
+        <code>app/</code> 이 지금 쓰는 React 버전이고, <code>screens/</code> 는 예전 정적 HTML 버전(localStorage로만 동작)입니다.
+        둘은 <strong>일부러</strong> 따로 갑니다. 고칠 곳은 거의 항상 <code>app/</code> 입니다.
+      </p>
+    </div>
+  </section>
+
+  <section id="screens">
+    <h2>화면 지도 <span class="tag">app/src/pages</span></h2>
+    <p class="lede">
+      주소 하나에 화면 파일 하나가 붙습니다. <strong>누가 들어갈 수 있는지</strong>는 <code>app/src/App.jsx</code>의
+      문지기(가드)가 정하고, 못 들어가면 조용히 다른 화면으로 보냅니다.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>주소</th><th>화면 파일</th><th>들어갈 수 있는 사람</th><th>하는 일</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">/onboarding</td><td class="mono">OnboardingScreen</td><td><span class="pill all">가족 없을 때</span></td><td>가족·구성원 만들기. 여기서만 가족이 생긴다</td></tr>
+          <tr><td class="mono">/</td><td class="mono">EntryScreen</td><td><span class="pill all">모두</span></td><td>누구로 앱을 쓸지 고르는 첫 화면</td></tr>
+          <tr><td class="mono">/child-outfit/:id</td><td class="mono">ChildOutfitScreen</td><td><span class="pill child">본인 또는 부모</span></td><td>날씨 + 요일 지정복으로 오늘 옷차림</td></tr>
+          <tr><td class="mono">/child-todo/:id</td><td class="mono">ChildTodoScreen</td><td><span class="pill child">본인 또는 부모</span></td><td>오늘 할일·나의 미션·별·연속 달성</td></tr>
+          <tr><td class="mono">/parent-tasks</td><td class="mono">ParentTasksScreen</td><td><span class="pill parent">부모(PIN)</span></td><td>할일 등록·마감일·확인 도장</td></tr>
+          <tr><td class="mono">/parent-progress</td><td class="mono">ParentProgressScreen</td><td><span class="pill parent">부모(PIN)</span></td><td>부부 완료 현황</td></tr>
+          <tr><td class="mono">/parent-recipe</td><td class="mono">ParentRecipeScreen</td><td><span class="pill parent">부모(PIN)</span></td><td>오늘의 메뉴와 레시피 관리</td></tr>
+          <tr><td class="mono">/outfit-settings</td><td class="mono">OutfitSettingsScreen</td><td><span class="pill parent">부모(PIN)</span></td><td>요일별 지정복 규칙</td></tr>
+          <tr><td class="mono">/child-schedule</td><td class="mono">ChildScheduleScreen</td><td><span class="pill parent">부모(PIN)</span></td><td>아이 스케줄(요일 반복·알림)</td></tr>
+          <tr><td class="mono">/parent-unlock/:id</td><td class="mono">ParentUnlockScreen</td><td><span class="pill all">모두</span></td><td>부모 PIN 만들기·입력</td></tr>
+          <tr><td class="mono">/family-room</td><td class="mono">FamilyRoomScreen</td><td><span class="pill all">모두</span></td><td>가족톡·미니게임·포인트·보상</td></tr>
+          <tr><td class="mono">/info-feed</td><td class="mono">InfoFeedScreen</td><td><span class="pill all">모두</span></td><td>생활 정보 피드</td></tr>
+          <tr><td class="mono">/weekend</td><td class="mono">WeekendScreen</td><td><span class="pill all">모두</span></td><td>주말 나들이(관광공사 API)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>화면이 아닌, 여러 화면이 나눠 쓰는 조각</h3>
+    <div class="grid cols-3">
+      <div class="card">
+        <h4>Layout · Header · BottomNav</h4>
+        <p>모든 화면을 감싸는 껍데기와 아래 탭 5개(홈·할일·정보·주말·아지트). ‘할일’ 탭은 지금 보는 화면에 따라 아이용/부모용으로 갈립니다.</p>
+      </div>
+      <div class="card">
+        <h4>ChatBot</h4>
+        <p>규칙 기반 한국어 해석기(LLM 아님). 할일 추가·완료·조회와 옷차림 질문을 처리합니다. 아이가 쓰면 자기 할일만 넣도록 서버가 강제합니다.</p>
+      </div>
+      <div class="card">
+        <h4>FamilyRewards · TodaySchedule · FavoriteLinks</h4>
+        <p>각각 보상 목표, 오늘 일정 + 알림 예약, 퇴근길 저장함. 화면 안에 끼워 쓰는 부품입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="auth">
+    <h2>신원과 권한 <span class="tag">로그인이 없다</span></h2>
+    <p class="lede">
+      이 앱에는 로그인이 없습니다. 대신 요청마다 <strong>헤더 세 개</strong>가 실려 나가고, 데이터베이스가
+      그 값을 보고 “이 사람이 이 행을 봐도 되는가”를 판단합니다. 무엇을 보장하고 무엇을 못 하는지가
+      분명하니, 발표에서 넘겨 말하지 마세요.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 300" role="img" aria-label="요청에 실리는 세 개의 헤더가 각각 가족 범위, 행동 주체, 부모 권한을 결정하는 흐름도">
+          <rect x="12" y="40" width="240" height="180" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="26" y="64" font-size="13" font-weight="700" fill="currentColor">브라우저가 보내는 것</text>
+          <rect x="26" y="78" width="212" height="38" rx="6" fill="none" stroke="currentColor" opacity="0.6"></rect>
+          <text x="36" y="96" font-size="11.5" font-weight="700" fill="currentColor">x-family-id</text>
+          <text x="36" y="110" font-size="10.5" fill="currentColor" opacity="0.75">우리 가족이 누구인지</text>
+          <rect x="26" y="122" width="212" height="38" rx="6" fill="none" stroke="currentColor" opacity="0.6"></rect>
+          <text x="36" y="140" font-size="11.5" font-weight="700" fill="#C2185B">x-member-id</text>
+          <text x="36" y="154" font-size="10.5" fill="#C2185B">자기신고값 — 증거가 아니다</text>
+          <rect x="26" y="166" width="212" height="38" rx="6" fill="none" stroke="currentColor" opacity="0.6"></rect>
+          <text x="36" y="184" font-size="11.5" font-weight="700" fill="#2E7D32">x-parent-token</text>
+          <text x="36" y="198" font-size="10.5" fill="#2E7D32">PIN을 맞혀야 받는다</text>
+
+          <line x1="252" y1="130" x2="336" y2="130" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"></line>
+          <text x="258" y="122" font-size="11" fill="currentColor">모든 요청</text>
+
+          <rect x="340" y="40" width="250" height="180" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="354" y="64" font-size="13" font-weight="700" fill="currentColor">Postgres가 판단하는 것</text>
+          <text x="354" y="88" font-size="11.5" fill="currentColor">current_family_id() — 범위</text>
+          <text x="354" y="110" font-size="11.5" fill="currentColor">acting_member_id() — 행위자</text>
+          <text x="354" y="132" font-size="11.5" fill="currentColor">is_parent() — 부모인가</text>
+          <text x="354" y="162" font-size="11" fill="currentColor" opacity="0.75">RLS 정책이 행 단위로 걸러낸다</text>
+          <text x="354" y="180" font-size="11" fill="currentColor" opacity="0.75">열 단위 제한은 RLS로 불가능</text>
+          <text x="354" y="200" font-size="11" fill="#0055FF">→ 그래서 RPC가 따로 있다</text>
+
+          <line x1="590" y1="100" x2="674" y2="76" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"></line>
+          <line x1="590" y1="160" x2="674" y2="184" stroke="#0055FF" stroke-width="1.6" marker-end="url(#ahb)"></line>
+
+          <rect x="678" y="40" width="210" height="74" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="692" y="64" font-size="12.5" font-weight="700" fill="currentColor">그냥 테이블 접근</text>
+          <text x="692" y="84" font-size="11" fill="currentColor" opacity="0.75">조회는 가족 전체</text>
+          <text x="692" y="102" font-size="11" fill="currentColor" opacity="0.75">쓰기는 대개 부모만</text>
+
+          <rect x="678" y="146" width="210" height="94" rx="10" fill="none" stroke="#0055FF" stroke-width="1.5"></rect>
+          <text x="692" y="170" font-size="12.5" font-weight="700" fill="#0055FF">RPC로만 되는 일</text>
+          <text x="692" y="190" font-size="11" fill="currentColor" opacity="0.8">toggle_my_todo · add_my_todo</text>
+          <text x="692" y="208" font-size="11" fill="currentColor" opacity="0.8">delete_my_todo · approve_todo</text>
+          <text x="692" y="226" font-size="11" fill="currentColor" opacity="0.8">parent_login · create_family</text>
+
+          <text x="12" y="266" font-size="11.5" fill="#C2185B">한계: x-member-id는 자기신고값이라 형제끼리의 장난은 막지 못한다.</text>
+          <text x="12" y="284" font-size="11.5" fill="#C2185B">이 시스템이 주장할 수 있는 최대치는 “PIN을 아는 사람 = 부모”까지다.</text>
+        </svg>
+      </div>
+      <figcaption>
+        아이에게 <code>todos</code> 수정 권한을 직접 주지 않는 이유가 여기 있습니다. RLS는 행 단위라
+        “<code>is_done</code>만 바꾸게” 제한할 수 없어서, 열어주면 제목과 담당자까지 바꿀 수 있습니다.
+        그래서 필요한 동작 하나씩만 RPC로 뚫어 둡니다.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section id="data">
+    <h2>데이터 모델 <span class="tag">가족이 모든 것의 뿌리</span></h2>
+    <p class="lede">
+      모든 표가 <code>family_id</code>를 갖고, 그 값이 곧 울타리입니다. 표를 새로 만들 때도 이 칼럼과
+      RLS 정책을 빠뜨리면 안 됩니다 — 빠뜨리면 남의 가족 데이터가 보입니다.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 340" role="img" aria-label="families를 뿌리로 members, todos, schedules, rewards 등 표들이 이어지는 관계도">
+          <rect x="330" y="14" width="180" height="46" rx="8" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <text x="420" y="35" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">families</text>
+          <text x="420" y="51" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.7">가족 = 울타리</text>
+
+          <rect x="330" y="106" width="180" height="46" rx="8" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <text x="420" y="127" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">members</text>
+          <text x="420" y="143" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.7">부모 / 자녀 · 캐릭터</text>
+
+          <line x1="420" y1="60" x2="420" y2="102" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"></line>
+          <text x="428" y="86" font-size="10.5" fill="currentColor">1 : N</text>
+
+          <rect x="60" y="200" width="176" height="60" rx="8" fill="none" stroke="#0055FF" stroke-width="1.8"></rect>
+          <text x="148" y="221" font-size="12.5" font-weight="700" text-anchor="middle" fill="#0055FF">todos</text>
+          <text x="148" y="237" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">due_date · self_made</text>
+          <text x="148" y="252" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">is_done · approved_by</text>
+
+          <rect x="256" y="200" width="150" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+          <text x="331" y="221" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">schedules</text>
+          <text x="331" y="240" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">한 행 = 한 요일</text>
+
+          <rect x="426" y="200" width="150" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+          <text x="501" y="221" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">rewards</text>
+          <text x="501" y="240" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">가족 목표 / 아이 별 목표</text>
+
+          <rect x="596" y="200" width="150" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+          <text x="671" y="221" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">weekly_outfit_rules</text>
+          <text x="671" y="240" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">요일별 지정복</text>
+
+          <rect x="766" y="200" width="122" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+          <text x="827" y="221" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">그 밖</text>
+          <text x="827" y="238" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">recipes · quick_tasks</text>
+          <text x="827" y="252" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">favorite_links …</text>
+
+          <path d="M 360 152 L 148 196" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"></path>
+          <path d="M 400 152 L 331 196" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"></path>
+          <path d="M 440 152 L 501 196" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"></path>
+          <path d="M 480 152 L 671 196" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ah)"></path>
+          <text x="196" y="176" font-size="10.5" fill="currentColor">담당자</text>
+          <text x="530" y="176" font-size="10.5" fill="currentColor">누구의 목표</text>
+
+          <rect x="60" y="286" width="828" height="40" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4"></rect>
+          <text x="74" y="311" font-size="11.5" fill="currentColor">아지트 전용: chat_messages(7일 뒤 자동 삭제) · game_results(포인트의 유일한 근거) · game_sessions(원격 대전판)</text>
+        </svg>
+      </div>
+      <figcaption>
+        <code>todos</code>가 파랗게 표시된 이유는 이 앱에서 가장 많이 손대는 표이기 때문입니다.
+        칼럼 네 개(마감일·스스로 만듦·완료·확인)가 아이 화면의 거의 모든 표시를 결정합니다.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section id="stars">
+    <h2>할일과 별 <span class="tag">가장 자주 오해하는 부분</span></h2>
+    <p class="lede">
+      저금통이 <strong>두 개</strong>입니다. 아이의 <strong>별</strong>과 가족의 <strong>포인트</strong>는
+      서로 다른 규칙으로 쌓이고, 서로 다른 보상으로 갑니다. 여기를 헷갈리면 점수가 이상해집니다.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 290" role="img" aria-label="할일이 만들어져 완료되고 부모 확인을 거쳐 아이의 별과 가족 포인트로 나뉘어 쌓이는 흐름도">
+          <rect x="14" y="30" width="180" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="104" y="54" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">부모가 준 할일</text>
+          <text x="104" y="74" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">마감일을 고를 수 있다</text>
+
+          <rect x="14" y="130" width="180" height="66" rx="8" fill="none" stroke="#C2185B" stroke-width="1.5"></rect>
+          <text x="104" y="154" font-size="12.5" font-weight="700" text-anchor="middle" fill="#C2185B">아이가 정한 미션</text>
+          <text x="104" y="174" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">하루 10개까지 · self_made</text>
+
+          <line x1="194" y1="63" x2="266" y2="106" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"></line>
+          <line x1="194" y1="163" x2="266" y2="126" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"></line>
+
+          <rect x="270" y="86" width="150" height="58" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="345" y="110" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">아이가 체크</text>
+          <text x="345" y="128" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">is_done = true</text>
+
+          <line x1="420" y1="115" x2="492" y2="115" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"></line>
+          <text x="424" y="106" font-size="10.5" fill="currentColor">아직 별 0</text>
+
+          <rect x="496" y="86" width="160" height="58" rx="8" fill="none" stroke="#B98900" stroke-width="2"></rect>
+          <text x="576" y="110" font-size="12.5" font-weight="700" text-anchor="middle" fill="#B98900">부모의 확인 도장</text>
+          <text x="576" y="128" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">approve_todo</text>
+
+          <line x1="656" y1="102" x2="722" y2="70" stroke="#B98900" stroke-width="1.8" marker-end="url(#ah)"></line>
+          <line x1="420" y1="132" x2="722" y2="196" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ah)"></line>
+
+          <rect x="726" y="34" width="160" height="66" rx="8" fill="none" stroke="#B98900" stroke-width="2"></rect>
+          <text x="806" y="58" font-size="12.5" font-weight="700" text-anchor="middle" fill="#B98900">아이의 별</text>
+          <text x="806" y="78" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">아이 별 목표로 간다</text>
+
+          <rect x="726" y="166" width="160" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="806" y="190" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">가족 포인트</text>
+          <text x="806" y="210" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">완료 1개 = 10p</text>
+
+          <text x="440" y="196" font-size="11" fill="currentColor">부모가 준 할일만 (self_made 제외)</text>
+          <text x="14" y="248" font-size="11.5" fill="currentColor" opacity="0.8">두 저금통 모두 “지금 상태”에서 매번 계산한다 — 적립 표에 쌓지 않는다.</text>
+          <text x="14" y="268" font-size="11.5" fill="currentColor" opacity="0.8">그래서 체크를 풀면 점수도 함께 돌아가고, 껐다 켜기로 점수를 불릴 수 없다.</text>
+        </svg>
+      </div>
+      <figcaption>
+        아이가 스스로 만든 미션이 가족 포인트로 가지 않는 이유: 완료 하나가 10p인데 아이가 할일을
+        만들 수 있으면 “물 마시기” 스무 개로 200p가 됩니다. 별만 주면 자율성은 살고 점수 부풀리기는 막힙니다.
+      </figcaption>
+    </figure>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h4>연속 달성(스트릭)은 ‘완료’ 기준</h4>
+        <p>부모가 이틀 뒤에 확인해도 아이의 연속이 깨지면 안 됩니다. 아이가 한 일은 그날 한 것이니까요.
+        할일이 하나도 없던 날은 <strong>건너뛰고</strong>, 오늘이 아직 안 끝났으면 <strong>끊지 않습니다</strong>.</p>
+        <p>저장하지 않고 매번 계산합니다(<code>computeStreak</code>) — 따로 저장하면 할일을 지웠을 때 기록만 남아 어긋납니다.</p>
+      </div>
+      <div class="card">
+        <h4>별은 ‘승인’ 기준</h4>
+        <p>체크는 아이가 혼자 누르는 것이라, 실제로 했는지는 아이만 압니다. 별은 보상으로 바뀌는 값이라
+        확인하는 사람이 필요합니다. 그 확인이 곧 “봤다”는 신호가 되어 아이에게 전해집니다.</p>
+        <p>완료를 풀면 서버가 도장도 함께 뗍니다 — 안 그러면 껐다 켜기로 확인받지 않은 별이 되살아납니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="room">
+    <h2>아지트의 실시간 <span class="tag">조합이 특이하다</span></h2>
+    <p class="lede">
+      Supabase의 실시간 기능 중 <strong>Broadcast와 Presence만</strong> 씁니다. 표 변경 감지
+      (<code>postgres_changes</code>)는 이 앱에서 <strong>동작하지 않습니다</strong> — 신원이 요청 헤더에만
+      실리는데, 그 방식은 웹소켓의 토큰으로 권한을 따지기 때문입니다.
+    </p>
+
+    <figure>
+      <div class="scroller">
+        <svg viewBox="0 0 900 250" role="img" aria-label="채팅 메시지가 REST로 저장되고 같은 내용이 Broadcast로 상대에게 전달되는 두 갈래 흐름도">
+          <rect x="14" y="80" width="176" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="102" y="106" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">보낸 사람 화면</text>
+          <text x="102" y="126" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">메시지 입력</text>
+
+          <line x1="190" y1="98" x2="286" y2="56" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"></line>
+          <text x="196" y="66" font-size="10.5" fill="currentColor">① 표에 저장 (REST)</text>
+
+          <line x1="190" y1="128" x2="286" y2="170" stroke="#0055FF" stroke-width="1.6" marker-end="url(#ahb)"></line>
+          <text x="196" y="168" font-size="10.5" fill="#0055FF">② 같은 내용을 Broadcast</text>
+
+          <rect x="290" y="26" width="180" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="380" y="50" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">chat_messages</text>
+          <text x="380" y="68" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">7일 뒤 자동 삭제</text>
+
+          <rect x="290" y="140" width="180" height="60" rx="8" fill="none" stroke="#0055FF" stroke-width="1.5"></rect>
+          <text x="380" y="164" font-size="12.5" font-weight="700" text-anchor="middle" fill="#0055FF">Realtime 채널</text>
+          <text x="380" y="182" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">family-room:&lt;가족 id&gt;</text>
+
+          <line x1="470" y1="170" x2="566" y2="170" stroke="#0055FF" stroke-width="1.6" marker-end="url(#ahb)"></line>
+          <rect x="570" y="140" width="180" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+          <text x="660" y="164" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">열어둔 가족 화면</text>
+          <text x="660" y="182" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">즉시 붙는다</text>
+
+          <line x1="190" y1="113" x2="566" y2="60" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#ah)"></line>
+          <rect x="570" y="26" width="180" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></rect>
+          <text x="660" y="50" font-size="12.5" font-weight="700" text-anchor="middle" fill="currentColor">앱을 닫아둔 가족</text>
+          <text x="660" y="68" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.75">③ 웹푸시로 알림창</text>
+
+          <text x="14" y="228" font-size="11.5" fill="currentColor" opacity="0.8">알림을 쏘는 주체는 서버가 아니라 “메시지를 보낸 쪽 클라이언트”다 (/api/push).</text>
+        </svg>
+      </div>
+      <figcaption>
+        원격 대전(<code>game_sessions</code>)도 같은 방식입니다. Broadcast로는 “바뀌었다”만 알리고
+        판 내용은 데이터베이스에서 다시 읽습니다 — 판 자체를 실어 보내면 순서가 뒤집혀 오래된 판이 새 판을 덮습니다.
+      </figcaption>
+    </figure>
+
+    <div class="note">
+      <strong>미니게임을 추가할 때</strong>
+      <p>
+        <code>game_key</code>를 검사하는 CHECK 제약이 <strong>두 곳</strong>(<code>game_results</code>,
+        <code>game_sessions</code>)에 있습니다. 한쪽만 넓히면 “혼자서는 되는데 원격만 안 된다”로 보입니다.
+      </p>
+    </div>
+  </section>
+
+  <section id="external">
+    <h2>외부 API <span class="tag">app/api</span></h2>
+    <p class="lede">
+      브라우저에서 바로 부르지 않는 이유는 두 가지입니다 — 키가 번들에 박히고, CORS에 막힙니다.
+      그래서 작은 서버 함수를 두고 그 뒤에서 키를 붙입니다. 키는 <code>app/.env</code>에
+      <strong><code>VITE_</code> 접두사 없이</strong> 넣습니다. 붙이면 브라우저로 새어 나갑니다.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>파일</th><th>부르는 곳</th><th>주의할 점</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">api/tour.js</td><td>주말 나들이</td><td>국문 서비스를 써야 결과가 나온다. 축제는 종료일을 직접 걸러낸다</td></tr>
+          <tr><td class="mono">api/weather.js</td><td>아이 옷차림</td><td>기상청이 아니라 OpenWeatherMap. 눈에는 우비를 권하지 않는다</td></tr>
+          <tr><td class="mono">api/news.js</td><td>정보 피드</td><td>—</td></tr>
+          <tr><td class="mono">api/linkmeta.js</td><td>퇴근길 저장함</td><td>키가 없는데도 프록시를 쓰는 유일한 경우(CORS). 쇼핑몰은 제목을 안 주는 게 정상</td></tr>
+          <tr><td class="mono">api/push.js</td><td>가족톡 알림</td><td>서비스 롤 키를 쓰지 않는다 — 뚫리면 DB 전체가 열린다</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      배포할 때는 Vercel 프로젝트의 환경변수에도 같은 이름으로 넣어야 합니다. 로컬에서는
+      <code>npm run dev</code>가 같은 <code>/api/*</code> 경로를 그대로 띄워 주므로 따로 준비할 것이 없습니다.
+    </p>
+  </section>
+
+  <section id="howto">
+    <h2>고치는 순서 <span class="tag">이 순서를 지키면 안 깨진다</span></h2>
+    <p class="lede">데이터 구조가 바뀌는 작업은 항상 데이터베이스가 먼저입니다. 화면부터 고치면 화면은 멀쩡한데 저장만 실패합니다.</p>
+
+    <ol class="steps">
+      <li>
+        <strong>바꿀 것이 표나 권한인지 먼저 판단합니다.</strong>
+        칼럼·정책·RPC가 필요하면 <code>app/supabase/</code>에 <code>migration_NN_이름.sql</code> 파일을 새로 만듭니다.
+        기존 파일은 고치지 않습니다 — 이미 실행된 것이라 고쳐도 반영되지 않습니다.
+      </li>
+      <li>
+        <strong>Supabase 대시보드의 SQL Editor에서 실행합니다.</strong>
+        이 환경에는 Supabase CLI도 psql도 없고, 익명 키로는 정책을 만들 수 없습니다. 사람이 붙여넣어 실행하는 것이 유일한 길입니다.
+      </li>
+      <li>
+        <strong>화면을 고칩니다.</strong> 규칙(계산·판정)은 <code>app/src/lib/</code>에, 화면은
+        <code>app/src/pages/</code>에 둡니다. 규칙을 화면 안에 적으면 다른 화면에서 같은 값이 어긋납니다.
+      </li>
+      <li>
+        <strong>검증합니다.</strong> <code>npm run build</code>(문법·임포트)와 <code>npm run lint</code>.
+        <code>FamilyContext.jsx</code>의 경고 한 줄은 원래 있는 것이라 무시합니다.
+      </li>
+      <li>
+        <strong>권한과 정책은 <code>curl</code>로 확인합니다.</strong> 화면을 클릭해 보는 것보다 훨씬 빠르고,
+        정책이 실제로 어떻게 동작하는지 알 수 있는 유일한 방법입니다.
+        <br><strong>상태 코드를 믿지 마세요</strong> — 가족 id가 틀리면 오류 없이 <code>200 []</code>이고,
+        한 행도 지우지 못한 삭제도 <code>204</code>입니다. 결과 행을 직접 확인해야 합니다.
+      </li>
+      <li>
+        <strong>눈으로 봐야 하는 것은 브라우저에서 봅니다.</strong> 애니메이션, 진행 막대, 배치는
+        빌드도 린트도 잡아주지 않습니다.
+      </li>
+    </ol>
+  </section>
+
+  <section id="traps">
+    <h2>함정 모음 <span class="tag">전부 실제로 겪은 것</span></h2>
+    <p class="lede">
+      원인을 찾는 데 가장 오래 걸렸던 것들입니다. 증상이 비슷하면 여기부터 보세요.
+    </p>
+
+    <div class="trap">
+      <h4>고쳤는데 안 고쳐진다</h4>
+      <p class="sym">증상: 코드는 분명히 바꿨는데 화면이 그대로다.</p>
+      <p class="fix">개발 서버가 두 개 떠 있습니다. 예전 서버가 5173을 물고 있으면 새 서버는 5174로 밀려나고,
+      우리가 보는 5173은 계속 수정 전 코드입니다. <code>netstat -ano | grep ':517'</code>로 확인하고 정리한 뒤 다시 띄우세요.</p>
+    </div>
+
+    <div class="trap">
+      <h4>가족을 만들면 42501로 실패한다</h4>
+      <p class="sym">증상: 온보딩에서 가족 생성이 권한 오류로 롤백된다.</p>
+      <p class="fix"><code>families</code>에 넣을 때 <code>.select()</code>를 붙이면 안 됩니다. 붙이면 방금 넣은 행을
+      다시 읽으려 하고, 그 읽기가 조회 정책에 걸려 넣기까지 통째로 취소됩니다. id는 클라이언트가 만들어
+      헤더와 같은 값을 써야 합니다.</p>
+    </div>
+
+    <div class="trap">
+      <h4>실시간이 오류 없이 조용히 안 온다</h4>
+      <p class="sym">증상: 표는 잘 바뀌는데 다른 기기 화면이 갱신되지 않는다. 오류도 없다.</p>
+      <p class="fix">표 변경 감지(<code>postgres_changes</code>)를 쓴 것입니다. 이 앱의 신원은 요청 헤더에만 있어서
+      그 방식은 한 행도 전달하지 않습니다. Broadcast로 바꾸세요.</p>
+    </div>
+
+    <div class="trap">
+      <h4>아침에 넣은 할일이 ‘지난 일’로 들어간다</h4>
+      <p class="sym">증상: 새벽~오전에 추가한 항목이 오늘이 아니라 지난 날짜로 분류된다.</p>
+      <p class="fix">데이터베이스는 UTC로 돕니다. 한국 시간 자정~오전 9시 사이에는 서버의 “오늘”이 하루 이릅니다.
+      날짜를 만들 때는 <code>current_date</code>가 아니라 서울 기준 함수(<code>app_today()</code>)를 쓰세요.</p>
+    </div>
+
+    <div class="trap">
+      <h4>원격 대전이 느리고 자주 실패한다</h4>
+      <p class="sym">증상: 한 수를 두면 저장 요청이 끝없이 반복된다.</p>
+      <p class="fix">올린 뒤 돌아온 판은 내용이 같아도 다른 객체라, 참조로 비교하면 늘 “바뀌었다”가 됩니다.
+      판 내용의 서명(문자열)으로 비교해야 합니다.</p>
+    </div>
+
+    <div class="trap">
+      <h4>점수가 계속 늘어난다</h4>
+      <p class="sym">증상: 체크를 껐다 켜는 것만으로 포인트가 쌓인다.</p>
+      <p class="fix">완료를 사건으로 적립했기 때문입니다. 점수는 항상 <strong>지금 상태</strong>에서 세야 합니다.
+      그러면 체크를 풀 때 점수도 함께 돌아갑니다.</p>
+    </div>
+  </section>
+
+  <section id="migrations">
+    <h2>마이그레이션 연표 <span class="tag">01 → 20</span></h2>
+    <p class="lede">
+      전부 <code>app/supabase/</code>에 있고, 모두 실행된 상태입니다. 각 파일 맨 위 주석에
+      “왜 이렇게 했는지”가 적혀 있으니, 손대기 전에 그 문단을 먼저 읽으세요.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>번호</th><th>무엇을 넣었나</th><th>기억할 점</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">01</td><td>빈 가족 삭제 허용</td><td>구성원이 없는 가족만. 넓히면 가장 위험한 권한이 된다</td></tr>
+          <tr><td class="mono">02·03</td><td>역할·부모 PIN·핵심 RPC</td><td>PIN 5회 실패 시 15분 잠금. 두 함수가 카운터를 공유한다</td></tr>
+          <tr><td class="mono">04</td><td>퇴근길 저장함</td><td>영상/쇼핑 구분</td></tr>
+          <tr><td class="mono">05·06·16·17</td><td>아지트 · 미니게임 · 원격 대전</td><td>게임을 늘리면 CHECK를 두 곳 넓힌다</td></tr>
+          <tr><td class="mono">07·12</td><td>레시피와 조리법</td><td>기본 레시피는 앱에서 수정 불가</td></tr>
+          <tr><td class="mono">08</td><td>보상 목표</td><td>달성 처리는 부모만</td></tr>
+          <tr><td class="mono">09</td><td>아이 스케줄</td><td>여러 요일 반복 = 요일마다 한 행</td></tr>
+          <tr><td class="mono">10·11</td><td>가족 이름 중복 금지 · 캐릭터</td><td>이름은 대소문자·공백 무시하고 비교</td></tr>
+          <tr><td class="mono">13</td><td>자주 쓰는 항목</td><td>부모 두 사람이 다른 기기를 쓰므로 DB에 둔다</td></tr>
+          <tr><td class="mono">14·15</td><td>웹푸시 구독 · 채팅 7일 보관</td><td>15는 <code>pg_cron</code>을 먼저 켜야 한다</td></tr>
+          <tr><td class="mono">18</td><td>할일 마감일 · 아이 미션 · 아이 별 목표</td><td>아이가 만든 할일은 가족 포인트를 주지 않는다</td></tr>
+          <tr><td class="mono">19</td><td>부모 확인 도장</td><td>도장이 별 합산의 조건이다</td></tr>
+          <tr><td class="mono">20</td><td>‘오늘’을 서울 날짜로</td><td>UTC 자정 이후 9시간 동안 날짜가 어긋나던 문제</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      더 깊은 배경은 저장소의 <code>CLAUDE.md</code>(왜 그렇게 했는지)와 <code>prd.md</code>(무엇을 만들기로 했는지)에 있습니다.
+      이 문서와 어긋나는 내용이 있으면 <strong>코드와 마이그레이션 파일이 사실</strong>입니다.
+    </p>
+  </footer>
+</main>

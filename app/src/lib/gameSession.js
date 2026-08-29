@@ -18,6 +18,21 @@ export async function loadSessions(supabase) {
   return { data: (data || []).filter((s) => Date.parse(s.updated_at) >= cutoff) }
 }
 
+// 오래된 방은 목록에서 감추는 것으로 끝나지 않는다 — 행은 그대로 쌓인다.
+// 어차피 보이지 않는 방이라 지워도 잃는 것이 없고, 안 지우면 가족이 게임을 할수록
+// 테이블이 한없이 늘어난다. 지우기 권한은 가족 범위라 누구 것이든 지울 수 있다.
+export async function purgeStaleSessions(supabase) {
+  const cutoff = new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString()
+  await supabase.from('game_sessions').delete().lt('updated_at', cutoff)
+}
+
+// 내가 만들었지만 아무도 안 들어온 방. 방 만들기를 여러 번 누르면 빈 방이 줄줄이
+// 남아서, 상대가 어느 방에 들어가야 하는지 알 수 없다.
+export async function removeMyOpenSessions(supabase, memberId) {
+  if (!memberId) return
+  await supabase.from('game_sessions').delete().eq('p1_member_id', memberId).is('p2_member_id', null)
+}
+
 export async function createSession(supabase, { familyId, gameKey, memberId, state }) {
   const { data, error } = await supabase
     .from('game_sessions')

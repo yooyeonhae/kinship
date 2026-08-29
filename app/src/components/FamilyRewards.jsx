@@ -2,14 +2,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { useFamily } from '../context/FamilyContext'
 import { isMissingTable } from '../lib/familyRoom'
 
-const EMPTY = { title: '', requiredPoints: '', note: '' }
+// memberId가 비어 있으면 가족 공동 목표(가족 포인트로), 값이 있으면 그 아이의
+// 별로 이루는 개인 목표다. 아이가 스스로 만든 할일은 가족 포인트를 주지 않으므로
+// (migration_18), 아이의 동기는 이 별 목표로 이어진다.
+const EMPTY = { title: '', requiredPoints: '', note: '', memberId: '' }
 
 function formatPoints(n) {
   return n.toLocaleString('ko-KR')
 }
 
 function FamilyRewards({ points }) {
-  const { supabase, familyId, isParentAuthed } = useFamily()
+  const { supabase, familyId, members, isParentAuthed } = useFamily()
+  const children = members.filter((m) => m.role === 'child')
 
   const [rewards, setRewards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,6 +23,8 @@ function FamilyRewards({ points }) {
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
+  // 아이별 별 개수. 완료 상태인 할일을 세는 것이라 체크를 풀면 함께 줄어든다.
+  const [starsByMember, setStarsByMember] = useState({})
 
   const load = useCallback(async () => {
     if (!familyId) return
@@ -34,15 +40,44 @@ function FamilyRewards({ points }) {
     setLoading(false)
   }, [supabase, familyId])
 
+  const loadStars = useCallback(async () => {
+    if (!familyId) return
+    const { data, error } = await supabase
+      .from('todos')
+      .select('assignee_member_id, approved_by')
+      .eq('is_done', true)
+    if (error) return
+    const tally = {}
+    for (const row of data || []) {
+      if (!row.assignee_member_id) continue
+      // 부모가 승인한 할일만 별로 센다. 아이가 체크만 한 것은 아직 0이다.
+      if (!row.approved_by) continue
+      tally[row.assignee_member_id] = (tally[row.assignee_member_id] || 0) + 1
+    }
+    setStarsByMember(tally)
+  }, [supabase, familyId])
+
   useEffect(() => {
     load()
-  }, [load])
+    loadStars()
+  }, [load, loadStars])
 
-  const pending = rewards.filter((r) => !r.redeemed_at)
-  const done = rewards.filter((r) => r.redeemed_at)
+  // 아이가 할일을 체크하면 별이 바뀐다. 할일 화면이 쏘는 신호를 같이 듣는다.
+  useEffect(() => {
+    window.addEventListener('kinship:points', loadStars)
+    window.addEventListener('kinship:change', loadStars)
+    return () => {
+      window.removeEventListener('kinship:points', loadStars)
+      window.removeEventListener('kinship:change', loadStars)
+    }
+  }, [loadStars])
+
+  const pending = rewards.filter((r) => !r.redeemed_at && !r.member_id)
+  const done = rewards.filter((r) => r.redeemed_at && !r.member_id)
   // 다음 목표 = 아직 못 받은 것 중 가장 가까운 것
   const next = pending.find((r) => (points ?? 0) < r.required_points) || null
   const reached = pending.filter((r) => (points ?? 0) >= r.required_points)
+  const childGoals = rewards.filter((r) => !r.redeemed_at && r.member_id)
 
   function startCreate() {
     setEditingId(null)
@@ -57,6 +92,7 @@ function FamilyRewards({ points }) {
       title: reward.title,
       requiredPoints: String(reward.required_points),
       note: reward.note || '',
+      memberId: reward.member_id || '',
     })
     setErrorMsg('')
     setOpen(true)
@@ -71,18 +107,27 @@ function FamilyRewards({ points }) {
       return
     }
     if (!Number.isInteger(required) || required < 1) {
-      setErrorMsg('목표 포인트를 1 이상의 숫자로 적어주세요.')
+      setErrorMsg(draft.memberId ? '필요한 별 개수를 1 이상으로 적어주세요.' : '목표 포인트를 1 이상의 숫자로 적어주세요.')
       return
     }
     setBusy(true)
     const payload = { title, required_points: required, note: draft.note.trim() || null }
+    // 가족 목표일 때는 member_id를 아예 보내지 않는다 — migration_18을 아직
+    // 실행하지 않은 상태에서도 지금까지 쓰던 가족 목표는 그대로 저장돼야 한다.
+    if (draft.memberId || editingId) payload.member_id = draft.memberId || null
     const query = editingId
       ? supabase.from('rewards').update(payload).eq('reward_id', editingId)
       : supabase.from('rewards').insert({ ...payload, family_id: familyId })
     const { error } = await query
     setBusy(false)
     if (error) {
-      setErrorMsg(error.code === '42501' ? '보상 목표는 부모만 정할 수 있어요.' : '저장하지 못했어요.')
+      setErrorMsg(
+        error.code === '42501'
+          ? '보상 목표는 부모만 정할 수 있어요.'
+          : /does not exist|schema cache/i.test(error.message || '')
+            ? '아이 별 목표는 migration_18_todo_due_and_stars.sql을 실행한 뒤에 쓸 수 있어요.'
+            : '저장하지 못했어요.'
+      )
       return
     }
     setOpen(false)
@@ -224,6 +269,72 @@ function FamilyRewards({ points }) {
             </ul>
           )}
 
+          {/* 아이의 별 목표. 아이 화면에도 같은 값이 보이고, '받았어요'는 부모만
+              누른다 — 아이가 스스로 소진 처리하면 협의가 아니라 선언이 된다. */}
+          {childGoals.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-dashed border-border">
+              <p className="font-display font-bold text-[13px] mb-2 flex items-center gap-1.5">
+                <i className="ph-fill ph-star text-base text-tape-yellow"></i>아이 별 목표
+              </p>
+              <ul className="flex flex-col gap-2">
+                {childGoals.map((r) => {
+                  const owned = starsByMember[r.member_id] || 0
+                  const name = members.find((m) => m.member_id === r.member_id)?.name || '아이'
+                  const pct = Math.min(100, Math.round((owned / r.required_points) * 100))
+                  return (
+                    <li key={r.reward_id}>
+                      <div className="flex items-center justify-between gap-2 text-[13px]">
+                        <span className="min-w-0 truncate">
+                          {name} · {r.title}
+                        </span>
+                        <span className="shrink-0 flex items-center gap-1">
+                          <span className="text-[12px] text-foreground-muted">
+                            별 {Math.min(owned, r.required_points)}/{r.required_points}
+                          </span>
+                          {isParentAuthed && (
+                            <>
+                              {owned >= r.required_points && (
+                                <button
+                                  type="button"
+                                  onClick={() => redeem(r)}
+                                  className="text-[12px] font-display font-bold text-secondary-dark active:scale-95 transition duration-150"
+                                >
+                                  줬어요
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => startEdit(r)}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-foreground-muted active:scale-90 transition duration-150"
+                                aria-label={`${r.title} 수정`}
+                              >
+                                <i className="ph-bold ph-pencil-simple text-sm"></i>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => remove(r)}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-foreground-muted active:scale-90 transition duration-150"
+                                aria-label={`${r.title} 삭제`}
+                              >
+                                <i className="ph-bold ph-trash text-sm"></i>
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-surface-muted rounded-full overflow-hidden mt-1">
+                        <div
+                          className="h-full bg-tape-yellow rounded-full transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        ></div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
           {done.length > 0 && (
             <p className="text-[12px] text-foreground-muted mt-3 pt-2 border-t border-dashed border-border">
               지난 보상: {done.map((r) => r.title).join(', ')}
@@ -238,18 +349,34 @@ function FamilyRewards({ points }) {
             type="text"
             value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            placeholder="보상 이름 — 예: 가족 외식"
+            placeholder={draft.memberId ? '보상 이름 — 예: 아이스크림' : '보상 이름 — 예: 가족 외식'}
             maxLength={60}
             className="bg-surface-muted rounded-md px-3 py-2.5 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
             autoComplete="off"
           />
+          {/* 누구의 목표인가. 가족 목표는 가족 포인트로, 아이 목표는 그 아이가
+              모은 별로 이룬다 — 단위가 달라서 아래 입력의 안내도 함께 바뀐다. */}
+          {children.length > 0 && (
+            <select
+              value={draft.memberId}
+              onChange={(e) => setDraft({ ...draft, memberId: e.target.value })}
+              className="bg-surface-muted rounded-md px-3 py-2.5 text-[14px] border border-border outline-none"
+            >
+              <option value="">가족 공동 목표 (가족 포인트)</option>
+              {children.map((c) => (
+                <option key={c.member_id} value={c.member_id}>
+                  {c.name}의 별 목표
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="number"
             inputMode="numeric"
             min={1}
             value={draft.requiredPoints}
             onChange={(e) => setDraft({ ...draft, requiredPoints: e.target.value })}
-            placeholder="목표 포인트 — 예: 10000"
+            placeholder={draft.memberId ? '필요한 별 개수 — 예: 10' : '목표 포인트 — 예: 10000'}
             className="bg-surface-muted rounded-md px-3 py-2.5 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
           />
           <input

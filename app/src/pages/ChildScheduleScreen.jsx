@@ -11,6 +11,14 @@ import {
   todayKey,
 } from '../lib/schedules'
 
+// 자주 쓰는 묶음. "월수금 태권도"를 요일 세 번 눌러 고르는 것보다 이게 빠르고,
+// 무엇보다 평일 5개를 하나씩 누르다 하나 빠뜨리는 실수가 없어진다.
+const DAY_PRESETS = [
+  { label: '평일', days: ['월', '화', '수', '목', '금'] },
+  { label: '주말', days: ['토', '일'] },
+  { label: '매일', days: ['월', '화', '수', '목', '금', '토', '일'] },
+]
+
 const ALARM_OPTIONS = [
   { value: '', label: '알림 없음' },
   { value: '0', label: '시작할 때' },
@@ -26,7 +34,9 @@ function emptyDraft(memberId) {
     memberId: memberId || '',
     title: '',
     repeatType: 'weekly',
-    dayOfWeek: todayKey(),
+    // 매주 반복은 여러 요일을 고를 수 있다. 스키마의 day_of_week는 한 칸이라
+    // 고른 요일마다 한 행씩 넣는다(migration_09의 schedules_when_check를 건드리지 않는다).
+    days: [todayKey()],
     scheduleDate: toDateInputValue(),
     startTime: '17:00',
     alarmMinutes: '10',
@@ -96,7 +106,7 @@ function ChildScheduleScreen() {
       memberId: schedule.member_id,
       title: schedule.title,
       repeatType: schedule.repeat_type,
-      dayOfWeek: schedule.day_of_week || todayKey(),
+      days: [schedule.day_of_week || todayKey()],
       scheduleDate: schedule.schedule_date || toDateInputValue(),
       startTime: schedule.start_time.slice(0, 5),
       alarmMinutes: schedule.alarm_minutes === null ? '' : String(schedule.alarm_minutes),
@@ -115,22 +125,68 @@ function ChildScheduleScreen() {
       setErrorMsg('자녀를 선택해주세요.')
       return
     }
+    // 고른 요일은 화면 순서(월~일)로 맞춰둔다. 누른 순서대로 넣으면 같은 선택인데도
+    // 목록에 들어가는 순서가 달라져, 무엇이 저장됐는지 눈으로 맞추기 어렵다.
+    const pickedDays = DAY_ORDER.filter((d) => draft.days.includes(d))
+    if (draft.repeatType === 'weekly' && !pickedDays.length) {
+      setErrorMsg('요일을 하나 이상 골라주세요.')
+      return
+    }
     setBusy(true)
+
     // 반복이면 요일만, 하루짜리면 날짜만 채운다 — schedules_when_check가 둘 다 차 있는 걸 막는다
-    const payload = {
+    const base = {
       family_id: familyId,
       member_id: draft.memberId,
       title,
       repeat_type: draft.repeatType,
-      day_of_week: draft.repeatType === 'weekly' ? draft.dayOfWeek : null,
       schedule_date: draft.repeatType === 'once' ? draft.scheduleDate : null,
       start_time: draft.startTime,
       alarm_minutes: draft.alarmMinutes === '' ? null : Number(draft.alarmMinutes),
     }
-    const query = editingId
-      ? supabase.from('schedules').update(payload).eq('schedule_id', editingId)
-      : supabase.from('schedules').insert(payload)
-    const { error } = await query
+
+    // 같은 아이·같은 이름·같은 시간이 그 요일에 이미 있으면 넣지 않는다. 요일을
+    // 두 번 고르는 실수로 같은 일정이 겹쳐 쌓이면 알림도 두 번 뜬다.
+    const alreadyOn = (day) =>
+      schedules.some(
+        (x) =>
+          x.schedule_id !== editingId &&
+          x.member_id === draft.memberId &&
+          x.repeat_type === 'weekly' &&
+          x.day_of_week === day &&
+          x.title === title &&
+          x.start_time.slice(0, 5) === draft.startTime
+      )
+
+    let error = null
+    if (draft.repeatType === 'once') {
+      const payload = { ...base, day_of_week: null }
+      const res = editingId
+        ? await supabase.from('schedules').update(payload).eq('schedule_id', editingId)
+        : await supabase.from('schedules').insert(payload)
+      error = res.error
+    } else {
+      // 고친 일정은 첫 요일로 바꾸고, 늘어난 요일은 새 행으로 넣는다.
+      const [first, ...rest] = pickedDays
+      const extra = (editingId ? rest : pickedDays).filter((d) => !alreadyOn(d))
+      if (editingId) {
+        const res = await supabase
+          .from('schedules')
+          .update({ ...base, day_of_week: first })
+          .eq('schedule_id', editingId)
+        error = res.error
+      }
+      if (!error && extra.length) {
+        const res = await supabase.from('schedules').insert(extra.map((d) => ({ ...base, day_of_week: d })))
+        error = res.error
+      }
+      if (!error && !editingId && !extra.length) {
+        setBusy(false)
+        setErrorMsg('고른 요일에 이미 같은 일정이 있어요.')
+        return
+      }
+    }
+
     setBusy(false)
     if (error) {
       setErrorMsg(error.code === '42501' ? '스케줄 등록은 부모만 할 수 있어요.' : '저장하지 못했어요.')
@@ -245,22 +301,54 @@ function ChildScheduleScreen() {
             </div>
 
             {draft.repeatType === 'weekly' ? (
-              <div className="grid grid-cols-7 gap-1">
-                {DAY_ORDER.map((day) => (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => setDraft({ ...draft, dayOfWeek: day })}
-                    className={`rounded-md py-2 font-display font-bold text-[14px] border transition duration-150 ${
-                      draft.dayOfWeek === day
-                        ? 'bg-primary text-on-primary border-foreground'
-                        : 'bg-surface-muted text-foreground-muted border-border'
-                    }`}
-                    aria-pressed={draft.dayOfWeek === day}
-                  >
-                    {day}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-7 gap-1">
+                  {DAY_ORDER.map((day) => {
+                    const on = draft.days.includes(day)
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            days: on ? draft.days.filter((d) => d !== day) : [...draft.days, day],
+                          })
+                        }
+                        className={`rounded-md py-2 font-display font-bold text-[14px] border transition duration-150 ${
+                          on
+                            ? 'bg-primary text-on-primary border-foreground'
+                            : 'bg-surface-muted text-foreground-muted border-border'
+                        }`}
+                        aria-pressed={on}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {DAY_PRESETS.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setDraft({ ...draft, days: preset.days })}
+                      className="bg-surface border border-border rounded-full px-3 py-1 text-[12px] font-display font-bold active:scale-95 transition duration-150"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                  <span className="text-[12px] text-foreground-muted ml-auto">
+                    {draft.days.length
+                      ? `매주 ${DAY_ORDER.filter((d) => draft.days.includes(d)).join('·')}`
+                      : '요일을 골라주세요'}
+                  </span>
+                </div>
+                {editingId && draft.days.length > 1 && (
+                  <p className="text-[12px] text-foreground-muted">
+                    요일을 늘리면 늘린 요일에 같은 일정이 새로 추가돼요. 지울 때는 요일별로 지워요.
+                  </p>
+                )}
               </div>
             ) : (
               <input

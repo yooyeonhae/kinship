@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { fetchWeather, buildRecommendation } from '../lib/weather'
+import { DEFAULT_SETTINGS, SETTINGS_EVENT, loadSettings } from '../lib/settings'
 
 // schema.sql의 day_of_week CHECK 제약과 같은 값('월'..'일')
 const DAY_CHARS = ['일', '월', '화', '수', '목', '금', '토']
@@ -36,6 +37,9 @@ function ChildOutfitScreen() {
   const [errorMsg, setErrorMsg] = useState('')
   const [weather, setWeather] = useState(null)
   const [weatherError, setWeatherError] = useState('')
+  // 날씨는 가족이 정한 기본 지역으로 부른다(migration_22). 예전에는 인자 없이 불러서
+  // 프록시의 기본값(서울)만 나왔다.
+  const [region, setRegion] = useState(DEFAULT_SETTINGS.default_region)
 
   const reqIdRef = useRef(0)
 
@@ -65,8 +69,23 @@ function ChildOutfitScreen() {
   }, [loadRule])
 
   useEffect(() => {
+    if (!familyId) return
     let alive = true
-    fetchWeather()
+    const read = async () => {
+      const res = await loadSettings(supabase)
+      if (alive) setRegion(res.data.default_region)
+    }
+    read()
+    window.addEventListener(SETTINGS_EVENT, read)
+    return () => {
+      alive = false
+      window.removeEventListener(SETTINGS_EVENT, read)
+    }
+  }, [supabase, familyId])
+
+  useEffect(() => {
+    let alive = true
+    fetchWeather(region)
       .then((data) => {
         if (alive) setWeather(data)
       })
@@ -76,7 +95,7 @@ function ChildOutfitScreen() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [region])
 
   const recommendation = outfitType && weather ? buildRecommendation(outfitType, weather) : null
 
