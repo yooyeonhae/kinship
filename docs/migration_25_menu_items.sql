@@ -85,13 +85,22 @@ INSERT INTO menu_items (name, category, search_keyword, image_url, source_type) 
 ('떡볶이', '한그릇/면류', 'Tteokbokki spicy rice cakes', 'https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('만둣국', '한그릇/면류', 'Manduguk korean dumpling soup', 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 
--- [양식/퓨전 (6종)]
 ('돈가스', '양식/퓨전', 'Tonkatsu pork cutlet platter', 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('함박스테이크', '양식/퓨전', 'Hamburg steak patty egg', 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('토마토파스타', '양식/퓨전', 'Tomato spaghetti pasta basil', 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('크림파스타', '양식/퓨전', 'Cream sauce fettuccine pasta', 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('알리오올리오', '양식/퓨전', 'Aglio e olio garlic olive oil pasta', 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
-('찹스테이크', '양식/퓨전', 'Chop steak bite size beef vegetables', 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', 'LOCAL')
+('찹스테이크', '양식/퓨전', 'Chop steak bite size beef vegetables', 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+
+-- [기본 레시피 세트 명칭 보강]
+('된장찌개 정식', '찌개/국물류', 'Doenjang jjigae korean stew set', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('소불고기 덮밥', '고기/구이/볶음류', 'Korean beef bulgogi rice bowl', 'https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('계란말이와 밥', '한그릇/면류', 'Gyeran mari rolled omelette with rice', 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('참치마요 덮밥', '한그릇/면류', 'Tuna mayo rice bowl', 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('콩나물국밥', '찌개/국물류', 'Kongnamul gukbap bean sprout soup with rice', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('두부조림', '고기/구이/볶음류', 'Dubu jorim braised tofu', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('된장국과 생선구이', '해산물류', 'Grilled fish with soybean soup set', 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('떡국', '찌개/국물류', 'Tteokguk korean sliced rice cake soup', 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80', 'LOCAL')
 
 ON CONFLICT (name) DO UPDATE SET
   category = EXCLUDED.category,
