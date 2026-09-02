@@ -225,6 +225,103 @@ function ParentTasksScreen() {
 
   const remainingTotal = parents.reduce((sum, p) => sum + todos.filter((t) => t.assignee_member_id === p.member_id && !t.is_done).length, 0)
 
+  const today = todayValue()
+  // ① 미완료 (날짜 오래된 것 먼저, 긴급한 것이 위에)
+  const todosUndone = todos.filter((t) => !t.is_done)
+  // ② 오늘 완료
+  const todosDoneToday = todos.filter((t) => t.is_done && t.due_date === today)
+  // ③ 지난 날 완료 (숨김 처리 대상)
+  const todosDonePast = todos.filter((t) => t.is_done && t.due_date !== today)
+
+  function renderTaskRow(t) {
+    const name = memberName(t.assignee_member_id)
+    const token = t.assignee_member_id ? colorTokenForMember(members, t.assignee_member_id) : null
+    const assignee = members.find((m) => m.member_id === t.assignee_member_id) || null
+    return (
+      <div
+        key={t.todo_id}
+        className="task-row relative overflow-hidden bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4"
+        data-done={t.is_done}
+      >
+        <span className="task-corner absolute top-0 right-0 w-8 h-8 bg-border" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }} aria-hidden="true"></span>
+        <button
+          type="button"
+          onClick={() => toggleTask(t)}
+          className="task-circle w-11 h-11 rounded-full border-2 border-border flex items-center justify-center shrink-0"
+          aria-label={t.is_done ? '완료 취소' : '완료 체크'}
+        >
+          <i className="ph-bold ph-check task-check text-on-secondary text-lg"></i>
+          <i className="ph-bold ph-x task-cross text-destructive text-lg" aria-hidden="true"></i>
+        </button>
+        <div className="flex-1 min-w-0">
+          <span className="task-label font-display font-bold text-[16px]">{t.title}</span>
+          <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
+            {t.due_date && t.due_date !== todayValue() && (
+              <span
+                className={`text-[12px] font-display font-bold px-1.5 py-0.5 rounded ${
+                  t.due_date < todayValue() && !t.is_done
+                    ? 'bg-destructive/15 text-destructive'
+                    : 'bg-surface-muted text-foreground-muted'
+                }`}
+              >
+                {dueLabel(t.due_date)}
+              </span>
+            )}
+            {t.self_made && (
+              <span className="text-[12px] font-display font-bold px-1.5 py-0.5 rounded bg-tape-yellow/40 text-foreground">
+                스스로 정함
+              </span>
+            )}
+            {t.approved_by ? (
+              <span className="text-[12px] font-display font-bold text-accent">🏅 확인함 · 별 +1</span>
+            ) : t.is_done && t.assignee_member_id && settings.require_approval ? (
+              <span className="text-[12px] font-display font-bold text-destructive">확인 기다림 · 별 아직 0</span>
+            ) : null}
+            {t.is_done && (
+              <span className="text-[13px] text-foreground-muted">
+                완료: {memberName(t.completed_by) || name || '가족'}
+              </span>
+            )}
+          </span>
+        </div>
+        <span
+          className={`w-9 h-9 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[17px] shrink-0`}
+          title={name ? `${name}${t.is_done ? ' 완료' : ', 아직 완료 안 함'}` : '담당자 미정'}
+        >
+          <span aria-hidden="true">{assignee ? characterOf(assignee) : '❓'}</span>
+        </span>
+        {t.is_done && isParentAuthed && settings.require_approval && (
+          <button
+            type="button"
+            onClick={() => toggleApprove(t)}
+            className={`shrink-0 rounded-full flex items-center justify-center gap-1 border-2 active:scale-90 transition duration-150 ${
+              t.approved_by
+                ? 'w-8 h-8 bg-tape-yellow border-foreground'
+                : 'px-2.5 h-8 bg-primary text-on-primary border-foreground shadow-sticker'
+            }`}
+            aria-label={t.approved_by ? `${t.title} 확인 취소` : `${t.title} 확인하고 별 주기`}
+            title={
+              t.approved_by
+                ? '확인했어요 — 별 +1 (다시 누르면 취소)'
+                : '확인하면 아이 별에 합산돼요'
+            }
+          >
+            <span aria-hidden="true">🏅</span>
+            {!t.approved_by && <span className="font-display font-bold text-[12px]">별 주기</span>}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => removeTask(t.todo_id)}
+          className="task-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150"
+          aria-label="삭제"
+        >
+          <i className="ph-bold ph-trash text-base text-foreground-muted"></i>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -554,98 +651,29 @@ function ParentTasksScreen() {
       {loadingTodos ? (
         <p className="text-foreground-muted text-center py-4">불러오는 중...</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {todos.map((t) => {
-            const name = memberName(t.assignee_member_id)
-            const token = t.assignee_member_id ? colorTokenForMember(members, t.assignee_member_id) : null
-            const assignee = members.find((m) => m.member_id === t.assignee_member_id) || null
-            return (
-              <div
-                key={t.todo_id}
-                className="task-row relative overflow-hidden bg-surface border border-border rounded-lg shadow-soft px-4 py-4 flex items-center gap-4"
-                data-done={t.is_done}
-              >
-                <span className="task-corner absolute top-0 right-0 w-8 h-8 bg-border" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }} aria-hidden="true"></span>
-                <button
-                  type="button"
-                  onClick={() => toggleTask(t)}
-                  className="task-circle w-11 h-11 rounded-full border-2 border-border flex items-center justify-center shrink-0"
-                  aria-label={t.is_done ? '완료 취소' : '완료 체크'}
-                >
-                  <i className="ph-bold ph-check task-check text-on-secondary text-lg"></i>
-                  <i className="ph-bold ph-x task-cross text-destructive text-lg" aria-hidden="true"></i>
-                </button>
-                <div className="flex-1 min-w-0">
-                  <span className="task-label font-display font-bold text-[16px]">{t.title}</span>
-                  {/* 오늘 것이 대부분이라 오늘은 굳이 적지 않는다. 다른 날짜일 때만
-                      눈에 띄어야 "내일 준비물을 오늘 목록에서 봤다"가 안 생긴다. */}
-                  <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                    {t.due_date && t.due_date !== todayValue() && (
-                      <span
-                        className={`text-[12px] font-display font-bold px-1.5 py-0.5 rounded ${
-                          t.due_date < todayValue() && !t.is_done
-                            ? 'bg-destructive/15 text-destructive'
-                            : 'bg-surface-muted text-foreground-muted'
-                        }`}
-                      >
-                        {dueLabel(t.due_date)}
-                      </span>
-                    )}
-                    {t.self_made && (
-                      <span className="text-[12px] font-display font-bold px-1.5 py-0.5 rounded bg-tape-yellow/40 text-foreground">
-                        스스로 정함
-                      </span>
-                    )}
-                    {t.approved_by ? (
-                      <span className="text-[12px] font-display font-bold text-accent">🏅 확인함 · 별 +1</span>
-                    ) : t.is_done && t.assignee_member_id && settings.require_approval ? (
-                      <span className="text-[12px] font-display font-bold text-destructive">확인 기다림 · 별 아직 0</span>
-                    ) : null}
-                    {t.is_done && (
-                      <span className="text-[13px] text-foreground-muted">
-                        완료: {memberName(t.completed_by) || name || '가족'}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <span
-                  className={`w-9 h-9 rounded-full ${token ? MEMBER_BG_CLASS[token] : 'bg-surface-muted border border-border'} ring-2 ring-surface shadow-soft flex items-center justify-center text-[17px] shrink-0`}
-                  title={name ? `${name}${t.is_done ? ' 완료' : ', 아직 완료 안 함'}` : '담당자 미정'}
-                >
-                  <span aria-hidden="true">{assignee ? characterOf(assignee) : '❓'}</span>
-                </span>
-                {t.is_done && isParentAuthed && settings.require_approval && (
-                  <button
-                    type="button"
-                    onClick={() => toggleApprove(t)}
-                    className={`shrink-0 rounded-full flex items-center justify-center gap-1 border-2 active:scale-90 transition duration-150 ${
-                      t.approved_by
-                        ? 'w-8 h-8 bg-tape-yellow border-foreground'
-                        : 'px-2.5 h-8 bg-primary text-on-primary border-foreground shadow-sticker'
-                    }`}
-                    aria-label={t.approved_by ? `${t.title} 확인 취소` : `${t.title} 확인하고 별 주기`}
-                    title={
-                      t.approved_by
-                        ? '확인했어요 — 별 +1 (다시 누르면 취소)'
-                        : '확인하면 아이 별에 합산돼요'
-                    }
-                  >
-                    <span aria-hidden="true">🏅</span>
-                    {!t.approved_by && <span className="font-display font-bold text-[12px]">별 주기</span>}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeTask(t.todo_id)}
-                  className="task-remove w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition duration-150"
-                  aria-label="삭제"
-                >
-                  <i className="ph-bold ph-trash text-base text-foreground-muted"></i>
-                </button>
+        <>
+          {/* ── ① 미완료 할일 (가장 위) ── */}
+          {todosUndone.length === 0 && todosDoneToday.length === 0 && todosDonePast.length === 0 && (
+            <p className="text-foreground-muted text-center py-4 text-[14px]">할일이 없어요. 위에서 추가해보세요!</p>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {[...todosUndone, ...todosDoneToday].map((t) => renderTaskRow(t))}
+          </div>
+
+          {/* ── ② 지난 날 완료 항목 (맨 아래, 흐리게) ── */}
+          {todosDonePast.length > 0 && (
+            <div className="mt-4">
+              <p className="font-display font-bold text-[12px] text-foreground-muted flex items-center gap-1.5 mb-2">
+                <i className="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i>
+                지난 날 완료한 일 {todosDonePast.length}개
+              </p>
+              <div className="flex flex-col gap-3 opacity-50">
+                {todosDonePast.map((t) => renderTaskRow(t))}
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex-1"></div>

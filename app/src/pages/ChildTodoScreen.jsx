@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import TodaySchedule from '../components/TodaySchedule'
+import { pushSupported, enablePush } from '../lib/push'
 import {
   CHILD_QUICK_TASKS,
   addMyTodo,
@@ -34,7 +35,7 @@ function iconForTitle(title) {
 }
 
 function headingFor(total, filled) {
-  if (total === 0) return '오늘 할일을 정해볼까요?'
+  if (total === 0) return null // Free 연출은 별도 렌더
   if (filled === 0) return '오늘 할일을 시작해볼까요?'
   if (filled === total) return '다 했어요! 최고예요!'
   return '우와, 거의 다 했어요!'
@@ -70,6 +71,8 @@ function ChildTodoScreen() {
   const [addInput, setAddInput] = useState('')
   const [addBusy, setAddBusy] = useState(false)
   const [addMsg, setAddMsg] = useState('')
+  // 알림 관련 상태
+  const [notifyStatus, setNotifyStatus] = useState('idle') // idle | sending | done | error | unsupported
 
   // 자녀를 빠르게 전환하면 먼저 보낸 요청이 나중에 도착해 다른 아이의 목록을
   // 덮어쓸 수 있으므로, 마지막 요청의 응답만 반영한다.
@@ -171,6 +174,10 @@ function ChildTodoScreen() {
   const remaining = total - filled
   const progressPct = total > 0 ? (filled / total) * 100 : 0
   const nextGoal = goals[0]
+
+  // 오늘 할일: 미완료를 위에, 완료를 아래에 — 지금 해야 할 일이 바로 보이도록
+  const givenUndone = givenTodos.filter((t) => !t.is_done)
+  const givenDone  = givenTodos.filter((t) => t.is_done)
 
   async function handleToggle(todo) {
     const nextDone = !todo.is_done
@@ -391,38 +398,107 @@ function ChildTodoScreen() {
         )}
       </div>
 
-      <div className="bg-surface-muted rounded-lg shadow-soft px-5 py-5 mb-6 text-center">
-        <h1 className="font-display font-extrabold text-[22px] leading-[28px] text-accent">{headingFor(total, filled)}</h1>
-        {total > 0 ? (
-          <>
-            <p className="font-doodle text-[18px] text-foreground-muted mt-1">
-              오늘 {filled}/{total}개 했어요!
-            </p>
-            <div className="relative mt-4">
-              <div className="h-3.5 rounded-full bg-border overflow-hidden flex" aria-hidden="true">
-                {todayTodos.map((t, i) => (
-                  <span
-                    key={t.todo_id}
-                    className={`progress-star ${i < filled ? 'is-filled' : ''} ${poppedStar === i ? 'pop' : ''}`}
-                  ></span>
-                ))}
-              </div>
-              <span
-                className="progress-marker w-6 h-6 rounded-full bg-surface border-2 border-foreground shadow-sticker flex items-center justify-center"
-                style={{ left: `${progressPct}%` }}
-                aria-hidden="true"
-              >
-                <i className="ph-fill ph-smiley text-[12px] text-tape-yellow"></i>
-              </span>
-            </div>
-          </>
-        ) : (
-          // 할일이 하나도 없는 날 빈 막대와 "0/0개"를 띄우면 뭘 해야 하는지 알 수 없다.
-          <p className="font-doodle text-[18px] text-foreground-muted mt-1">
-            {isMe ? '하고 싶은 일을 아래에서 골라봐요!' : '오늘은 정해진 할일이 없어요.'}
+      {total === 0 && !loading ? (
+        /* ── 오늘 할일이 없는 날 Free 카드 ── */
+        <div className="bg-surface-muted rounded-lg shadow-soft px-5 py-6 mb-6 text-center relative overflow-hidden">
+          {/* 배경 장식 */}
+          <span className="absolute -top-4 -right-4 text-[80px] opacity-10 select-none" aria-hidden="true">🎉</span>
+          <span className="absolute -bottom-4 -left-4 text-[60px] opacity-10 select-none" aria-hidden="true">✨</span>
+          <p className="font-display font-extrabold text-[32px] leading-[38px] text-accent">오늘은 Free!</p>
+          <p className="font-doodle text-[18px] text-foreground-muted mt-2">
+            {isMe ? '오늘은 정해진 할일이 없어요 🎈' : `${childName}는 오늘 자유로운 날이에요!`}
           </p>
-        )}
-      </div>
+          {isMe && (
+            <p className="text-[13px] text-foreground-muted mt-1">아래에서 하고 싶은 미션을 골라봐요!</p>
+          )}
+        </div>
+      ) : (
+        /* ── 오늘 할일이 있는 날 진행 카드 ── */
+        <div className="bg-surface-muted rounded-lg shadow-soft px-5 py-5 mb-6 text-center">
+          <h1 className="font-display font-extrabold text-[22px] leading-[28px] text-accent">{headingFor(total, filled)}</h1>
+          {total > 0 && (
+            <>
+              <p className="font-doodle text-[18px] text-foreground-muted mt-1">
+                오늘 {filled}/{total}개 했어요!
+              </p>
+              <div className="relative mt-4">
+                <div className="h-3.5 rounded-full bg-border overflow-hidden flex" aria-hidden="true">
+                  {todayTodos.map((t, i) => (
+                    <span
+                      key={t.todo_id}
+                      className={`progress-star ${i < filled ? 'is-filled' : ''} ${poppedStar === i ? 'pop' : ''}`}
+                    ></span>
+                  ))}
+                </div>
+                <span
+                  className="progress-marker w-6 h-6 rounded-full bg-surface border-2 border-foreground shadow-sticker flex items-center justify-center"
+                  style={{ left: `${progressPct}%` }}
+                  aria-hidden="true"
+                >
+                  <i className="ph-fill ph-smiley text-[12px] text-tape-yellow"></i>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 미완료 할일 알림 버튼 — 오늘 못 한 일이 있을 때만 표시 ── */}
+      {isMe && remaining > 0 && !loading && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!pushSupported()) {
+                setNotifyStatus('unsupported')
+                return
+              }
+              setNotifyStatus('sending')
+              const res = await enablePush(supabase, { familyId, memberId })
+              if (!res.ok) {
+                setNotifyStatus(res.error === 'unsupported' ? 'unsupported' : 'error')
+                return
+              }
+              // 알림 등록이 됐으면 즉시 로컬 알림으로 "지금 해야 할 일" 목록 표시
+              try {
+                const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+                if (reg) {
+                  const undone = givenTodos.filter((t) => !t.is_done).map((t) => t.title)
+                  const body = undone.length
+                    ? `지금 해야 할 일이에요 👉 ${undone.join(', ')}`
+                    : `${remaining}개 남았어요, 하나씩 해봐요!`
+                  reg.showNotification(`${childName}, 파이팅! 🌟`, {
+                    body,
+                    icon: '/icon-192.png',
+                    badge: '/icon-192.png',
+                    tag: `todo-reminder-${memberId}`,
+                  })
+                }
+              } catch { /* 무시 */ }
+              setNotifyStatus('done')
+              setTimeout(() => setNotifyStatus('idle'), 3000)
+            }}
+            disabled={notifyStatus === 'sending'}
+            className="w-full flex items-center justify-center gap-2 bg-primary/10 border-2 border-primary rounded-full py-3 font-display font-bold text-[14px] text-primary active:scale-[0.97] transition-all duration-150 disabled:opacity-60"
+          >
+            <i className="ph-fill ph-bell-ringing text-lg"></i>
+            {notifyStatus === 'sending'
+              ? '알림 설정 중...'
+              : notifyStatus === 'done'
+              ? '✅ 알림을 보냈어요!'
+              : notifyStatus === 'unsupported'
+              ? '이 기기는 알림을 지원하지 않아요'
+              : notifyStatus === 'error'
+              ? '알림 허용이 필요해요'
+              : `지금 해야 할 일 ${remaining}개 알림 받기`}
+          </button>
+          {notifyStatus === 'done' && (
+            <p className="text-[12px] text-foreground-muted text-center mt-1">
+              앞으로도 할일 알림이 오면 잘 확인해요!
+            </p>
+          )}
+        </div>
+      )}
 
       {errorMsg && (
         <div className="bg-surface border-2 border-destructive rounded-md px-4 py-3 mb-4 flex items-center gap-2">
@@ -438,20 +514,22 @@ function ChildTodoScreen() {
         </div>
       )}
 
+      {/* ── ① 오늘 미완료 할일 (가장 위) ── */}
       {loading ? (
         <p className="text-foreground-muted text-center">불러오는 중...</p>
-      ) : (
-        <div className="flex flex-col gap-3">{givenTodos.map(renderRow)}</div>
-      )}
+      ) : givenUndone.length > 0 ? (
+        <div className="flex flex-col gap-3 mb-2">
+          {givenUndone.map(renderRow)}
+        </div>
+      ) : null}
 
-      <p className={`remaining-msg font-doodle text-[19px] text-accent mt-5 text-center ${celebrate ? 'celebrate' : ''}`}>
+      <p className={`remaining-msg font-doodle text-[19px] text-accent mt-3 mb-4 text-center ${celebrate ? 'celebrate' : ''}`}>
         {total === 0 ? ' ' : remaining === 0 ? '다 했어요! 오늘도 최고예요!' : `${remaining}개 남았어요, 하나씩 눌러봐요!`}
       </p>
 
-      {/* 내가 정한 미션은 접지 않는다 — 추가한 것이 버튼 뒤에 숨으면 "넣었는데
-          안 보인다"가 된다. 추가 입력칸과 같은 카드 안에 바로 쌓인다. */}
+      {/* ── ② 나의 미션 리스트 ── */}
       {(missionTodos.length > 0 || (isMe && !needsMigration)) && (
-        <div className="bg-surface border-2 border-foreground rounded-md shadow-sticker px-4 py-4 mt-2 mb-4">
+        <div className="bg-surface border-2 border-foreground rounded-md shadow-sticker px-4 py-4 mb-4">
           <p className="font-display font-bold text-[15px] mb-1 flex items-center gap-1.5">
             <i className="ph-duotone ph-target text-lg text-accent" aria-hidden="true"></i>
             나의 미션 리스트
@@ -514,15 +592,25 @@ function ChildTodoScreen() {
         </div>
       )}
 
-      {/* 지난 못 한 일도 접지 않는다. 오늘 할 일보다 아래에 두는 것으로 충분하고,
-          버튼 뒤에 있으면 있는지조차 모른다. */}
+      {/* ── ③ 오늘 완료된 할일 (아래) ── */}
+      {!loading && givenDone.length > 0 && (
+        <div className="mb-4">
+          <p className="font-display font-bold text-[13px] flex items-center gap-1.5 mb-2 text-foreground-muted">
+            <i className="ph-fill ph-check-circle text-base text-accent" aria-hidden="true"></i>
+            완료한 일 {givenDone.length}개
+          </p>
+          <div className="flex flex-col gap-3">{givenDone.map(renderRow)}</div>
+        </div>
+      )}
+
+      {/* ── ④ 지난 날 못 한 일 (맨 아래) ── */}
       {overdue.length > 0 && (
         <div className="mb-4">
-          <p className="font-display font-bold text-[14px] flex items-center gap-1.5 mb-2">
+          <p className="font-display font-bold text-[13px] flex items-center gap-1.5 mb-2 text-foreground-muted">
             <i className="ph-bold ph-clock-counter-clockwise text-base text-foreground-muted" aria-hidden="true"></i>
-            며칠 전 못 한 일 {overdue.length}개
+            지난 날 못 한 일 {overdue.length}개
           </p>
-          <div className="flex flex-col gap-3">{overdue.map(renderRow)}</div>
+          <div className="flex flex-col gap-3 opacity-70">{overdue.map(renderRow)}</div>
         </div>
       )}
     </>

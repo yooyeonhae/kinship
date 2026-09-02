@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseDescription, parseSteps } from '../lib/recipes'
+import { parseDescription, parseSteps, getRecipePhoto } from '../lib/recipes'
 
 const EMPTY = { title: '', ingredients: '', note: '', cookMinutes: '', steps: '' }
 
@@ -207,45 +207,52 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
         <ul className="flex gap-3 overflow-x-auto pb-2 snap-x">
           {mine.map((r) => {
             const { ingredients, note } = parseDescription(r.description)
+            const photoUrl = getRecipePhoto(r)
             return (
               <li
                 key={r.recipe_id}
-                className="bg-surface border border-border rounded-md shadow-soft px-3.5 py-3 shrink-0 w-[min(248px,68vw)] snap-start"
+                className="bg-surface border-2 border-foreground rounded-xl shadow-soft overflow-hidden shrink-0 w-[min(248px,68vw)] snap-start flex flex-col"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-display font-bold text-[15px]">
-                      {r.title}
-                      {r.cook_minutes ? (
-                        <span className="ml-2 font-body font-normal text-[12px] text-foreground-muted">{r.cook_minutes}분</span>
-                      ) : null}
-                    </p>
-                    {ingredients.length > 0 && (
-                      <p className="text-[12px] text-foreground-muted mt-0.5">{ingredients.join(' · ')}</p>
-                    )}
-                    {note && <p className="text-[13px] text-foreground-muted mt-1 leading-[19px]">{note}</p>}
-                    <p className="text-[12px] text-foreground-muted mt-1">
-                      {parseSteps(r.steps).length > 0 ? `만드는 법 ${parseSteps(r.steps).length}단계` : '만드는 법 없음'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                <div className="relative aspect-[16/9] w-full bg-surface-muted overflow-hidden">
+                  <img
+                    src={photoUrl}
+                    alt={r.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 rounded-full p-0.5 backdrop-blur-xs">
                     <button
                       type="button"
                       onClick={() => startEdit(r)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted active:scale-90 transition duration-150"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white hover:bg-white/20 active:scale-90 transition"
                       aria-label={`${r.title} 수정`}
                     >
-                      <i className="ph-bold ph-pencil-simple text-base"></i>
+                      <i className="ph-bold ph-pencil-simple text-xs"></i>
                     </button>
                     <button
                       type="button"
                       onClick={() => onDelete(r)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted active:scale-90 transition duration-150"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white hover:bg-destructive active:scale-90 transition"
                       aria-label={`${r.title} 삭제`}
                     >
-                      <i className="ph-bold ph-trash text-base"></i>
+                      <i className="ph-bold ph-trash text-xs"></i>
                     </button>
                   </div>
+                </div>
+
+                <div className="p-3">
+                  <p className="font-display font-bold text-[15px] flex items-center justify-between">
+                    <span className="truncate">{r.title}</span>
+                    {r.cook_minutes ? (
+                      <span className="font-display font-bold text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
+                        {r.cook_minutes}분
+                      </span>
+                    ) : null}
+                  </p>
+                  {ingredients.length > 0 && (
+                    <p className="text-[12px] text-foreground-muted mt-1 truncate">{ingredients.join(' · ')}</p>
+                  )}
+                  {note && <p className="text-[12px] text-foreground-muted mt-1 leading-[18px] line-clamp-2">{note}</p>}
                 </div>
               </li>
             )

@@ -4,48 +4,78 @@ import { useFamily } from '../context/FamilyContext'
 import FavoriteLinks from '../components/FavoriteLinks'
 import RecipeManager from '../components/RecipeManager'
 import RecipeDetail from '../components/RecipeDetail'
-import { parseDescription, pickTodayRecipes, sortRecipes } from '../lib/recipes'
+import { parseDescription, pickTodayRecipes, sortRecipes, getRecipePhoto, fetchHybridMenuImage } from '../lib/recipes'
 
 // 카드가 두 장이라 장식도 두 벌이다. 목업의 기울기·스티커 위치를 그대로 쓴다.
 const CARD_DECOR = [
-  { rotate: '-rotate-1', icon: 'ph-bowl-food', badge: 'absolute -bottom-3 right-3', badgeBg: 'bg-accent', badgeFg: 'text-on-accent', timeColor: 'text-primary' },
-  { rotate: 'rotate-2', icon: 'ph-cooking-pot', badge: 'absolute -top-3 left-3', badgeBg: 'bg-primary', badgeFg: 'text-on-primary', timeColor: 'text-secondary' },
+  { rotate: '-rotate-1', badge: 'absolute -bottom-3 right-3', badgeBg: 'bg-accent', badgeFg: 'text-on-accent', timeColor: 'text-primary' },
+  { rotate: 'rotate-2', badge: 'absolute -top-3 left-3', badgeBg: 'bg-primary', badgeFg: 'text-on-primary', timeColor: 'text-secondary' },
 ]
 
 function RecipeCard({ recipe, decor, onOpen }) {
   const { ingredients, note } = parseDescription(recipe.description)
+  const [photoUrl, setPhotoUrl] = useState(() => getRecipePhoto(recipe))
+
+  // 1차가 fallback인 경우 2차 외부 검색&캐싱 비동기 호출
+  useEffect(() => {
+    let alive = true
+    const initial = getRecipePhoto(recipe)
+    setPhotoUrl(initial)
+
+    fetchHybridMenuImage(recipe.title).then((url) => {
+      if (alive && url && url !== initial) {
+        setPhotoUrl(url)
+      }
+    })
+
+    return () => {
+      alive = false
+    }
+  }, [recipe.title, recipe.image_url])
 
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`${recipe.title} 레시피 보기`}
-      className={`${decor.rotate} text-left bg-surface border-2 border-foreground rounded-md shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150`}
+      className={`${decor.rotate} text-left bg-surface border-2 border-foreground rounded-xl shadow-sticker overflow-hidden active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 flex flex-col`}
     >
-      <div className="relative">
-        <div className="aspect-[4/3] rounded-t-[14px] overflow-hidden bg-surface-muted flex items-center justify-center">
-          <i className={`ph-duotone ${decor.icon} text-6xl text-foreground-muted`} aria-hidden="true"></i>
-        </div>
+      {/* 실제 음식 사진 영역 */}
+      <div className="relative aspect-[4/3] w-full bg-surface-muted overflow-hidden">
+        <img
+          src={photoUrl}
+          alt={recipe.title}
+          className="w-full h-full object-cover transition duration-300 hover:scale-105"
+          loading="lazy"
+        />
+        {/* 그라데이션 오버레이 */}
+        <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
+
         <span className={`${decor.badge} w-8 h-8 rounded-full ${decor.badgeBg} ring-4 ring-surface shadow-soft flex items-center justify-center`} aria-hidden="true">
           <i className={`ph-fill ph-star ${decor.badgeFg} text-xs`}></i>
         </span>
       </div>
-      <div className="p-3 pt-4">
-        <h2 className="font-display font-extrabold text-[17px] leading-tight mb-2">{recipe.title}</h2>
 
-        {ingredients.length > 0 && (
-          <ul className="flex flex-wrap gap-1 mb-2">
-            {ingredients.map((item) => (
-              <li key={item} className="bg-surface-muted rounded-full px-2 py-0.5 text-[11px] text-foreground-muted">
-                {item}
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="p-3 pt-3.5 flex-1 flex flex-col justify-between">
+        <div>
+          <h2 className="font-display font-extrabold text-[17px] leading-tight mb-1.5 text-foreground">
+            {recipe.title}
+          </h2>
 
-        {note && <p className="text-[12px] text-foreground-muted leading-[18px] mb-2">{note}</p>}
+          {ingredients.length > 0 && (
+            <ul className="flex flex-wrap gap-1 mb-2">
+              {ingredients.map((item) => (
+                <li key={item} className="bg-surface-muted rounded-full px-2 py-0.5 text-[11px] text-foreground-muted border border-border/60">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
 
-        <div className="border-t border-dashed border-border pt-2 flex items-center justify-between">
+          {note && <p className="text-[12px] text-foreground-muted leading-[18px] mb-2 line-clamp-2">{note}</p>}
+        </div>
+
+        <div className="border-t border-dashed border-border pt-2 flex items-center justify-between mt-1">
           {recipe.cook_minutes ? (
             <span className={`inline-flex items-center gap-1 text-[11px] font-display font-bold ${decor.timeColor}`}>
               <i className="ph-bold ph-clock"></i>
@@ -55,7 +85,7 @@ function RecipeCard({ recipe, decor, onOpen }) {
             <span></span>
           )}
           <span className="inline-flex items-center gap-0.5 text-[11px] font-display font-bold text-foreground-muted">
-            레시피
+            레시피 보기
             <i className="ph-bold ph-caret-right text-[10px]"></i>
           </span>
         </div>
