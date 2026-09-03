@@ -1,35 +1,38 @@
 /**
  * 저녁 메뉴 이미지-레시피 매칭 및 하이브리드 캐싱 서비스
+ *
+ * [2026-09-03] 브라우저에서 각 URL을 직접 확인하여 잘못된 이미지를 전면 교체함.
+ * 기존 URL 다수가 아보카도 국수·케밥·아보카도 토스트 등 완전히 틀린 음식을 가리키고 있었음.
  */
 
-// ── 테마별 검증된 고화질 음식 사진 아카이브 ──
+// ── 테마별 검증된 고화질 음식 사진 아카이브 (브라우저 직접 검증 완료) ──
 export const CURATED_FOOD_PHOTOS = {
-  // 1. 닭요리 / 백숙 / 삼계탕 (누룽지 백숙 포함)
-  chicken_soup: 'https://images.unsplash.com/photo-1547928576-a4a33237cbc3?auto=format&fit=crop&w=800&q=80',
-  // 2. 뚝배기 찌개 / 찌개류 (김치찌개, 된장찌개, 순두부찌개, 청국장 등)
-  korean_stew: 'https://images.unsplash.com/photo-1583032015879-66c3ecfa50b9?auto=format&fit=crop&w=800&q=80',
-  // 3. 따뜻한 떡국 / 만둣국 / 사골국
-  tteokguk_soup: 'https://images.unsplash.com/photo-1547928576-a4a33237cbc3?auto=format&fit=crop&w=800&q=80',
-  // 4. 잔치국수 / 칼국수 / 면류
+  // 1. 닭요리 / 백숙 / 삼계탕 (누룽지 백숙 포함) — 삼계탕 뚝배기 ✅
+  chicken_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
+  // 2. 뚝배기 찌개 / 찌개류 (김치찌개, 된장찌개, 순두부찌개, 청국장 등) — 김치찌개 ✅
+  korean_stew: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
+  // 3. 따뜻한 떡국 / 만둣국 / 사골국 — 백탁 국물 ✅
+  tteokguk_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
+  // 4. 잔치국수 / 칼국수 / 면류 — 소면 국물 ✅
   korean_noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80',
-  // 5. 볶음밥 / 김치볶음밥 / 덮밥
-  fried_rice: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80',
-  // 6. 불고기 / 제육볶음 / 삼겹살 / 고기구이
-  korean_meat: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=800&q=80',
-  // 7. 생선구이 / 조림 / 해물
+  // 5. 볶음밥 / 김치볶음밥 / 덮밥 — 김치볶음밥 달걀 프라이 ✅
+  fried_rice: 'https://images.unsplash.com/photo-1600688654899-379ec76aca42?auto=format&fit=crop&w=800&q=80',
+  // 6. 불고기 / 제육볶음 / 삼겹살 / 고기구이 — 한국식 BBQ 그릴 ✅
+  korean_meat: 'https://images.unsplash.com/photo-1527578054032-8d8f044e013d?auto=format&fit=crop&w=800&q=80',
+  // 7. 생선구이 / 조림 / 해물 — 팬 시어드 연어/생선 ✅
   grilled_fish: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80',
-  // 8. 비빔밥
-  bibimbap: 'https://images.unsplash.com/photo-1553163147-622ab57be1c7?auto=format&fit=crop&w=800&q=80',
-  // 9. 돈까스 / 튀김
-  tonkatsu: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80',
-  // 10. 파스타 / 스파게티
+  // 8. 비빔밥 — 비빔밥 그릇 ✅
+  bibimbap: 'https://images.unsplash.com/photo-1718777791239-c473e9ce7376?auto=format&fit=crop&w=800&q=80',
+  // 9. 돈까스 / 튀김 — 돈카츠 ✅
+  tonkatsu: 'https://images.unsplash.com/photo-1496112774951-bf41010eed5e?auto=format&fit=crop&w=800&q=80',
+  // 10. 파스타 / 스파게티 — 페투치네 ✅
   pasta: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80',
-  // 11. 계란말이 / 반찬
-  egg_roll: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80',
-  // 12. 카레라이스
-  curry_rice: 'https://images.unsplash.com/photo-1628294895950-9805252327bc?auto=format&fit=crop&w=800&q=80',
-  // 13. 떡볶이 / 분식
-  tteokbokki: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=800&q=80',
+  // 11. 계란말이 / 반찬 — 계란 요리 (볶음밥 이미지로 대체) ✅
+  egg_roll: 'https://images.unsplash.com/photo-1600688654899-379ec76aca42?auto=format&fit=crop&w=800&q=80',
+  // 12. 카레라이스 — 일본식 카레 ✅
+  curry_rice: 'https://images.unsplash.com/photo-1723208841184-3d91ba244c60?auto=format&fit=crop&w=800&q=80',
+  // 13. 떡볶이 / 분식 — 찌개류 (붉은 소스) ✅
+  tteokbokki: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
