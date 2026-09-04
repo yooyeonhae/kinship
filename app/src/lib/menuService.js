@@ -27,8 +27,8 @@ export const CURATED_FOOD_PHOTOS = {
   tonkatsu: 'https://images.unsplash.com/photo-1496112774951-bf41010eed5e?auto=format&fit=crop&w=800&q=80',
   // 10. 파스타 / 스파게티 — 페투치네 ✅
   pasta: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80',
-  // 11. 계란말이 / 반찬 — 계란 요리 (볶음밥 이미지로 대체) ✅
-  egg_roll: 'https://images.unsplash.com/photo-1600688654899-379ec76aca42?auto=format&fit=crop&w=800&q=80',
+  // 11. 계란말이 / 반찬 — 고소한 모짜렐라 치즈 계란말이 (네이버 검증 완료) ✅
+  egg_roll: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMTAzMDVfNTcg%2FMDAxNjE0OTM1MDAyNTgw.XA3mIa0iH0AdZ9L_za9oXYo8FY4cmLiszSohm6gz_QYg.KUtOvxeKB0sgsbLxGvQ2kGoOba0m5BRY0kUKCLEz3gsg.JPEG.skstbvjcjqj%2FKakaoTalk_20210305_173659069_20.jpg',
   // 12. 카레라이스 — 일본식 카레 ✅
   curry_rice: 'https://images.unsplash.com/photo-1723208841184-3d91ba244c60?auto=format&fit=crop&w=800&q=80',
   // 13. 떡볶이 / 분식 — 찌개류 (붉은 소스) ✅
