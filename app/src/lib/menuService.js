@@ -35,6 +35,8 @@ export const CURATED_FOOD_PHOTOS = {
   tteokbokki: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
   // 14. 오므라이스 — 노란 계란옷에 케첩 지그재그 집밥 오므라이스 (네이버 검증 완료) ✅
   omurice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMDExMjVfNDAg%2FMDAxNjA2MjU1OTEyNzIx.e_rzPFRFG2CE3nwFbMArEBG0juyvP6rXQ9FKDDWGbDIg.JmYx3thG4csZDKVM_l-iUJkGOTOxTJVLQF-9uF5DEcYg.JPEG.lovetogapyjs%2FIMG_2821.JPG',
+  // 15. 소고기미역국 / 미역국 — 뽀얀 국물에 두툼한 양지가 듬뿍 든 소고기미역국 (네이버 검증 완료) ✅
+  miyeokguk: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA2MDRfNzgg%2FMDAxNzgwNTY4NjgzMjM1.TDbC-2o_OEGheJH9u-Ab48Bo3Obnfq64Rkj0EiG-e3gg.1qydX-5pPhz9FSEqs0Fye6AJxCscJz_HkCVS6BV8LUgg.JPEG%2F802260999.962271.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -55,8 +57,8 @@ export const SEED_MENU_50 = {
   닭곰탕: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   갈비탕: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   감자탕: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  소고기미역국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
-  미역국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
+  소고기미역국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.miyeokguk },
+  미역국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.miyeokguk },
   소고기무국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   소고기뭇국: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   육개장: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
@@ -152,6 +154,11 @@ function matchFoodPhotoByKeyword(title) {
   // 1. 닭/백숙/삼계탕 (누룽지 백숙 포함)
   if (/백숙|누룽지|삼계탕|닭백숙|닭곰탕|닭한마리/.test(t)) {
     return CURATED_FOOD_PHOTOS.chicken_soup
+  }
+
+  // 1.5 미역국 / 소고기미역국
+  if (/미역국/.test(t)) {
+    return CURATED_FOOD_PHOTOS.miyeokguk
   }
 
   // 2. 떡국 / 만둣국

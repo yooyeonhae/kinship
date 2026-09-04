@@ -7,6 +7,7 @@ const EMPTY = { title: '', ingredients: '', note: '', cookMinutes: '', steps: ''
 const PHOTO_OPTIONS = [
   { label: '백숙/삼계탕', url: CURATED_FOOD_PHOTOS.chicken_soup, emoji: '🍲' },
   { label: '찌개/탕', url: CURATED_FOOD_PHOTOS.korean_stew, emoji: '🥘' },
+  { label: '소고기미역국', url: CURATED_FOOD_PHOTOS.miyeokguk, emoji: '🍲' },
   { label: '떡국/만둣국', url: CURATED_FOOD_PHOTOS.tteokguk_soup, emoji: '🥣' },
   { label: '국수/면류', url: CURATED_FOOD_PHOTOS.korean_noodle, emoji: '🍜' },
   { label: '볶음밥/덮밥', url: CURATED_FOOD_PHOTOS.fried_rice, emoji: '🍳' },
