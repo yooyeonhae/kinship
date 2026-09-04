@@ -19,8 +19,8 @@ export const CURATED_FOOD_PHOTOS = {
   fried_rice: 'https://images.unsplash.com/photo-1600688654899-379ec76aca42?auto=format&fit=crop&w=800&q=80',
   // 6. 불고기 / 제육볶음 / 삼겹살 / 고기구이 — 한국식 BBQ 그릴 ✅
   korean_meat: 'https://images.unsplash.com/photo-1527578054032-8d8f044e013d?auto=format&fit=crop&w=800&q=80',
-  // 7. 생선구이 / 조림 / 해물 — 팬 시어드 연어/생선 ✅
-  grilled_fish: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80',
+  // 7. 생선구이 / 조림 / 해물 — 노릇한 고등어구이 & 뚝배기 된장찌개 백반 (네이버 검증 완료) ✅
+  grilled_fish: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjA1MjlfMjkg%2FMDAxNjUzNzU0NDc4MDUz.Op6avDaDz2ihAcFOrTQeR5aGCI7eHfCn2OHS8dWpZP8g.LAzOX7JyhUK627ovgQRt_YVJOaDMAnq7vbK-NipOef0g.JPEG.ican211%2F1653754477858.jpg',
   // 8. 비빔밥 — 비빔밥 그릇 ✅
   bibimbap: 'https://images.unsplash.com/photo-1718777791239-c473e9ce7376?auto=format&fit=crop&w=800&q=80',
   // 9. 돈까스 / 튀김 — 돈카츠 ✅
@@ -33,6 +33,8 @@ export const CURATED_FOOD_PHOTOS = {
   curry_rice: 'https://images.unsplash.com/photo-1723208841184-3d91ba244c60?auto=format&fit=crop&w=800&q=80',
   // 13. 떡볶이 / 분식 — 찌개류 (붉은 소스) ✅
   tteokbokki: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
+  // 14. 오므라이스 — 노란 계란옷에 케첩 지그재그 집밥 오므라이스 (네이버 검증 완료) ✅
+  omurice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMDExMjVfNDAg%2FMDAxNjA2MjU1OTEyNzIx.e_rzPFRFG2CE3nwFbMArEBG0juyvP6rXQ9FKDDWGbDIg.JmYx3thG4csZDKVM_l-iUJkGOTOxTJVLQF-9uF5DEcYg.JPEG.lovetogapyjs%2FIMG_2821.JPG',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -106,7 +108,7 @@ export const SEED_MENU_50 = {
   '참치마요 덮밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
   카레라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.curry_rice },
   하이라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.curry_rice },
-  오므라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
+  오므라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.omurice },
   '계란말이와 밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.egg_roll },
   계란말이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.egg_roll },
   잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
@@ -162,13 +164,21 @@ function matchFoodPhotoByKeyword(title) {
     return CURATED_FOOD_PHOTOS.korean_noodle
   }
 
+  // 3.5 생선구이 / 생선구이 정식 (된장찌개 포함 시 생선구이 우선)
+  if (/된장국과\s*생선구이|생선구이|고등어구이|갈치구이|조기구이/.test(t)) {
+    return CURATED_FOOD_PHOTOS.grilled_fish
+  }
+
   // 4. 찌개 / 탕 / 뚝배기
   if (/찌개|된장|김치찌개|순두부|부대찌개|청국장|전골|탕/.test(t)) {
     return CURATED_FOOD_PHOTOS.korean_stew
   }
 
-  // 5. 볶음밥 / 비빔밥 / 덮밥 / 카레
-  if (/김치볶음밥|볶음밥|오므라이스|참치마요/.test(t)) {
+  // 5. 볶음밥 / 오므라이스 / 비빔밥 / 덮밥 / 카레
+  if (/오므라이스/.test(t)) {
+    return CURATED_FOOD_PHOTOS.omurice
+  }
+  if (/김치볶음밥|볶음밥|참치마요/.test(t)) {
     return CURATED_FOOD_PHOTOS.fried_rice
   }
   if (/비빔밥|잡채/.test(t)) {

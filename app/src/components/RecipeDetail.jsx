@@ -71,6 +71,7 @@ function RecipeDetail({ recipe, onClose }) {
             src={photoUrl}
             alt={recipe.title}
             className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-black/30 pointer-events-none" />
 

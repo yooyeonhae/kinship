@@ -78,7 +78,7 @@ INSERT INTO menu_items (name, category, search_keyword, image_url, source_type) 
 ('김치볶음밥', '한그릇/면류', 'Kimchi fried rice with egg', 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('카레라이스', '한그릇/면류', 'Japanese curry rice dish', 'https://images.unsplash.com/photo-1628294895950-9805252327bc?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('하이라이스', '한그릇/면류', 'Hayashi rice hash beef', 'https://images.unsplash.com/photo-1628294895950-9805252327bc?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
-('오므라이스', '한그릇/면류', 'Omurice omelette rice', 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('오므라이스', '한그릇/면류', 'Omurice omelette rice', 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMDExMjVfNDAg%2FMDAxNjA2MjU1OTEyNzIx.e_rzPFRFG2CE3nwFbMArEBG0juyvP6rXQ9FKDDWGbDIg.JmYx3thG4csZDKVM_l-iUJkGOTOxTJVLQF-9uF5DEcYg.JPEG.lovetogapyjs%2FIMG_2821.JPG', 'LOCAL'),
 ('잡채', '한그릇/면류', 'Japchae korean glass noodles', 'https://images.unsplash.com/photo-1553163147-622ab57be1c7?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('잔치국수', '한그릇/면류', 'Janchi guksu warm banquet noodles', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('비빔국수', '한그릇/면류', 'Bibim guksu spicy cold noodles', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
@@ -99,7 +99,7 @@ INSERT INTO menu_items (name, category, search_keyword, image_url, source_type) 
 ('참치마요 덮밥', '한그릇/면류', 'Tuna mayo rice bowl', 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('콩나물국밥', '찌개/국물류', 'Kongnamul gukbap bean sprout soup with rice', 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
 ('두부조림', '고기/구이/볶음류', 'Dubu jorim braised tofu', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
-('된장국과 생선구이', '해산물류', 'Grilled fish with soybean soup set', 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80', 'LOCAL'),
+('된장국과 생선구이', '해산물류', 'Grilled fish with soybean soup set', 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjA1MjlfMjkg%2FMDAxNjUzNzU0NDc4MDUz.Op6avDaDz2ihAcFOrTQeR5aGCI7eHfCn2OHS8dWpZP8g.LAzOX7JyhUK627ovgQRt_YVJOaDMAnq7vbK-NipOef0g.JPEG.ican211%2F1653754477858.jpg', 'LOCAL'),
 ('떡국', '찌개/국물류', 'Tteokguk korean sliced rice cake soup', 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80', 'LOCAL')
 
 ON CONFLICT (name) DO UPDATE SET

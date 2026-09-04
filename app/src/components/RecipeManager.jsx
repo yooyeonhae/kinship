@@ -10,8 +10,9 @@ const PHOTO_OPTIONS = [
   { label: '떡국/만둣국', url: CURATED_FOOD_PHOTOS.tteokguk_soup, emoji: '🥣' },
   { label: '국수/면류', url: CURATED_FOOD_PHOTOS.korean_noodle, emoji: '🍜' },
   { label: '볶음밥/덮밥', url: CURATED_FOOD_PHOTOS.fried_rice, emoji: '🍳' },
+  { label: '오므라이스', url: CURATED_FOOD_PHOTOS.omurice, emoji: '🍛' },
   { label: '고기/불고기', url: CURATED_FOOD_PHOTOS.korean_meat, emoji: '🥩' },
-  { label: '생선/해물', url: CURATED_FOOD_PHOTOS.grilled_fish, emoji: '🐟' },
+  { label: '생선/백반', url: CURATED_FOOD_PHOTOS.grilled_fish, emoji: '🐟' },
   { label: '비빔밥', url: CURATED_FOOD_PHOTOS.bibimbap, emoji: '🥗' },
   { label: '돈가스/분식', url: CURATED_FOOD_PHOTOS.tonkatsu, emoji: '🍱' },
   { label: '파스타', url: CURATED_FOOD_PHOTOS.pasta, emoji: '🍝' },
@@ -133,6 +134,7 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
                   src={previewPhoto}
                   alt="요리 사진 미리보기"
                   className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="text-[12px] text-foreground-muted leading-tight">
@@ -279,6 +281,7 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
                     alt={r.title}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 rounded-full p-0.5 backdrop-blur-xs">
                     <button

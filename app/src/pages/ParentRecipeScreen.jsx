@@ -47,6 +47,7 @@ function RecipeCard({ recipe, decor, onOpen }) {
           alt={recipe.title}
           className="w-full h-full object-cover transition duration-300 hover:scale-105"
           loading="lazy"
+          referrerPolicy="no-referrer"
         />
         {/* 그라데이션 오버레이 */}
         <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
