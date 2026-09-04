@@ -37,6 +37,8 @@ export const CURATED_FOOD_PHOTOS = {
   omurice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMDExMjVfNDAg%2FMDAxNjA2MjU1OTEyNzIx.e_rzPFRFG2CE3nwFbMArEBG0juyvP6rXQ9FKDDWGbDIg.JmYx3thG4csZDKVM_l-iUJkGOTOxTJVLQF-9uF5DEcYg.JPEG.lovetogapyjs%2FIMG_2821.JPG',
   // 15. 소고기미역국 / 미역국 — 뽀얀 국물에 두툼한 양지가 듬뿍 든 소고기미역국 (네이버 검증 완료) ✅
   miyeokguk: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA2MDRfNzgg%2FMDAxNzgwNTY4NjgzMjM1.TDbC-2o_OEGheJH9u-Ab48Bo3Obnfq64Rkj0EiG-e3gg.1qydX-5pPhz9FSEqs0Fye6AJxCscJz_HkCVS6BV8LUgg.JPEG%2F802260999.962271.jpg',
+  // 16. 닭볶음탕 / 닭도리탕 — 냄비 가득 푸짐한 홈메이드 매콤 닭볶음탕 (네이버 검증 완료) ✅
+  dakbokkeum: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMzA1MjRfMzMg%2FMDAxNjg0OTMxMDc3NDc1.3fvQPZWDYGkKyt5gg30AHfkC1gwTfQjIpsH1OhaOVf4g.IL_TBEJ_5KCbj0Ib9F098kqwX7mXQ6inYeanUt6n-rEg.JPEG.onlyuu_%2FKakaoTalk_20230524_211540210_10.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -78,7 +80,8 @@ export const SEED_MENU_50 = {
   갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   삼겹살구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   삼겹살: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  닭볶음탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
+  닭볶음탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.dakbokkeum },
+  닭도리탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.dakbokkeum },
   찜닭: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   안동찜닭: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   훈제오리구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
@@ -174,6 +177,11 @@ function matchFoodPhotoByKeyword(title) {
   // 3.5 생선구이 / 생선구이 정식 (된장찌개 포함 시 생선구이 우선)
   if (/된장국과\s*생선구이|생선구이|고등어구이|갈치구이|조기구이/.test(t)) {
     return CURATED_FOOD_PHOTOS.grilled_fish
+  }
+
+  // 3.8 닭볶음탕 / 닭도리탕 (찌개/탕보다 먼저 매칭)
+  if (/닭볶음|닭도리/.test(t)) {
+    return CURATED_FOOD_PHOTOS.dakbokkeum
   }
 
   // 4. 찌개 / 탕 / 뚝배기

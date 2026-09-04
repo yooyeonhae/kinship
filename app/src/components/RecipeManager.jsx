@@ -12,6 +12,7 @@ const PHOTO_OPTIONS = [
   { label: '국수/면류', url: CURATED_FOOD_PHOTOS.korean_noodle, emoji: '🍜' },
   { label: '볶음밥/덮밥', url: CURATED_FOOD_PHOTOS.fried_rice, emoji: '🍳' },
   { label: '오므라이스', url: CURATED_FOOD_PHOTOS.omurice, emoji: '🍛' },
+  { label: '닭볶음탕', url: CURATED_FOOD_PHOTOS.dakbokkeum, emoji: '🍗' },
   { label: '고기/불고기', url: CURATED_FOOD_PHOTOS.korean_meat, emoji: '🥩' },
   { label: '생선/백반', url: CURATED_FOOD_PHOTOS.grilled_fish, emoji: '🐟' },
   { label: '비빔밥', url: CURATED_FOOD_PHOTOS.bibimbap, emoji: '🥗' },
