@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- Kinship (우리가족 올인원 스마트 패밀리 플래너) Master Consolidated Schema
 -- File: full_schema.sql
--- Version: 2.0 (All 50 Curated Menus & Verified Local Food Photos Included)
+-- Version: 2.1 (Full Error-Proof DROP & CREATE with Verified Food Photos)
 -- Description:
 --   단 하나의 SQL 파일로 Supabase 데이터베이스의 모든 테이블, RLS 보안 정책,
 --   부모 PIN 보안 함수(RPC), 서울 시간 헬퍼, 인덱스, 50선 대표 메뉴 및
@@ -9,7 +9,6 @@
 --
 -- Execution:
 --   Supabase Dashboard → SQL Editor에 붙여넣고 Run을 실행하세요.
---   (IF NOT EXISTS / CREATE OR REPLACE / ON CONFLICT 구문으로 멱등성을 보장합니다)
 -- ==============================================================================
 
 -- 0. 필수 확장 모듈 활성화
@@ -17,7 +16,33 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==============================================================================
--- 1. 헤더 파싱 및 역할/인증 헬퍼 함수
+-- 1. 기존 함수 정리 (타입 충돌 방지용 DROP FUNCTION CASCADE)
+-- ==============================================================================
+DROP FUNCTION IF EXISTS safe_uuid(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS request_header(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS current_family_id() CASCADE;
+DROP FUNCTION IF EXISTS current_member_id() CASCADE;
+DROP FUNCTION IF EXISTS current_parent_token() CASCADE;
+DROP FUNCTION IF EXISTS token_parent_id() CASCADE;
+DROP FUNCTION IF EXISTS is_parent() CASCADE;
+DROP FUNCTION IF EXISTS acting_member_id() CASCADE;
+DROP FUNCTION IF EXISTS seoul_today() CASCADE;
+DROP FUNCTION IF EXISTS app_today() CASCADE;
+DROP FUNCTION IF EXISTS create_family(TEXT, JSONB) CASCADE;
+DROP FUNCTION IF EXISTS set_parent_pin(UUID, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS set_parent_pin(UUID, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS parent_login(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS parent_logout() CASCADE;
+DROP FUNCTION IF EXISTS toggle_my_todo(UUID) CASCADE;
+DROP FUNCTION IF EXISTS approve_todo(UUID) CASCADE;
+DROP FUNCTION IF EXISTS add_my_todo(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS delete_my_todo(UUID) CASCADE;
+DROP FUNCTION IF EXISTS family_setting_int(TEXT, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS purge_old_todos() CASCADE;
+DROP FUNCTION IF EXISTS delete_old_chat_messages() CASCADE;
+
+-- ==============================================================================
+-- 2. 헤더 파싱 및 역할/인증 헬퍼 함수
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION safe_uuid(p TEXT) RETURNS UUID
@@ -49,14 +74,18 @@ LANGUAGE sql STABLE AS $$
   SELECT safe_uuid(request_header('x-parent-token'))
 $$;
 
--- 서울 기준(KST) 오늘 날짜 반환 헬퍼 함수
 CREATE OR REPLACE FUNCTION seoul_today() RETURNS DATE
 LANGUAGE sql IMMUTABLE AS $$
   SELECT (NOW() AT TIME ZONE 'Asia/Seoul')::DATE
 $$;
 
+CREATE OR REPLACE FUNCTION app_today() RETURNS DATE
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT (NOW() AT TIME ZONE 'Asia/Seoul')::DATE
+$$;
+
 -- ==============================================================================
--- 2. 핵심 테이블 정의
+-- 3. 핵심 테이블 정의
 -- ==============================================================================
 
 -- (1) 가족 테이블 (families)
@@ -112,7 +141,7 @@ CREATE TABLE IF NOT EXISTS wardrobe_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
   member_id UUID REFERENCES members (member_id) ON DELETE CASCADE,
-  category TEXT NOT NULL, -- 'top', 'bottom', 'outer', 'shoes', 'acc'
+  category TEXT NOT NULL,
   name TEXT NOT NULL,
   image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -129,9 +158,11 @@ CREATE TABLE IF NOT EXISTS todos (
   completed_at TIMESTAMPTZ,
   due_date DATE DEFAULT seoul_today(),
   star_points INT NOT NULL DEFAULT 1,
-  recurrence TEXT DEFAULT 'none', -- 'none', 'daily', 'weekdays', 'weekly'
-  approval_status TEXT DEFAULT 'approved', -- 'approved', 'pending', 'rejected'
+  recurrence TEXT DEFAULT 'none',
+  self_made BOOLEAN NOT NULL DEFAULT FALSE,
+  approval_status TEXT DEFAULT 'approved',
   approved_by UUID REFERENCES members (member_id) ON DELETE SET NULL,
+  approved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -170,7 +201,7 @@ CREATE TABLE IF NOT EXISTS schedules (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- (11) 가족 레시피 (recipes) - 가족별 및 공용(family_id is null)
+-- (11) 가족 레시피 (recipes)
 CREATE TABLE IF NOT EXISTS recipes (
   recipe_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID REFERENCES families (family_id) ON DELETE CASCADE,
@@ -193,24 +224,26 @@ CREATE TABLE IF NOT EXISTS favorite_links (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- (13) 가족 소통방 메시지 (family_room_messages)
-CREATE TABLE IF NOT EXISTS family_room_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- (13) 가족 채팅 메시지 (chat_messages)
+CREATE TABLE IF NOT EXISTS chat_messages (
+  message_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
-  member_id UUID NOT NULL REFERENCES members (member_id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
+  member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
+  sender_name TEXT NOT NULL CHECK (length(btrim(sender_name)) BETWEEN 1 AND 40),
+  content TEXT NOT NULL CHECK (length(btrim(content)) BETWEEN 1 AND 500),
   media_url TEXT,
-  reactions JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- (14) 미니게임 세션 (game_sessions)
-CREATE TABLE IF NOT EXISTS game_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- (14) 게임 결과 테이블 (game_results)
+CREATE TABLE IF NOT EXISTS game_results (
+  result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
-  game_type TEXT NOT NULL, -- 'updown', 'wordchain', 'balance'
-  state JSONB DEFAULT '{}'::jsonb,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain')),
+  winner_member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
+  opponent_member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
+  is_draw BOOLEAN NOT NULL DEFAULT FALSE,
+  points INT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -227,10 +260,21 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- (16) 가족 맞춤 설정 테이블 (family_settings)
 CREATE TABLE IF NOT EXISTS family_settings (
   family_id UUID PRIMARY KEY REFERENCES families (family_id) ON DELETE CASCADE,
+  pin_mode TEXT NOT NULL DEFAULT 'off' CHECK (pin_mode IN ('off', 'parent_switch', 'strict')),
+  todo_point INT NOT NULL DEFAULT 1 CHECK (todo_point BETWEEN 1 AND 10),
+  mission_daily_limit INT NOT NULL DEFAULT 10 CHECK (mission_daily_limit BETWEEN 1 AND 30),
+  mission_weekend_limit INT NOT NULL DEFAULT 15 CHECK (mission_weekend_limit BETWEEN 1 AND 30),
+  todo_keep_days INT NOT NULL DEFAULT 30 CHECK (todo_keep_days BETWEEN 0 AND 365),
+  chat_keep_days INT NOT NULL DEFAULT 7 CHECK (chat_keep_days BETWEEN 1 AND 90),
+  overdue_days INT NOT NULL DEFAULT 7 CHECK (overdue_days BETWEEN 1 AND 30),
+  default_region TEXT NOT NULL DEFAULT '서울',
+  todo_self_create BOOLEAN NOT NULL DEFAULT TRUE,
+  todo_approval BOOLEAN NOT NULL DEFAULT TRUE,
   d_day_title TEXT,
   d_day_date DATE,
   theme TEXT DEFAULT 'blue',
   features JSONB DEFAULT '{"outfit":true,"menu":true,"todo":true,"chat":true,"reward":true,"game":true}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -246,153 +290,431 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 -- ==============================================================================
--- 3. 부모 PIN 인증 및 권한 판정 함수 (RPC)
+-- 4. 부모 PIN 인증 및 권한 판정 함수 (RPC)
 -- ==============================================================================
 
+-- 유효한 부모 토큰이 가리키는 member_id
+CREATE OR REPLACE FUNCTION token_parent_id() RETURNS UUID
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
+  SELECT s.member_id
+  FROM parent_sessions s
+  JOIN members m ON m.member_id = s.member_id
+  WHERE s.token = current_parent_token()
+    AND s.family_id = current_family_id()
+    AND s.expires_at > NOW()
+    AND m.role = 'parent'
+$$;
+
+-- 부모 여부 판정
 CREATE OR REPLACE FUNCTION is_parent() RETURNS BOOLEAN
-LANGUAGE plpgsql STABLE AS $$
-DECLARE
-  m_id UUID;
-  f_id UUID;
-  tok UUID;
-  m_role TEXT;
-  has_pin BOOLEAN;
-  valid_session BOOLEAN;
-BEGIN
-  m_id := current_member_id();
-  f_id := current_family_id();
-  tok  := current_parent_token();
-
-  IF m_id IS NULL OR f_id IS NULL THEN
-    RETURN FALSE;
-  END IF;
-
-  SELECT role INTO m_role FROM members WHERE member_id = m_id AND family_id = f_id;
-  IF m_role <> 'parent' THEN
-    RETURN FALSE;
-  END IF;
-
-  SELECT EXISTS(SELECT 1 FROM parent_pins WHERE member_id = m_id AND family_id = f_id) INTO has_pin;
-  IF NOT has_pin THEN
-    RETURN TRUE;
-  END IF;
-
-  IF tok IS NULL THEN
-    RETURN FALSE;
-  END IF;
-
-  SELECT EXISTS(
-    SELECT 1 FROM parent_sessions
-    WHERE token = tok AND member_id = m_id AND family_id = f_id AND expires_at > NOW()
-  ) INTO valid_session;
-
-  RETURN valid_session;
-END;
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
+  SELECT
+    token_parent_id() IS NOT NULL
+    OR EXISTS (
+      SELECT 1
+      FROM members m
+      WHERE m.member_id = current_member_id()
+        AND m.family_id = current_family_id()
+        AND m.role = 'parent'
+        AND NOT EXISTS (SELECT 1 FROM parent_pins p WHERE p.member_id = m.member_id)
+    )
 $$;
 
--- 부모 PIN 설정 함수
-CREATE OR REPLACE FUNCTION set_parent_pin(p_family_id UUID, p_member_id UUID, p_pin TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  m_role TEXT;
-BEGIN
-  IF p_pin !~ '^\d{4,6}$' THEN
-    RAISE EXCEPTION 'PIN은 4~6자리 숫자여야 합니다.';
-  END IF;
-
-  SELECT role INTO m_role FROM members WHERE member_id = p_member_id AND family_id = p_family_id;
-  IF m_role <> 'parent' THEN
-    RAISE EXCEPTION '부모 역할만 PIN을 설정할 수 있습니다.';
-  END IF;
-
-  INSERT INTO parent_pins (member_id, family_id, pin_hash, updated_at)
-  VALUES (p_member_id, p_family_id, crypt(p_pin, gen_salt('bf', 8)), NOW())
-  ON CONFLICT (member_id) DO UPDATE
-  SET pin_hash = crypt(p_pin, gen_salt('bf', 8)),
-      failed_attempts = 0,
-      locked_until = NULL,
-      updated_at = NOW();
-
-  RETURN TRUE;
-END;
+-- 동작 수행 멤버 식별
+CREATE OR REPLACE FUNCTION acting_member_id() RETURNS UUID
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
+  SELECT coalesce(
+    token_parent_id(),
+    (SELECT m.member_id FROM members m
+      WHERE m.member_id = current_member_id()
+        AND m.family_id = current_family_id())
+  )
 $$;
 
--- 부모 PIN 검증 및 세션 토큰 발급 함수
-CREATE OR REPLACE FUNCTION verify_parent_pin(p_family_id UUID, p_member_id UUID, p_pin TEXT)
-RETURNS UUID
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+-- 가족 생성 RPC
+CREATE OR REPLACE FUNCTION create_family(p_name TEXT, p_members JSONB)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE
-  rec RECORD;
-  new_token UUID;
+  v_family_id UUID := gen_random_uuid();
+  v_m JSONB;
+  v_count INT := 0;
 BEGIN
-  SELECT * INTO rec FROM parent_pins WHERE member_id = p_member_id AND family_id = p_family_id;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '설정된 PIN이 없습니다.';
+  IF coalesce(trim(p_name), '') = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'name_required');
+  END IF;
+  IF p_members IS NULL OR jsonb_typeof(p_members) <> 'array' OR jsonb_array_length(p_members) = 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'members_required');
   END IF;
 
-  IF rec.locked_until IS NOT NULL AND rec.locked_until > NOW() THEN
-    RAISE EXCEPTION 'PIN 입력 실패 초과로 잠겨 있습니다. 잠시 후 다시 시도하세요.';
+  FOR v_m IN SELECT * FROM jsonb_array_elements(p_members) LOOP
+    IF coalesce(trim(v_m ->> 'name'), '') = '' THEN
+      RETURN json_build_object('ok', false, 'error', 'member_name_required');
+    END IF;
+    IF (v_m ->> 'role') NOT IN ('parent', 'child') THEN
+      RETURN json_build_object('ok', false, 'error', 'member_role_invalid');
+    END IF;
+  END LOOP;
+
+  INSERT INTO families (family_id, name) VALUES (v_family_id, trim(p_name));
+
+  FOR v_m IN SELECT * FROM jsonb_array_elements(p_members) LOOP
+    INSERT INTO members (family_id, name, role)
+      VALUES (v_family_id, trim(v_m ->> 'name'), v_m ->> 'role');
+    v_count := v_count + 1;
+  END LOOP;
+
+  INSERT INTO family_settings (family_id) VALUES (v_family_id)
+  ON CONFLICT (family_id) DO NOTHING;
+
+  RETURN json_build_object('ok', true, 'family_id', v_family_id, 'member_count', v_count);
+END $$;
+
+-- 부모 PIN 설정/변경 RPC
+CREATE OR REPLACE FUNCTION set_parent_pin(p_member_id UUID, p_new_pin TEXT, p_old_pin TEXT DEFAULT NULL)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_existing parent_pins;
+  v_max_attempts CONSTANT INT := 5;
+  v_lock_duration CONSTANT INTERVAL := INTERVAL '15 minutes';
+BEGIN
+  IF v_family IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'family_required');
+  END IF;
+  IF p_new_pin IS NULL OR p_new_pin !~ '^[0-9]{4}$' THEN
+    RETURN json_build_object('ok', false, 'error', 'pin_must_be_4_digits');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM members m
+    WHERE m.member_id = p_member_id AND m.family_id = v_family AND m.role = 'parent'
+  ) THEN
+    RETURN json_build_object('ok', false, 'error', 'not_a_parent');
   END IF;
 
-  IF rec.pin_hash = crypt(p_pin, rec.pin_hash) THEN
+  SELECT * INTO v_existing FROM parent_pins WHERE member_id = p_member_id;
+
+  IF v_existing.member_id IS NOT NULL THEN
+    IF v_existing.locked_until IS NOT NULL AND v_existing.locked_until > NOW() THEN
+      RETURN json_build_object('ok', false, 'error', 'locked', 'locked_until', v_existing.locked_until);
+    END IF;
+
+    IF p_old_pin IS NULL OR v_existing.pin_hash <> crypt(p_old_pin, v_existing.pin_hash) THEN
+      UPDATE parent_pins
+        SET failed_attempts = failed_attempts + 1,
+            locked_until = CASE
+              WHEN failed_attempts + 1 >= v_max_attempts THEN NOW() + v_lock_duration
+              ELSE NULL
+            END
+        WHERE member_id = p_member_id;
+      RETURN json_build_object('ok', false, 'error', 'old_pin_mismatch',
+        'attempts_left', greatest(0, v_max_attempts - (v_existing.failed_attempts + 1)));
+    END IF;
+
     UPDATE parent_pins
-    SET failed_attempts = 0, locked_until = NULL
-    WHERE member_id = p_member_id;
-
-    new_token := gen_random_uuid();
-    INSERT INTO parent_sessions (token, member_id, family_id, expires_at)
-    VALUES (new_token, p_member_id, p_family_id, NOW() + INTERVAL '12 hours');
-
-    RETURN new_token;
-  ELSE
-    UPDATE parent_pins
-    SET failed_attempts = failed_attempts + 1,
-        locked_until = CASE WHEN failed_attempts + 1 >= 5 THEN NOW() + INTERVAL '15 minutes' ELSE NULL END
-    WHERE member_id = p_member_id;
-
-    RAISE EXCEPTION 'PIN 번호가 일치하지 않습니다.';
+      SET pin_hash = crypt(p_new_pin, gen_salt('bf', 8)),
+          failed_attempts = 0, locked_until = NULL, updated_at = NOW()
+      WHERE member_id = p_member_id;
+    DELETE FROM parent_sessions WHERE member_id = p_member_id;
+    RETURN json_build_object('ok', true, 'created', false);
   END IF;
-END;
-$$;
 
--- 자녀 전용 본인 할 일 토글 RPC
+  IF EXISTS (SELECT 1 FROM parent_pins p WHERE p.family_id = v_family)
+     AND token_parent_id() IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'parent_auth_required');
+  END IF;
+
+  INSERT INTO parent_pins (member_id, family_id, pin_hash)
+    VALUES (p_member_id, v_family, crypt(p_new_pin, gen_salt('bf', 8)));
+  RETURN json_build_object('ok', true, 'created', true);
+END $$;
+
+-- 부모 로그인 RPC
+CREATE OR REPLACE FUNCTION parent_login(p_member_id UUID, p_pin TEXT)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_rec parent_pins;
+  v_token UUID;
+  v_expires TIMESTAMPTZ := NOW() + INTERVAL '30 days';
+BEGIN
+  IF v_family IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'family_required');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM members m
+    WHERE m.member_id = p_member_id AND m.family_id = v_family AND m.role = 'parent'
+  ) THEN
+    RETURN json_build_object('ok', false, 'error', 'not_a_parent');
+  END IF;
+
+  SELECT * INTO v_rec FROM parent_pins WHERE member_id = p_member_id;
+  IF v_rec.member_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'pin_not_set');
+  END IF;
+  IF v_rec.locked_until IS NOT NULL AND v_rec.locked_until > NOW() THEN
+    RETURN json_build_object('ok', false, 'error', 'locked', 'locked_until', v_rec.locked_until);
+  END IF;
+
+  IF v_rec.pin_hash <> crypt(p_pin, v_rec.pin_hash) THEN
+    UPDATE parent_pins
+      SET failed_attempts = failed_attempts + 1,
+          locked_until = CASE WHEN failed_attempts + 1 >= 5 THEN NOW() + INTERVAL '15 minutes' ELSE NULL END
+      WHERE member_id = p_member_id;
+    RETURN json_build_object('ok', false, 'error', 'invalid_pin',
+      'attempts_left', greatest(0, 5 - (v_rec.failed_attempts + 1)));
+  END IF;
+
+  UPDATE parent_pins SET failed_attempts = 0, locked_until = NULL WHERE member_id = p_member_id;
+
+  DELETE FROM parent_sessions WHERE expires_at < NOW();
+  INSERT INTO parent_sessions (member_id, family_id, expires_at)
+    VALUES (p_member_id, v_family, v_expires)
+    RETURNING token INTO v_token;
+
+  RETURN json_build_object('ok', true, 'token', v_token, 'member_id', p_member_id, 'expires_at', v_expires);
+END $$;
+
+-- 부모 로그아웃 RPC
+CREATE OR REPLACE FUNCTION parent_logout() RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+BEGIN
+  DELETE FROM parent_sessions
+    WHERE token = current_parent_token() AND family_id = current_family_id();
+  RETURN json_build_object('ok', true);
+END $$;
+
+-- 자녀 완료 토글 RPC
 CREATE OR REPLACE FUNCTION toggle_my_todo(p_todo_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE
-  m_id UUID;
-  f_id UUID;
-  t_row RECORD;
+  v_family UUID := current_family_id();
+  v_actor UUID := acting_member_id();
+  v_todo todos;
 BEGIN
-  m_id := current_member_id();
-  f_id := current_family_id();
-
-  IF m_id IS NULL OR f_id IS NULL THEN
-    RAISE EXCEPTION '가족 및 멤버 식별자가 필요합니다.';
+  IF v_family IS NULL OR v_actor IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'identity_required');
   END IF;
 
-  SELECT * INTO t_row FROM todos WHERE todo_id = p_todo_id AND family_id = f_id;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '할 일을 찾을 수 없습니다.';
+  SELECT * INTO v_todo FROM todos
+    WHERE todo_id = p_todo_id AND family_id = v_family;
+  IF v_todo.todo_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'not_found');
   END IF;
 
-  UPDATE todos
-  SET is_done = NOT is_done,
-      completed_by = CASE WHEN NOT is_done THEN m_id ELSE NULL END,
-      completed_at = CASE WHEN NOT is_done THEN NOW() ELSE NULL END
-  WHERE todo_id = p_todo_id AND family_id = f_id;
+  IF NOT is_parent() AND v_todo.assignee_member_id IS DISTINCT FROM v_actor THEN
+    RETURN json_build_object('ok', false, 'error', 'not_your_todo');
+  END IF;
 
-  RETURN TRUE;
-END;
+  UPDATE todos SET
+    is_done      = NOT v_todo.is_done,
+    completed_by = CASE WHEN NOT v_todo.is_done THEN v_actor ELSE NULL END,
+    completed_at = CASE WHEN NOT v_todo.is_done THEN NOW() ELSE NULL END,
+    approved_by  = CASE WHEN NOT v_todo.is_done THEN v_todo.approved_by ELSE NULL END,
+    approved_at  = CASE WHEN NOT v_todo.is_done THEN v_todo.approved_at ELSE NULL END
+    WHERE todo_id = p_todo_id
+    RETURNING * INTO v_todo;
+
+  RETURN json_build_object('ok', true, 'todo', row_to_json(v_todo));
+END $$;
+
+-- 부모 할 일 승인/도장 RPC
+CREATE OR REPLACE FUNCTION approve_todo(p_todo_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_actor  UUID := acting_member_id();
+  v_todo   todos;
+BEGIN
+  IF v_family IS NULL OR v_actor IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'identity_required');
+  END IF;
+  IF NOT is_parent() THEN
+    RETURN json_build_object('ok', false, 'error', 'parent_only');
+  END IF;
+
+  SELECT * INTO v_todo FROM todos
+    WHERE todo_id = p_todo_id AND family_id = v_family;
+  IF v_todo.todo_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'not_found');
+  END IF;
+  IF NOT v_todo.is_done THEN
+    RETURN json_build_object('ok', false, 'error', 'not_done');
+  END IF;
+
+  UPDATE todos SET
+    approved_by = CASE WHEN v_todo.approved_by IS NULL THEN v_actor ELSE NULL END,
+    approved_at = CASE WHEN v_todo.approved_by IS NULL THEN NOW() ELSE NULL END
+    WHERE todo_id = p_todo_id
+    RETURNING * INTO v_todo;
+
+  RETURN json_build_object('ok', true, 'todo', row_to_json(v_todo));
+END $$;
+
+-- 자녀 스스로 할 일 추가 RPC
+CREATE OR REPLACE FUNCTION add_my_todo(p_title TEXT)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_actor  UUID := acting_member_id();
+  v_title  TEXT := btrim(coalesce(p_title, ''));
+  v_count  INT;
+  v_todo   todos;
+BEGIN
+  IF v_family IS NULL OR v_actor IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'identity_required');
+  END IF;
+  IF v_title = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'empty_title');
+  END IF;
+  IF char_length(v_title) > 40 THEN
+    RETURN json_build_object('ok', false, 'error', 'too_long');
+  END IF;
+
+  SELECT count(*) INTO v_count FROM todos
+    WHERE family_id = v_family
+      AND assignee_member_id = v_actor
+      AND self_made
+      AND due_date = current_date;
+  IF v_count >= 10 THEN
+    RETURN json_build_object('ok', false, 'error', 'daily_limit');
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM todos
+      WHERE family_id = v_family
+        AND assignee_member_id = v_actor
+        AND due_date = current_date
+        AND lower(btrim(title)) = lower(v_title)
+  ) THEN
+    RETURN json_build_object('ok', false, 'error', 'duplicate');
+  END IF;
+
+  INSERT INTO todos (family_id, title, assignee_member_id, due_date, self_made)
+    VALUES (v_family, v_title, v_actor, current_date, true)
+    RETURNING * INTO v_todo;
+
+  RETURN json_build_object('ok', true, 'todo', row_to_json(v_todo));
+END $$;
+
+-- 자녀 본인 생성 할 일 삭제 RPC
+CREATE OR REPLACE FUNCTION delete_my_todo(p_todo_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_actor  UUID := acting_member_id();
+  v_todo   todos;
+BEGIN
+  IF v_family IS NULL OR v_actor IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'identity_required');
+  END IF;
+
+  SELECT * INTO v_todo FROM todos
+    WHERE todo_id = p_todo_id AND family_id = v_family;
+  IF v_todo.todo_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'not_found');
+  END IF;
+
+  IF NOT is_parent() AND (NOT v_todo.self_made OR v_todo.assignee_member_id IS DISTINCT FROM v_actor) THEN
+    RETURN json_build_object('ok', false, 'error', 'cannot_delete');
+  END IF;
+
+  DELETE FROM todos WHERE todo_id = p_todo_id;
+  RETURN json_build_object('ok', true);
+END $$;
+
+-- 설정값 조회 헬퍼
+CREATE OR REPLACE FUNCTION family_setting_int(p_key TEXT, p_default INTEGER)
+RETURNS INTEGER
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT coalesce(
+    (SELECT CASE p_key
+       WHEN 'todo_point' THEN todo_point
+       WHEN 'mission_daily_limit' THEN mission_daily_limit
+       WHEN 'mission_weekend_limit' THEN mission_weekend_limit
+       WHEN 'todo_keep_days' THEN todo_keep_days
+       WHEN 'chat_keep_days' THEN chat_keep_days
+       WHEN 'overdue_days' THEN overdue_days
+     END
+     FROM family_settings WHERE family_id = current_family_id()),
+    p_default)
 $$;
+
+-- 오래된 할 일 정리 RPC
+CREATE OR REPLACE FUNCTION purge_old_todos()
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_days   INT  := family_setting_int('todo_keep_days', 30);
+  v_deleted INTEGER;
+BEGIN
+  IF v_family IS NULL OR v_days <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  DELETE FROM todos
+   WHERE family_id = v_family
+     AND NOT is_done
+     AND due_date < app_today() - v_days;
+
+  GET DIAGNOSTICS v_deleted = row_count;
+  RETURN v_deleted;
+END $$;
+
+-- 오래된 채팅 자동 정리 RPC
+CREATE OR REPLACE FUNCTION delete_old_chat_messages()
+RETURNS INTEGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_deleted INTEGER;
+BEGIN
+  DELETE FROM chat_messages c
+  WHERE c.created_at < NOW() - (
+    coalesce((SELECT s.chat_keep_days FROM family_settings s WHERE s.family_id = c.family_id), 7)
+    || ' days')::interval;
+  GET DIAGNOSTICS v_deleted = row_count;
+  RETURN v_deleted;
+END $$;
 
 -- ==============================================================================
--- 4. RLS 보안 활성화 및 정책(Policies)
+-- 5. 권한 부여 (GRANT EXECUTE)
+-- ==============================================================================
+
+GRANT EXECUTE ON FUNCTION safe_uuid(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION request_header(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION current_family_id() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION current_member_id() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION current_parent_token() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION seoul_today() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_today() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION token_parent_id() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION is_parent() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION acting_member_id() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION create_family(TEXT, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION set_parent_pin(UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION parent_login(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION parent_logout() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION toggle_my_todo(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION approve_todo(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION add_my_todo(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION delete_my_todo(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION purge_old_todos() TO anon, authenticated;
+
+-- ==============================================================================
+-- 6. RLS 보안 활성화 및 정책(Policies)
 -- ==============================================================================
 
 ALTER TABLE families ENABLE ROW LEVEL SECURITY;
 ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parent_pins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parent_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_outfit_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wardrobe_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
@@ -401,8 +723,8 @@ ALTER TABLE rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorite_links ENABLE ROW LEVEL SECURITY;
-ALTER TABLE family_room_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
@@ -418,18 +740,27 @@ WITH CHECK (true);
 
 DROP POLICY IF EXISTS "families_update" ON families;
 CREATE POLICY "families_update" ON families FOR UPDATE TO anon, authenticated
-USING (family_id = current_family_id());
+USING (family_id = current_family_id() AND is_parent())
+WITH CHECK (family_id = current_family_id() AND is_parent());
 
 -- (2) members
-DROP POLICY IF EXISTS "members_all" ON members;
-CREATE POLICY "members_all" ON members FOR ALL TO anon, authenticated
-USING (family_id = current_family_id() OR current_family_id() IS NULL)
-WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
+DROP POLICY IF EXISTS "members_select" ON members;
+CREATE POLICY "members_select" ON members FOR SELECT TO anon, authenticated
+USING (family_id = current_family_id() OR current_family_id() IS NULL);
+
+DROP POLICY IF EXISTS "members_write" ON members;
+CREATE POLICY "members_write" ON members FOR ALL TO anon, authenticated
+USING (family_id = current_family_id() AND is_parent())
+WITH CHECK (family_id = current_family_id() AND is_parent());
 
 -- (3) weekly_outfit_rules & wardrobe_items
-DROP POLICY IF EXISTS "weekly_outfit_rules_all" ON weekly_outfit_rules;
-CREATE POLICY "weekly_outfit_rules_all" ON weekly_outfit_rules FOR ALL TO anon, authenticated
-USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "weekly_outfit_rules_select" ON weekly_outfit_rules;
+CREATE POLICY "weekly_outfit_rules_select" ON weekly_outfit_rules FOR SELECT TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "weekly_outfit_rules_write" ON weekly_outfit_rules;
+CREATE POLICY "weekly_outfit_rules_write" ON weekly_outfit_rules FOR ALL TO anon, authenticated
+USING (is_parent()) WITH CHECK (is_parent());
 
 DROP POLICY IF EXISTS "wardrobe_items_all" ON wardrobe_items;
 CREATE POLICY "wardrobe_items_all" ON wardrobe_items FOR ALL TO anon, authenticated
@@ -443,8 +774,8 @@ USING (family_id = current_family_id() OR current_family_id() IS NULL);
 
 DROP POLICY IF EXISTS "todos_write" ON todos;
 CREATE POLICY "todos_write" ON todos FOR ALL TO anon, authenticated
-USING (family_id = current_family_id() OR current_family_id() IS NULL)
-WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
+USING (family_id = current_family_id() AND is_parent())
+WITH CHECK (family_id = current_family_id() AND is_parent());
 
 -- (5) quick_tasks & rewards & schedules
 DROP POLICY IF EXISTS "quick_tasks_all" ON quick_tasks;
@@ -462,7 +793,7 @@ CREATE POLICY "schedules_all" ON schedules FOR ALL TO anon, authenticated
 USING (family_id = current_family_id() OR current_family_id() IS NULL)
 WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
 
--- (6) recipes & favorite_links & family_room_messages
+-- (6) recipes & favorite_links
 DROP POLICY IF EXISTS "recipes_all" ON recipes;
 CREATE POLICY "recipes_all" ON recipes FOR ALL TO anon, authenticated
 USING (family_id IS NULL OR family_id = current_family_id())
@@ -473,17 +804,25 @@ CREATE POLICY "favorite_links_all" ON favorite_links FOR ALL TO anon, authentica
 USING (family_id = current_family_id() OR current_family_id() IS NULL)
 WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
 
-DROP POLICY IF EXISTS "family_room_messages_all" ON family_room_messages;
-CREATE POLICY "family_room_messages_all" ON family_room_messages FOR ALL TO anon, authenticated
+-- (7) chat_messages & game_results
+DROP POLICY IF EXISTS "chat_messages_select" ON chat_messages;
+CREATE POLICY "chat_messages_select" ON chat_messages FOR SELECT TO anon, authenticated
+USING (family_id = current_family_id() OR current_family_id() IS NULL);
+
+DROP POLICY IF EXISTS "chat_messages_insert" ON chat_messages;
+CREATE POLICY "chat_messages_insert" ON chat_messages FOR INSERT TO anon, authenticated
+WITH CHECK (family_id = current_family_id());
+
+DROP POLICY IF EXISTS "chat_messages_delete" ON chat_messages;
+CREATE POLICY "chat_messages_delete" ON chat_messages FOR DELETE TO anon, authenticated
+USING (family_id = current_family_id() AND is_parent());
+
+DROP POLICY IF EXISTS "game_results_all" ON game_results;
+CREATE POLICY "game_results_all" ON game_results FOR ALL TO anon, authenticated
 USING (family_id = current_family_id() OR current_family_id() IS NULL)
 WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
 
--- (7) game_sessions & push_subscriptions & family_settings & menu_items
-DROP POLICY IF EXISTS "game_sessions_all" ON game_sessions;
-CREATE POLICY "game_sessions_all" ON game_sessions FOR ALL TO anon, authenticated
-USING (family_id = current_family_id() OR current_family_id() IS NULL)
-WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
-
+-- (8) push_subscriptions & family_settings & menu_items
 DROP POLICY IF EXISTS "push_subscriptions_all" ON push_subscriptions;
 CREATE POLICY "push_subscriptions_all" ON push_subscriptions FOR ALL TO anon, authenticated
 USING (family_id = current_family_id() OR current_family_id() IS NULL)
@@ -499,7 +838,7 @@ CREATE POLICY "menu_items_all" ON menu_items FOR ALL TO anon, authenticated
 USING (true) WITH CHECK (true);
 
 -- ==============================================================================
--- 5. 성능 최적화 인덱스
+-- 7. 성능 최적화 인덱스
 -- ==============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_members_family ON members(family_id);
@@ -509,10 +848,11 @@ CREATE INDEX IF NOT EXISTS idx_schedules_family_date ON schedules(family_id, dat
 CREATE INDEX IF NOT EXISTS idx_recipes_family ON recipes(family_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_name ON menu_items(name);
 CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category);
-CREATE INDEX IF NOT EXISTS idx_messages_family ON family_room_messages(family_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_family ON chat_messages(family_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_parent_sessions_lookup ON parent_sessions(token, family_id);
 
 -- ==============================================================================
--- 6. 대표 저녁 메뉴 50선 시드 데이터 (검증된 고화질 홈메이드 이미지 반영)
+-- 8. 대표 저녁 메뉴 50선 시드 데이터 (검증된 고화질 홈메이드 이미지 반영)
 -- ==============================================================================
 
 INSERT INTO menu_items (name, category, search_keyword, image_url, source_type) VALUES
@@ -582,7 +922,7 @@ SET category = EXCLUDED.category,
     source_type = EXCLUDED.source_type;
 
 -- ==============================================================================
--- 7. 기본 공용 레시피 (14종) 시드 데이터 (조리순서 및 최신 이미지 매핑)
+-- 9. 기본 공용 레시피 (14종) 시드 데이터 (조리순서 및 최신 이미지 매핑)
 -- ==============================================================================
 
 INSERT INTO recipes (family_id, title, description, steps, cook_minutes, image_url) VALUES
@@ -671,6 +1011,6 @@ INSERT INTO recipes (family_id, title, description, steps, cook_minutes, image_u
 ON CONFLICT (recipe_id) DO NOTHING;
 
 -- ==============================================================================
--- 8. 최종 확인
+-- 10. 최종 확인
 -- ==============================================================================
 SELECT 'Kinship Master Schema Successfully Installed!' AS status;
