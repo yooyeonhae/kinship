@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- Kinship (우리가족 올인원 스마트 패밀리 플래너) Master Consolidated Schema
 -- File: full_schema.sql
--- Version: 2.1 (Full Error-Proof DROP & CREATE with Verified Food Photos)
+-- Version: 2.2 (100% Robust Migration & Fresh Install Compatible)
 -- Description:
 --   단 하나의 SQL 파일로 Supabase 데이터베이스의 모든 테이블, RLS 보안 정책,
 --   부모 PIN 보안 함수(RPC), 서울 시간 헬퍼, 인덱스, 50선 대표 메뉴 및
@@ -107,6 +107,11 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 기존 members 테이블 업그레이드 보장
+ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#3b82f6';
+ALTER TABLE members ADD COLUMN IF NOT EXISTS stars INT NOT NULL DEFAULT 0;
+
 -- (3) 부모 PIN 보안 테이블 (parent_pins)
 CREATE TABLE IF NOT EXISTS parent_pins (
   member_id UUID PRIMARY KEY REFERENCES members (member_id) ON DELETE CASCADE,
@@ -166,6 +171,15 @@ CREATE TABLE IF NOT EXISTS todos (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 기존 todos 테이블 업그레이드 보장
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS due_date DATE DEFAULT seoul_today();
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS star_points INT NOT NULL DEFAULT 1;
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS recurrence TEXT DEFAULT 'none';
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS self_made BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS approval_status TEXT DEFAULT 'approved';
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES members (member_id) ON DELETE SET NULL;
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+
 -- (8) 퀵 태스크 템플릿 (quick_tasks)
 CREATE TABLE IF NOT EXISTS quick_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -193,13 +207,22 @@ CREATE TABLE IF NOT EXISTS rewards (
 CREATE TABLE IF NOT EXISTS schedules (
   schedule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
-  member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
+  member_id UUID NOT NULL REFERENCES members (member_id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  date DATE NOT NULL,
-  time TIME,
-  color TEXT DEFAULT '#3b82f6',
+  repeat_type TEXT NOT NULL DEFAULT 'once' CHECK (repeat_type IN ('weekly', 'once')),
+  day_of_week TEXT CHECK (day_of_week IN ('월', '화', '수', '목', '금', '토', '일')),
+  schedule_date DATE,
+  start_time TIME NOT NULL DEFAULT '09:00',
+  alarm_minutes INTEGER CHECK (alarm_minutes IS NULL OR alarm_minutes BETWEEN 0 AND 1440),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 기존 schedules 테이블 업그레이드 보장
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS repeat_type TEXT NOT NULL DEFAULT 'once';
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS day_of_week TEXT;
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS schedule_date DATE;
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS start_time TIME NOT NULL DEFAULT '09:00';
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS alarm_minutes INTEGER;
 
 -- (11) 가족 레시피 (recipes)
 CREATE TABLE IF NOT EXISTS recipes (
@@ -213,6 +236,11 @@ CREATE TABLE IF NOT EXISTS recipes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 기존 recipes 테이블 업그레이드 보장
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS steps TEXT;
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS cook_minutes INT DEFAULT 20;
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS image_url TEXT;
+
 -- (12) 즐겨찾기 링크 (favorite_links)
 CREATE TABLE IF NOT EXISTS favorite_links (
   link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -223,6 +251,9 @@ CREATE TABLE IF NOT EXISTS favorite_links (
   order_index INT DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS title TEXT DEFAULT '';
+ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS order_index INT DEFAULT 0;
 
 -- (13) 가족 채팅 메시지 (chat_messages)
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -277,6 +308,22 @@ CREATE TABLE IF NOT EXISTS family_settings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 기존 family_settings 테이블 업그레이드 보장
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS pin_mode TEXT NOT NULL DEFAULT 'off';
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS todo_point INT NOT NULL DEFAULT 1;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS mission_daily_limit INT NOT NULL DEFAULT 10;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS mission_weekend_limit INT NOT NULL DEFAULT 15;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS todo_keep_days INT NOT NULL DEFAULT 30;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS chat_keep_days INT NOT NULL DEFAULT 7;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS overdue_days INT NOT NULL DEFAULT 7;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS default_region TEXT NOT NULL DEFAULT '서울';
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS todo_self_create BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS todo_approval BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS d_day_title TEXT;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS d_day_date DATE;
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'blue';
+ALTER TABLE family_settings ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '{"outfit":true,"menu":true,"todo":true,"chat":true,"reward":true,"game":true}'::jsonb;
 
 -- (17) 저녁 메뉴 이미지 매칭 및 하이브리드 캐싱 (menu_items - 50선)
 CREATE TABLE IF NOT EXISTS menu_items (
@@ -838,13 +885,14 @@ CREATE POLICY "menu_items_all" ON menu_items FOR ALL TO anon, authenticated
 USING (true) WITH CHECK (true);
 
 -- ==============================================================================
--- 7. 성능 최적화 인덱스
+-- 7. 성능 최적화 인덱스 (실제 컬럼명 일치 보장)
 -- ==============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_members_family ON members(family_id);
 CREATE INDEX IF NOT EXISTS idx_todos_family_due ON todos(family_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_todos_assignee ON todos(assignee_member_id);
-CREATE INDEX IF NOT EXISTS idx_schedules_family_date ON schedules(family_id, date);
+CREATE INDEX IF NOT EXISTS idx_schedules_family_member ON schedules(family_id, member_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_family_date ON schedules(family_id, schedule_date);
 CREATE INDEX IF NOT EXISTS idx_recipes_family ON recipes(family_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_name ON menu_items(name);
 CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category);
