@@ -9,12 +9,12 @@
 export const CURATED_FOOD_PHOTOS = {
   // 1. 닭요리 / 백숙 / 삼계탕 (누룽지 백숙 포함) — 삼계탕 뚝배기 ✅
   chicken_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
-  // 2. 뚝배기 된장찌개 (된장찌개, 청국장 등) — 두부·애호박 듬뿍 시골 된장찌개 뚝배기 (네이버 검증 완료) ✅
-  doenjang_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjA1MjRfMjAx%2FMDAxNjUzMzU5NzMyMTA1.JBLegAt9QKmkaAarA_s3QjN1HrUJ0uYseihlf7NZnDEg.dImxpZBLOoW_LXPwvtlXTXSA6G-C_I8VwEbWjtu0s0Ag.JPEG.ddalgi00001%2FIMG_9578.JPG',
+  // 2. 뚝배기 된장찌개 (된장찌개, 청국장 등) — 차돌박이 & 두부·애호박 가득 뚝배기 차돌된장찌개 (네이버 검증 완료) ✅
+  doenjang_jjigae: '/images/doenjang_jjigae.jpg',
   // 2.1 뚝배기 김치찌개 (김치찌개, 부대찌개, 동태찌개 등) — 돼지고기 듬뿍 보글보글 묵은지 김치찌개 뚝배기 (네이버 검증 완료) ✅
   kimchi_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjAxMDVfMTA4%2FMDAxNjQxMzU0MTAwMDcy.Q9C7tiGVeobbjb_QWWVQAnq43iigry783UfoWNuv0Q4g.a9yZU02dd5B8eU8pt0JClu4n4uBgE3C6GRCp4tLHdAgg.JPEG.melone1225%2FIMG_3026-1.jpg',
-  // 2.2 뚝배기 순두부찌개 — 얼큰하고 몽글몽글한 해물 순두부찌개 & 계란 노른자 (네이버 검증 완료) ✅
-  sundubu_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fcafefiles.naver.net%2F20160222_118%2Fukyosun_1456141214887GqTx6_JPEG%2FDSC_0001.jpg',
+  // 2.2 뚝배기 순두부찌개 — 우드 트레이 위 정갈한 뚝배기 순두부찌개 (워터마크 제거 & 클로즈업 완료) ✅
+  sundubu_jjigae: '/images/sundubu_jjigae.jpg',
   // 하위 호환용 기본 찌개 (김치찌개 사진으로 설정)
   korean_stew: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjAxMDVfMTA4%2FMDAxNjQxMzU0MTAwMDcy.Q9C7tiGVeobbjb_QWWVQAnq43iigry783UfoWNuv0Q4g.a9yZU02dd5B8eU8pt0JClu4n4uBgE3C6GRCp4tLHdAgg.JPEG.melone1225%2FIMG_3026-1.jpg',
   // 3. 따뜻한 떡국 / 만둣국 / 사골국 — 백탁 국물 ✅
