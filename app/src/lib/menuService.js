@@ -39,8 +39,8 @@ export const CURATED_FOOD_PHOTOS = {
   egg_roll: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMTAzMDVfNTcg%2FMDAxNjE0OTM1MDAyNTgw.XA3mIa0iH0AdZ9L_za9oXYo8FY4cmLiszSohm6gz_QYg.KUtOvxeKB0sgsbLxGvQ2kGoOba0m5BRY0kUKCLEz3gsg.JPEG.skstbvjcjqj%2FKakaoTalk_20210305_173659069_20.jpg',
   // 12. 카레라이스 — 일본식 카레 ✅
   curry_rice: 'https://images.unsplash.com/photo-1723208841184-3d91ba244c60?auto=format&fit=crop&w=800&q=80',
-  // 13. 떡볶이 / 분식 — 찌개류 (붉은 소스) ✅
-  tteokbokki: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
+  // 13. 떡볶이 / 분식 — 화이트 볼에 소복이 담긴 정갈한 쌀떡볶이 (네이버 검증 완료) ✅
+  tteokbokki: '/images/tteokbokki.jpg',
   // 14. 오므라이스 — 노란 계란옷에 케첩 지그재그 집밥 오므라이스 (네이버 검증 완료) ✅
   omurice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMDExMjVfNDAg%2FMDAxNjA2MjU1OTEyNzIx.e_rzPFRFG2CE3nwFbMArEBG0juyvP6rXQ9FKDDWGbDIg.JmYx3thG4csZDKVM_l-iUJkGOTOxTJVLQF-9uF5DEcYg.JPEG.lovetogapyjs%2FIMG_2821.JPG',
   // 15. 소고기미역국 / 미역국 — 뽀얀 국물에 두툼한 양지가 듬뿍 든 소고기미역국 (네이버 검증 완료) ✅
@@ -175,8 +175,13 @@ export const SEED_MENU_50 = {
   소고기잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.japchae },
   잔치국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
   국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
-  비빔국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
   떡볶이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  '국물 떡볶이': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  국물떡볶이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  '쌀 떡볶이': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  쌀떡볶이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  라볶이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
+  치즈떡볶이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tteokbokki },
 
   // [양식/퓨전]
   돈가스: { category: '양식/퓨전', image_url: CURATED_FOOD_PHOTOS.tonkatsu },
@@ -296,6 +301,9 @@ function matchFoodPhotoByKeyword(title) {
   }
   if (/잡채/.test(t)) {
     return CURATED_FOOD_PHOTOS.japchae
+  }
+  if (/떡볶이|라볶이|분식/.test(t)) {
+    return CURATED_FOOD_PHOTOS.tteokbokki
   }
   if (/카레|하이라이스/.test(t)) {
     return CURATED_FOOD_PHOTOS.curry_rice

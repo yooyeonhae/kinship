@@ -25,6 +25,7 @@ const PHOTO_OPTIONS = [
   { label: '비빔밥', url: CURATED_FOOD_PHOTOS.bibimbap, emoji: '🥗' },
   { label: '잡채', url: CURATED_FOOD_PHOTOS.japchae, emoji: '🍜' },
   { label: '두부조림', url: CURATED_FOOD_PHOTOS.tofu_jorim, emoji: '🥘' },
+  { label: '떡볶이', url: CURATED_FOOD_PHOTOS.tteokbokki, emoji: '🥘' },
   { label: '계란말이', url: CURATED_FOOD_PHOTOS.egg_roll, emoji: '🥚' },
   { label: '돈가스/분식', url: CURATED_FOOD_PHOTOS.tonkatsu, emoji: '🍱' },
   { label: '파스타', url: CURATED_FOOD_PHOTOS.pasta, emoji: '🍝' },
