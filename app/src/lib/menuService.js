@@ -59,6 +59,8 @@ export const CURATED_FOOD_PHOTOS = {
   samgyeopsal: '/images/samgyeopsal.jpg',
   // 22. 보쌈 / 수육 — 화이트 접시 위 촉촉한 수육 & 새우젓·쌈장 정갈한 상차림 (네이버 검증 완료) ✅
   bossam_suyuk: '/images/bossam_suyuk.jpg',
+  // 23. 두부조림 — 팬 가득 자작하게 조려낸 매콤달콤 밥도둑 홈메이드 두부조림 (네이버 검증 완료) ✅
+  tofu_jorim: '/images/tofu_jorim.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -136,7 +138,9 @@ export const SEED_MENU_50 = {
   오삼불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   춘천닭갈비: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   LA갈비구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  두부조림: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
+  두부조림: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.tofu_jorim },
+  '두부 조림': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.tofu_jorim },
+  '매콤 두부조림': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.tofu_jorim },
 
   // [해산물류]
   고등어구이: { category: '해산물류', image_url: CURATED_FOOD_PHOTOS.grilled_fish },
@@ -259,6 +263,11 @@ function matchFoodPhotoByKeyword(title) {
   // 3.98 보쌈 / 수육
   if (/보쌈|수육/.test(t)) {
     return CURATED_FOOD_PHOTOS.bossam_suyuk
+  }
+
+  // 3.99 두부조림
+  if (/두부조림|두부\s*조림/.test(t)) {
+    return CURATED_FOOD_PHOTOS.tofu_jorim
   }
 
   // 4. 찌개 / 탕 / 뚝배기
