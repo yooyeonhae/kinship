@@ -27,8 +27,10 @@ export const CURATED_FOOD_PHOTOS = {
   korean_meat: 'https://images.unsplash.com/photo-1527578054032-8d8f044e013d?auto=format&fit=crop&w=800&q=80',
   // 7. 생선구이 / 조림 / 해물 — 노릇한 고등어구이 & 뚝배기 된장찌개 백반 (네이버 검증 완료) ✅
   grilled_fish: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjA1MjlfMjkg%2FMDAxNjUzNzU0NDc4MDUz.Op6avDaDz2ihAcFOrTQeR5aGCI7eHfCn2OHS8dWpZP8g.LAzOX7JyhUK627ovgQRt_YVJOaDMAnq7vbK-NipOef0g.JPEG.ican211%2F1653754477858.jpg',
-  // 8. 비빔밥 — 비빔밥 그릇 ✅
-  bibimbap: 'https://images.unsplash.com/photo-1718777791239-c473e9ce7376?auto=format&fit=crop&w=800&q=80',
+  // 8. 비빔밥 — 지글지글 뚝배기 돌솥 나물 비빔밥 (네이버 검증 완료) ✅
+  bibimbap: '/images/bibimbap.jpg',
+  // 8.1 잡채 — 도자기 접시 위 소고기 야채 궁중 잡채 (네이버 검증 완료) ✅
+  japchae: '/images/japchae.jpg',
   // 9. 돈까스 / 튀김 — 돈카츠 ✅
   tonkatsu: 'https://images.unsplash.com/photo-1496112774951-bf41010eed5e?auto=format&fit=crop&w=800&q=80',
   // 10. 파스타 / 스파게티 — 페투치네 ✅
@@ -149,6 +151,9 @@ export const SEED_MENU_50 = {
 
   // [한그릇/면류]
   비빔밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
+  돌솥비빔밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
+  나물비빔밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
+  육회비빔밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
   김치볶음밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
   볶음밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
   '스팸 김치볶음밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
@@ -161,7 +166,9 @@ export const SEED_MENU_50 = {
   오므라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.omurice },
   '계란말이와 밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.egg_roll },
   계란말이: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.egg_roll },
-  잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
+  잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.japchae },
+  궁중잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.japchae },
+  소고기잡채: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.japchae },
   잔치국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
   국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
   비빔국수: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.korean_noodle },
@@ -275,8 +282,11 @@ function matchFoodPhotoByKeyword(title) {
   if (/김치볶음밥|볶음밥/.test(t)) {
     return CURATED_FOOD_PHOTOS.fried_rice
   }
-  if (/비빔밥|잡채/.test(t)) {
+  if (/비빔밥/.test(t)) {
     return CURATED_FOOD_PHOTOS.bibimbap
+  }
+  if (/잡채/.test(t)) {
+    return CURATED_FOOD_PHOTOS.japchae
   }
   if (/카레|하이라이스/.test(t)) {
     return CURATED_FOOD_PHOTOS.curry_rice

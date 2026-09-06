@@ -23,6 +23,7 @@ const PHOTO_OPTIONS = [
   { label: '보쌈/수육', url: CURATED_FOOD_PHOTOS.bossam_suyuk, emoji: '🥩' },
   { label: '생선/백반', url: CURATED_FOOD_PHOTOS.grilled_fish, emoji: '🐟' },
   { label: '비빔밥', url: CURATED_FOOD_PHOTOS.bibimbap, emoji: '🥗' },
+  { label: '잡채', url: CURATED_FOOD_PHOTOS.japchae, emoji: '🍜' },
   { label: '계란말이', url: CURATED_FOOD_PHOTOS.egg_roll, emoji: '🥚' },
   { label: '돈가스/분식', url: CURATED_FOOD_PHOTOS.tonkatsu, emoji: '🍱' },
   { label: '파스타', url: CURATED_FOOD_PHOTOS.pasta, emoji: '🍝' },
