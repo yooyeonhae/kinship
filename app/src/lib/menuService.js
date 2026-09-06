@@ -9,8 +9,14 @@
 export const CURATED_FOOD_PHOTOS = {
   // 1. 닭요리 / 백숙 / 삼계탕 (누룽지 백숙 포함) — 삼계탕 뚝배기 ✅
   chicken_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
-  // 2. 뚝배기 찌개 / 찌개류 (김치찌개, 된장찌개, 순두부찌개, 청국장 등) — 김치찌개 ✅
-  korean_stew: 'https://images.unsplash.com/photo-1760228865341-675704c22a5b?auto=format&fit=crop&w=800&q=80',
+  // 2. 뚝배기 된장찌개 (된장찌개, 청국장 등) — 두부·애호박 듬뿍 시골 된장찌개 뚝배기 (네이버 검증 완료) ✅
+  doenjang_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjA1MjRfMjAx%2FMDAxNjUzMzU5NzMyMTA1.JBLegAt9QKmkaAarA_s3QjN1HrUJ0uYseihlf7NZnDEg.dImxpZBLOoW_LXPwvtlXTXSA6G-C_I8VwEbWjtu0s0Ag.JPEG.ddalgi00001%2FIMG_9578.JPG',
+  // 2.1 뚝배기 김치찌개 (김치찌개, 부대찌개, 동태찌개 등) — 돼지고기 듬뿍 보글보글 묵은지 김치찌개 뚝배기 (네이버 검증 완료) ✅
+  kimchi_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjAxMDVfMTA4%2FMDAxNjQxMzU0MTAwMDcy.Q9C7tiGVeobbjb_QWWVQAnq43iigry783UfoWNuv0Q4g.a9yZU02dd5B8eU8pt0JClu4n4uBgE3C6GRCp4tLHdAgg.JPEG.melone1225%2FIMG_3026-1.jpg',
+  // 2.2 뚝배기 순두부찌개 — 얼큰하고 몽글몽글한 해물 순두부찌개 & 계란 노른자 (네이버 검증 완료) ✅
+  sundubu_jjigae: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fcafefiles.naver.net%2F20160222_118%2Fukyosun_1456141214887GqTx6_JPEG%2FDSC_0001.jpg',
+  // 하위 호환용 기본 찌개 (김치찌개 사진으로 설정)
+  korean_stew: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMjAxMDVfMTA4%2FMDAxNjQxMzU0MTAwMDcy.Q9C7tiGVeobbjb_QWWVQAnq43iigry783UfoWNuv0Q4g.a9yZU02dd5B8eU8pt0JClu4n4uBgE3C6GRCp4tLHdAgg.JPEG.melone1225%2FIMG_3026-1.jpg',
   // 3. 따뜻한 떡국 / 만둣국 / 사골국 — 백탁 국물 ✅
   tteokguk_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
   // 4. 잔치국수 / 칼국수 / 면류 — 소면 국물 ✅
@@ -52,13 +58,21 @@ export const CURATED_FOOD_PHOTOS = {
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
 export const SEED_MENU_50 = {
   // [찌개/국물류]
-  김치찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  된장찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  '된장찌개 정식': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  순두부찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  부대찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  청국장: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
-  동태찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.korean_stew },
+  김치찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  '돼지고기 김치찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  '돼지 김치찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  '참치 김치찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  '스팸 김치찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  된장찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.doenjang_jjigae },
+  '된장찌개 정식': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.doenjang_jjigae },
+  '차돌 된장찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.doenjang_jjigae },
+  '해물 된장찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.doenjang_jjigae },
+  순두부찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.sundubu_jjigae },
+  '해물 순두부찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.sundubu_jjigae },
+  '바지락 순두부찌개': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.sundubu_jjigae },
+  부대찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
+  청국장: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.doenjang_jjigae },
+  동태찌개: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.kimchi_jjigae },
   삼계탕: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   '누룽지 백숙': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
   누룽지백숙: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.chicken_soup },
@@ -223,8 +237,14 @@ function matchFoodPhotoByKeyword(title) {
   }
 
   // 4. 찌개 / 탕 / 뚝배기
-  if (/찌개|된장|김치찌개|순두부|부대찌개|청국장|전골|탕/.test(t)) {
-    return CURATED_FOOD_PHOTOS.korean_stew
+  if (/순두부/.test(t)) {
+    return CURATED_FOOD_PHOTOS.sundubu_jjigae
+  }
+  if (/된장|청국장/.test(t)) {
+    return CURATED_FOOD_PHOTOS.doenjang_jjigae
+  }
+  if (/김치찌개|부대찌개|동태찌개|감자탕|육개장|찌개|탕|전골/.test(t)) {
+    return CURATED_FOOD_PHOTOS.kimchi_jjigae
   }
 
   // 5. 볶음밥 / 오므라이스 / 참치마요 / 비빔밥 / 덮밥 / 카레
