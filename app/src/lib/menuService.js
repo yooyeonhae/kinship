@@ -15,8 +15,8 @@ export const CURATED_FOOD_PHOTOS = {
   tteokguk_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
   // 4. 잔치국수 / 칼국수 / 면류 — 소면 국물 ✅
   korean_noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80',
-  // 5. 볶음밥 / 김치볶음밥 / 덮밥 — 김치볶음밥 달걀 프라이 ✅
-  fried_rice: 'https://images.unsplash.com/photo-1600688654899-379ec76aca42?auto=format&fit=crop&w=800&q=80',
+  // 5. 볶음밥 / 김치볶음밥 — 주물팬 가득 노릇하게 볶아낸 반숙 계란 후라이 김치볶음밥 (네이버 검증 완료) ✅
+  fried_rice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTA5MjRfMTI0%2FMDAxNzU4Njg5Njc4NzU5.yI2GLzjktfmOX3mXxKCv_gWkqu98rh35DnmHT96qGCcg.MJTrtIkyfHIjNaPBv6j2GpBy6wdnaJsOCbrg740UDgkg.JPEG%2FKC_TX_77001799_D2215.jpg',
   // 6. 불고기 / 제육볶음 / 삼겹살 / 고기구이 — 한국식 BBQ 그릴 ✅
   korean_meat: 'https://images.unsplash.com/photo-1527578054032-8d8f044e013d?auto=format&fit=crop&w=800&q=80',
   // 7. 생선구이 / 조림 / 해물 — 노릇한 고등어구이 & 뚝배기 된장찌개 백반 (네이버 검증 완료) ✅
@@ -45,6 +45,8 @@ export const CURATED_FOOD_PHOTOS = {
   jeyuk_bokkeum: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMTA0MDhfODEg%2FMDAxNjE3ODY5NTAxNTg5.0WXJn8pFWiPGHtDN9hzyL6_oca8iDncAMUPGqtHF9gYg.vA8aOyxNqYCclFtcioaSjLXCRkazfH_rGY4Nvb4Tv5sg.JPEG.peace8012%2FIMG_4081.JPG',
   // 19. 소불고기 / 불고기 / 소불고기 덮밥 — 달콤짭조름 자작한 양념의 밥도둑 홈메이드 소불고기 백반 (네이버 검증 완료) ✅
   bulgogi: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTEyMjNfMjU5%2FMDAxNzY2NDg0OTU2Nzc2.vxeG0V8wnuWrDtro80k5QI4tdh_JGK9x4fd4bGfTX0gg.UFtuEg4alI6HDqVyRqEfrw8r_YfuAq-XHQTyfuCM7xcg.JPEG%2Foutput%25A3%25DF264553869.jpg',
+  // 20. 참치마요 덮밥 / 마요덮밥 — 포슬포슬 에그스크램블과 참치, 지그재그 마요네즈 덮밥 (네이버 검증 완료) ✅
+  tuna_mayo: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTA0MTFfMTgy%2FMDAxNzQ0Mzc4NjA4MjU5.us5Id840wyDQ6iWsjw4Ml7t9NkWwxHr7ZYPZlZAGh24g.dwPPOiUiB-TR6IcydbWHHDDkeltXEIeY8NKcbIX2c0Ag.JPEG%2FIMG_5121.JPG',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -127,7 +129,11 @@ export const SEED_MENU_50 = {
   비빔밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bibimbap },
   김치볶음밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
   볶음밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
-  '참치마요 덮밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
+  '스팸 김치볶음밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.fried_rice },
+  '참치마요 덮밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tuna_mayo },
+  참치마요덮밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tuna_mayo },
+  참치마요: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tuna_mayo },
+  치킨마요덮밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.tuna_mayo },
   카레라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.curry_rice },
   하이라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.curry_rice },
   오므라이스: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.omurice },
@@ -221,11 +227,14 @@ function matchFoodPhotoByKeyword(title) {
     return CURATED_FOOD_PHOTOS.korean_stew
   }
 
-  // 5. 볶음밥 / 오므라이스 / 비빔밥 / 덮밥 / 카레
+  // 5. 볶음밥 / 오므라이스 / 참치마요 / 비빔밥 / 덮밥 / 카레
   if (/오므라이스/.test(t)) {
     return CURATED_FOOD_PHOTOS.omurice
   }
-  if (/김치볶음밥|볶음밥|참치마요/.test(t)) {
+  if (/참치마요|치킨마요|마요덮밥/.test(t)) {
+    return CURATED_FOOD_PHOTOS.tuna_mayo
+  }
+  if (/김치볶음밥|볶음밥/.test(t)) {
     return CURATED_FOOD_PHOTOS.fried_rice
   }
   if (/비빔밥|잡채/.test(t)) {
