@@ -21,8 +21,8 @@ export const CURATED_FOOD_PHOTOS = {
   tteokguk_soup: 'https://images.unsplash.com/photo-1562749606-0a9eb5a8a0f3?auto=format&fit=crop&w=800&q=80',
   // 4. 잔치국수 / 칼국수 / 면류 — 소면 국물 ✅
   korean_noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80',
-  // 5. 볶음밥 / 김치볶음밥 — 주물팬 가득 노릇하게 볶아낸 반숙 계란 후라이 김치볶음밥 (네이버 검증 완료) ✅
-  fried_rice: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTA5MjRfMTI0%2FMDAxNzU4Njg5Njc4NzU5.yI2GLzjktfmOX3mXxKCv_gWkqu98rh35DnmHT96qGCcg.MJTrtIkyfHIjNaPBv6j2GpBy6wdnaJsOCbrg740UDgkg.JPEG%2FKC_TX_77001799_D2215.jpg',
+  // 5. 볶음밥 / 김치볶음밥 — 주물팬 가득 노릇하게 볶아낸 반숙 계란 후라이 김치볶음밥 (텍스트 제거 & 클로즈업 완료) ✅
+  fried_rice: '/images/kimchi_fried_rice.jpg',
   // 6. 불고기 / 제육볶음 / 삼겹살 / 고기구이 — 한국식 BBQ 그릴 ✅
   korean_meat: 'https://images.unsplash.com/photo-1527578054032-8d8f044e013d?auto=format&fit=crop&w=800&q=80',
   // 7. 생선구이 / 조림 / 해물 — 노릇한 고등어구이 & 뚝배기 된장찌개 백반 (네이버 검증 완료) ✅
