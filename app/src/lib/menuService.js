@@ -43,6 +43,8 @@ export const CURATED_FOOD_PHOTOS = {
   galbijjim: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMzA5MjZfMjk4%2FMDAxNjk1NzAzMjAwMjUx.17KJXVWmwt0zyi2wRjtv5TxV3CCM8_wRq17Bn-Z4M24g.Sny4Yg89_8CdH9l2Smcdp8RysERLoSmArR6R66DWBIMg.JPEG.wjdwldbs9999%2FIMG_3052.jpg',
   // 18. 제육볶음 — 매콤달콤 양념에 노릇하게 볶아낸 도자기볼 홈메이드 제육볶음 (네이버 검증 완료) ✅
   jeyuk_bokkeum: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMTA0MDhfODEg%2FMDAxNjE3ODY5NTAxNTg5.0WXJn8pFWiPGHtDN9hzyL6_oca8iDncAMUPGqtHF9gYg.vA8aOyxNqYCclFtcioaSjLXCRkazfH_rGY4Nvb4Tv5sg.JPEG.peace8012%2FIMG_4081.JPG',
+  // 19. 소불고기 / 불고기 / 소불고기 덮밥 — 달콤짭조름 자작한 양념의 밥도둑 홈메이드 소불고기 백반 (네이버 검증 완료) ✅
+  bulgogi: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTEyMjNfMjU5%2FMDAxNzY2NDg0OTU2Nzc2.vxeG0V8wnuWrDtro80k5QI4tdh_JGK9x4fd4bGfTX0gg.UFtuEg4alI6HDqVyRqEfrw8r_YfuAq-XHQTyfuCM7xcg.JPEG%2Foutput%25A3%25DF264553869.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -79,9 +81,13 @@ export const SEED_MENU_50 = {
   '돼지고기 제육볶음': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.jeyuk_bokkeum },
   '제육 덮밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.jeyuk_bokkeum },
   제육덮밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.jeyuk_bokkeum },
-  소불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  '소불고기 덮밥': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
+  소불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  '소불고기 덮밥': { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  소불고기덮밥: { category: '한그릇/면류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  '뚝배기 불고기': { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  뚝배기불고기: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
+  뚝불: { category: '찌개/국물류', image_url: CURATED_FOOD_PHOTOS.bulgogi },
   돼지갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
   소갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
   갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
@@ -203,6 +209,11 @@ function matchFoodPhotoByKeyword(title) {
   // 3.95 제육볶음 / 제육덮밥
   if (/제육/.test(t)) {
     return CURATED_FOOD_PHOTOS.jeyuk_bokkeum
+  }
+
+  // 3.96 소불고기 / 불고기 / 소불고기덮밥 / 뚝배기불고기
+  if (/소불고기|뚝배기\s*불고기|뚝불|불고기/.test(t)) {
+    return CURATED_FOOD_PHOTOS.bulgogi
   }
 
   // 4. 찌개 / 탕 / 뚝배기
