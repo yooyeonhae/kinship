@@ -53,6 +53,10 @@ export const CURATED_FOOD_PHOTOS = {
   bulgogi: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTEyMjNfMjU5%2FMDAxNzY2NDg0OTU2Nzc2.vxeG0V8wnuWrDtro80k5QI4tdh_JGK9x4fd4bGfTX0gg.UFtuEg4alI6HDqVyRqEfrw8r_YfuAq-XHQTyfuCM7xcg.JPEG%2Foutput%25A3%25DF264553869.jpg',
   // 20. 참치마요 덮밥 / 마요덮밥 — 포슬포슬 에그스크램블과 참치, 지그재그 마요네즈 덮밥 (네이버 검증 완료) ✅
   tuna_mayo: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTA0MTFfMTgy%2FMDAxNzQ0Mzc4NjA4MjU5.us5Id840wyDQ6iWsjw4Ml7t9NkWwxHr7ZYPZlZAGh24g.dwPPOiUiB-TR6IcydbWHHDDkeltXEIeY8NKcbIX2c0Ag.JPEG%2FIMG_5121.JPG',
+  // 21. 삼겹살구이 — 불판 위 노릇노릇 구워진 삼겹살 & 김치 구이 (네이버 검증 완료) ✅
+  samgyeopsal: '/images/samgyeopsal.jpg',
+  // 22. 보쌈 / 수육 — 화이트 접시 위 촉촉한 수육 & 새우젓·쌈장 정갈한 상차림 (네이버 검증 완료) ✅
+  bossam_suyuk: '/images/bossam_suyuk.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -111,16 +115,20 @@ export const SEED_MENU_50 = {
   궁중갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
   매운돼지갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
   매운소갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
-  삼겹살구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  삼겹살: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
+  삼겹살구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.samgyeopsal },
+  삼겹살: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.samgyeopsal },
+  대패삼겹살: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.samgyeopsal },
+  통삼겹구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.samgyeopsal },
   닭볶음탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.dakbokkeum },
   닭도리탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.dakbokkeum },
   찜닭: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   안동찜닭: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   훈제오리구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  '수육/보쌈': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  보쌈: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  수육: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
+  '수육/보쌈': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bossam_suyuk },
+  '보쌈/수육': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bossam_suyuk },
+  보쌈: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bossam_suyuk },
+  수육: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bossam_suyuk },
+  돼지고기수육: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.bossam_suyuk },
   족발: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   떡갈비: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   오삼불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
@@ -234,6 +242,16 @@ function matchFoodPhotoByKeyword(title) {
   // 3.96 소불고기 / 불고기 / 소불고기덮밥 / 뚝배기불고기
   if (/소불고기|뚝배기\s*불고기|뚝불|불고기/.test(t)) {
     return CURATED_FOOD_PHOTOS.bulgogi
+  }
+
+  // 3.97 삼겹살 / 삼겹살구이 / 대패삼겹살
+  if (/삼겹/.test(t)) {
+    return CURATED_FOOD_PHOTOS.samgyeopsal
+  }
+
+  // 3.98 보쌈 / 수육
+  if (/보쌈|수육/.test(t)) {
+    return CURATED_FOOD_PHOTOS.bossam_suyuk
   }
 
   // 4. 찌개 / 탕 / 뚝배기
