@@ -39,6 +39,8 @@ export const CURATED_FOOD_PHOTOS = {
   miyeokguk: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA2MDRfNzgg%2FMDAxNzgwNTY4NjgzMjM1.TDbC-2o_OEGheJH9u-Ab48Bo3Obnfq64Rkj0EiG-e3gg.1qydX-5pPhz9FSEqs0Fye6AJxCscJz_HkCVS6BV8LUgg.JPEG%2F802260999.962271.jpg',
   // 16. 닭볶음탕 / 닭도리탕 — 냄비 가득 푸짐한 홈메이드 매콤 닭볶음탕 (네이버 검증 완료) ✅
   dakbokkeum: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMzA1MjRfMzMg%2FMDAxNjg0OTMxMDc3NDc1.3fvQPZWDYGkKyt5gg30AHfkC1gwTfQjIpsH1OhaOVf4g.IL_TBEJ_5KCbj0Ib9F098kqwX7mXQ6inYeanUt6n-rEg.JPEG.onlyuu_%2FKakaoTalk_20230524_211540210_10.jpg',
+  // 17. 갈비찜 / 소갈비찜 / 돼지갈비찜 — 냄비 가득 윤기 좔좔 홈메이드 갈비찜 (네이버 검증 완료) ✅
+  galbijjim: 'https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMzA5MjZfMjk4%2FMDAxNjk1NzAzMjAwMjUx.17KJXVWmwt0zyi2wRjtv5TxV3CCM8_wRq17Bn-Z4M24g.Sny4Yg89_8CdH9l2Smcdp8RysERLoSmArR6R66DWBIMg.JPEG.wjdwldbs9999%2FIMG_3052.jpg',
 }
 
 // ── 1. 대표 50선 및 자주 쓰이는 메뉴 사전 매핑 ──
@@ -75,9 +77,13 @@ export const SEED_MENU_50 = {
   소불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   불고기: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   '소불고기 덮밥': { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  돼지갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  소갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
-  갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
+  돼지갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  소갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  매운갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  궁중갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  매운돼지갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
+  매운소갈비찜: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.galbijjim },
   삼겹살구이: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   삼겹살: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.korean_meat },
   닭볶음탕: { category: '고기/구이/볶음류', image_url: CURATED_FOOD_PHOTOS.dakbokkeum },
@@ -182,6 +188,11 @@ function matchFoodPhotoByKeyword(title) {
   // 3.8 닭볶음탕 / 닭도리탕 (찌개/탕보다 먼저 매칭)
   if (/닭볶음|닭도리/.test(t)) {
     return CURATED_FOOD_PHOTOS.dakbokkeum
+  }
+
+  // 3.9 갈비찜 (소갈비찜, 돼지갈비찜, 매운갈비찜, 궁중갈비찜 등)
+  if (/갈비찜/.test(t)) {
+    return CURATED_FOOD_PHOTOS.galbijjim
   }
 
   // 4. 찌개 / 탕 / 뚝배기
