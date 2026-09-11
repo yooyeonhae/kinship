@@ -390,6 +390,9 @@ function FamilyRoomScreen() {
           setTopInvite(payload)
         }
       })
+      .on('broadcast', { event: 'game:leave' }, ({ payload }) => {
+        console.log('[FamilyRoom Screen] 실시간 게임 퇴장 수신:', payload)
+      })
       .on('presence', { event: 'sync' }, () => {
         setOnlineIds(Object.keys(channel.presenceState()))
       })

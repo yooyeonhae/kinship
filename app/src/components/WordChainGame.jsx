@@ -94,6 +94,7 @@ export default function WordChainGame({
   const [dismissedInviteIds, setDismissedInviteIds] = useState(new Set())
   const [inviteToast, setInviteToast] = useState(null)
   const [busyRemote, setBusyRemote] = useState(false)
+  const [opponentLeftModal, setOpponentLeftModal] = useState({ show: false, message: '' })
 
   // Active Game State
   const [players, setPlayers] = useState([]) // [{ id, name, avatar, isBot }]
@@ -272,7 +273,10 @@ export default function WordChainGame({
         setInGame(true)
         setPendingInvite(null)
 
-        if (remoteState.players) setPlayers(remoteState.players)
+        if (remoteState.players) {
+          setPlayers(remoteState.players)
+          playersRef.current = remoteState.players
+        }
         if (remoteState.alivePlayerIds) {
           const nextAlive = new Set(remoteState.alivePlayerIds)
           setAlivePlayerIds(nextAlive)
@@ -401,6 +405,26 @@ export default function WordChainGame({
           setReactions((prev) => prev.filter((r) => r.id !== id))
         }, 2400)
       }
+
+      // 6. Player left game notification
+      if (payload.event === 'game:leave' || payload.type === 'leave') {
+        if (payload.sessionId === sessionIdRef.current && payload.memberId !== currentMemberId) {
+          const person = payload.isHost ? '방장' : '상대방'
+          const name = payload.memberName ? `${person}(${payload.memberName})` : person
+          const msg = `${name}님이 게임을 나갔습니다.`
+          playErrSound(soundEnabled)
+          setOpponentLeftModal({ show: true, message: msg })
+          setGameOver(null)
+          setInGame(false)
+          setInWaitingRoom(false)
+          setSessionId(null)
+          sessionIdRef.current = null
+          setAcceptedMembers({})
+          setPlayers([])
+          playersRef.current = []
+        }
+        return
+      }
     }
 
     channel.on('broadcast', { event: GAME_EVENT }, onBroadcast)
@@ -408,6 +432,7 @@ export default function WordChainGame({
     channel.on('broadcast', { event: 'game:accepted' }, onBroadcast)
     channel.on('broadcast', { event: 'game:start' }, onBroadcast)
     channel.on('broadcast', { event: 'game:reaction' }, onBroadcast)
+    channel.on('broadcast', { event: 'game:leave' }, onBroadcast)
 
     return () => {}
   }, [channelRef, currentMemberId, inGame, inWaitingRoom, soundEnabled, voiceEnabled, supabase, checkForInvites, applyRemoteState])
@@ -885,15 +910,42 @@ export default function WordChainGame({
     }
   }
 
-  // Leave Waiting Room
-  async function handleLeaveWaitingRoom() {
-    if (sessionId && isHost && supabase) {
-      await leaveSession(supabase, sessionId)
+  // Leave Waiting Room / Exit to Lobby (unified)
+  async function handleExitToLobby() {
+    const currentSession = sessionIdRef.current
+    const host = isHostRef.current
+    if (currentSession && gameMode !== 'bot') {
+      try {
+        await channelRef?.current?.send({
+          type: 'broadcast',
+          event: 'game:leave',
+          payload: {
+            sessionId: currentSession,
+            memberId: currentMemberId,
+            memberName: currentMember.name,
+            isHost: host,
+          },
+        })
+        if (supabase) {
+          await leaveSession(supabase, currentSession)
+        }
+      } catch (err) {
+        console.warn('방 나가기 오류:', err)
+      }
     }
-    setInWaitingRoom(false)
+    setGameOver(null)
     setInGame(false)
+    setInWaitingRoom(false)
     setSessionId(null)
+    sessionIdRef.current = null
     setAcceptedMembers({})
+    setPlayers([])
+    playersRef.current = []
+    setShowCreateModal(false)
+  }
+
+  async function handleLeaveWaitingRoom() {
+    await handleExitToLobby()
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -957,21 +1009,35 @@ export default function WordChainGame({
       }
       finishGame(res)
     } else {
-      const nextAlive = new Set(alivePlayerIdsRef.current)
+      const allPlayers = playersRef.current.length > 0 ? playersRef.current : (players.length > 0 ? players : Object.values(acceptedMembers))
+      const nextAlive = new Set(alivePlayerIdsRef.current.size > 0 ? alivePlayerIdsRef.current : allPlayers.map((p) => p.id))
       nextAlive.delete(currPl.id)
       alivePlayerIdsRef.current = nextAlive
       setAlivePlayerIds(nextAlive)
 
       if (nextAlive.size <= 1) {
-        const survivorId = Array.from(nextAlive)[0]
-        const survivor = playersRef.current.find((p) => p.id === survivorId) || currPl
-        const res = {
-          winner: survivor.id,
-          winnerName: survivor.name,
-          reason: `시간 초과로 ${currPl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님!`,
-          totalWords: wordsRef.current.length - 1,
+        const remainingList = Array.from(nextAlive)
+        const survivorId = remainingList.length > 0 ? remainingList[0] : null
+        const otherPlayers = allPlayers.filter((p) => p.id !== currPl.id)
+        const survivor = survivorId ? allPlayers.find((p) => p.id === survivorId) : otherPlayers[0]
+
+        if (survivor && survivor.id !== currPl.id) {
+          const res = {
+            winner: survivor.id,
+            winnerName: survivor.name,
+            reason: `시간 초과로 ${currPl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님! 🏆`,
+            totalWords: Math.max(0, wordsRef.current.length - 1),
+          }
+          finishGame(res)
+        } else {
+          const res = {
+            winner: null,
+            winnerName: '게임 종료',
+            reason: `시간 초과로 ${currPl.name} 님이 탈락했습니다.`,
+            totalWords: Math.max(0, wordsRef.current.length - 1),
+          }
+          finishGame(res)
         }
-        finishGame(res)
       } else {
         setFeedback({ ok: false, message: `⏰ 시간 초과! ${currPl.name} 님 탈락!` })
         advanceTurn(currentTurn, nextAlive)
@@ -1196,21 +1262,35 @@ export default function WordChainGame({
       }
       finishGame(res)
     } else {
-      const nextAlive = new Set(alivePlayerIdsRef.current)
+      const allPlayers = playersRef.current.length > 0 ? playersRef.current : (players.length > 0 ? players : Object.values(acceptedMembers))
+      const nextAlive = new Set(alivePlayerIdsRef.current.size > 0 ? alivePlayerIdsRef.current : allPlayers.map((p) => p.id))
       nextAlive.delete(activePl.id)
       alivePlayerIdsRef.current = nextAlive
       setAlivePlayerIds(nextAlive)
 
       if (nextAlive.size <= 1) {
-        const survivorId = Array.from(nextAlive)[0]
-        const survivor = playersRef.current.find((p) => p.id === survivorId) || activePl
-        const res = {
-          winner: survivor.id,
-          winnerName: survivor.name,
-          reason: `${activePl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님!`,
-          totalWords: wordsRef.current.length - 1,
+        const remainingList = Array.from(nextAlive)
+        const survivorId = remainingList.length > 0 ? remainingList[0] : null
+        const otherPlayers = allPlayers.filter((p) => p.id !== activePl.id)
+        const survivor = survivorId ? allPlayers.find((p) => p.id === survivorId) : otherPlayers[0]
+
+        if (survivor && survivor.id !== activePl.id) {
+          const res = {
+            winner: survivor.id,
+            winnerName: survivor.name,
+            reason: `${activePl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님! 🏆`,
+            totalWords: Math.max(0, wordsRef.current.length - 1),
+          }
+          finishGame(res)
+        } else {
+          const res = {
+            winner: null,
+            winnerName: '게임 종료',
+            reason: `${activePl.name} 님이 기권했습니다.`,
+            totalWords: Math.max(0, wordsRef.current.length - 1),
+          }
+          finishGame(res)
         }
-        finishGame(res)
       } else {
         setFeedback({ ok: false, message: `🏳️ ${activePl.name} 님 탈락!` })
         advanceTurn(currentTurn, nextAlive)
@@ -1878,7 +1958,7 @@ export default function WordChainGame({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleExitGame}
+                onClick={handleExitToLobby}
                 className="px-2.5 py-1 text-xs font-bold rounded-md bg-surface-muted hover:bg-destructive/10 text-destructive border border-border transition"
               >
                 ✕ 나가기
@@ -2033,9 +2113,9 @@ export default function WordChainGame({
               e.preventDefault()
               submitWord(wordInput)
             }}
-            className="flex flex-col gap-2"
+            className="flex flex-col gap-2 w-full max-w-full"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full">
               <input
                 ref={inputRef}
                 type="text"
@@ -2044,18 +2124,18 @@ export default function WordChainGame({
                 disabled={!isMyTurn || isBotThinking || countdown !== null}
                 placeholder={
                   isBotThinking
-                    ? '🤖 로봇이 단어를 고르는 중입니다...'
+                    ? '🤖 로봇 생각 중...'
                     : !isMyTurn
-                      ? `⏳ ${activePlayer?.name || '상대방'} 님이 생각 중입니다...`
-                      : `'${getReqCharDisplay(currentHead)}'로 시작하는 단어 입력`
+                      ? `⏳ ${activePlayer?.name || '상대방'} 생각 중...`
+                      : `'${getReqCharDisplay(currentHead)}'로 시작하는 단어`
                 }
-                className="flex-1 bg-surface border-2 border-border focus:border-primary rounded-xl px-4 py-3 text-base font-bold outline-none transition disabled:opacity-50"
+                className="flex-1 min-w-0 bg-surface border-2 border-border focus:border-primary rounded-xl px-3.5 py-2.5 text-sm sm:text-base font-bold outline-none transition disabled:opacity-50"
                 autoComplete="off"
               />
               <button
                 type="submit"
                 disabled={!isMyTurn || isBotThinking || countdown !== null || !wordInput.trim()}
-                className="px-5 py-3 rounded-xl bg-primary text-on-primary border-2 border-foreground shadow-sticker font-display font-bold text-sm active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-50"
+                className="px-4 py-2.5 sm:py-3 shrink-0 whitespace-nowrap rounded-xl bg-primary text-on-primary border-2 border-foreground shadow-sticker font-display font-black text-xs sm:text-sm active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-50"
               >
                 말하기 ✓
               </button>
@@ -2198,17 +2278,34 @@ export default function WordChainGame({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setGameOver(null)
-                  setInGame(false)
-                  setInWaitingRoom(false)
-                  setSessionId(null)
-                }}
+                onClick={handleExitToLobby}
                 className="px-4 py-3 bg-surface-muted text-foreground rounded-xl font-display font-bold text-sm border border-border hover:bg-surface transition"
               >
                 로비로
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 🏃 OPPONENT LEFT NOTIFICATION MODAL ── */}
+      {opponentLeftModal.show && (
+        <div className="fixed inset-0 bg-foreground/75 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface border-4 border-foreground rounded-2xl p-6 max-w-sm w-full text-center shadow-sticker flex flex-col items-center gap-3 animate-pop">
+            <span className="text-5xl animate-bounce">🏃</span>
+            <h3 className="text-xl font-display font-black text-foreground">
+              게임 알림
+            </h3>
+            <p className="text-sm font-bold text-foreground-muted leading-relaxed">
+              {opponentLeftModal.message || '상대방이 게임을 나갔습니다.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpponentLeftModal({ show: false, message: '' })}
+              className="w-full py-3 bg-primary text-on-primary font-display font-black text-sm rounded-xl border-2 border-foreground shadow-sticker active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition mt-2"
+            >
+              로비로 돌아가기
+            </button>
           </div>
         </div>
       )}
