@@ -128,6 +128,7 @@ export default function WordChainGame({
   const sessionIdRef = useRef(null)
   const isHostRef = useRef(false)
   const lastStateVersionRef = useRef(0)
+  const countdownRef = useRef(null)
 
   const chainScrollRef = useRef(null)
   const timerRef = useRef(null)
@@ -143,6 +144,7 @@ export default function WordChainGame({
   useEffect(() => { isBotThinkingRef.current = isBotThinking }, [isBotThinking])
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
   useEffect(() => { isHostRef.current = isHost }, [isHost])
+  useEffect(() => { countdownRef.current = countdown }, [countdown])
 
   // Clear timers on unmount
   useEffect(() => {
@@ -230,6 +232,30 @@ export default function WordChainGame({
     return () => clearInterval(interval)
   }, [checkForInvites])
 
+  // Trigger 3-2-1 countdown helper
+  const triggerCountdown = useCallback(
+    (seedWord = '') => {
+      setCountdown(3)
+      playCountdownSound(false, soundEnabled)
+      let count = 3
+      const cdTimer = setInterval(() => {
+        count -= 1
+        if (count > 0) {
+          setCountdown(count)
+          playCountdownSound(false, soundEnabled)
+        } else if (count === 0) {
+          setCountdown('GO!')
+          playCountdownSound(true, soundEnabled)
+          if (seedWord) speakKorean(seedWord, { voiceEnabled })
+        } else {
+          clearInterval(cdTimer)
+          setCountdown(null)
+        }
+      }, 900)
+    },
+    [soundEnabled, voiceEnabled]
+  )
+
   // Apply remote session state to local component
   const applyRemoteState = useCallback(
     (remoteState, newSessionId) => {
@@ -269,15 +295,20 @@ export default function WordChainGame({
 
       // ── ACTIVE GAME PHASE ──
       if (remoteState.status === 'playing') {
+        const isGameJustStarting = (!inGame || inWaitingRoom) && (!remoteState.words || remoteState.words.length <= 1)
         setInWaitingRoom(false)
         setInGame(true)
         setPendingInvite(null)
 
-        if (remoteState.players) {
+        if (isGameJustStarting && countdownRef.current === null) {
+          triggerCountdown(remoteState.words?.[0]?.word || '')
+        }
+
+        if (remoteState.players && remoteState.players.length > 0) {
           setPlayers(remoteState.players)
           playersRef.current = remoteState.players
         }
-        if (remoteState.alivePlayerIds) {
+        if (remoteState.alivePlayerIds && remoteState.alivePlayerIds.length > 0) {
           const nextAlive = new Set(remoteState.alivePlayerIds)
           setAlivePlayerIds(nextAlive)
           alivePlayerIdsRef.current = nextAlive
@@ -321,7 +352,7 @@ export default function WordChainGame({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentMemberId, soundEnabled, voiceEnabled]
+    [currentMemberId, soundEnabled, voiceEnabled, inGame, inWaitingRoom, triggerCountdown]
   )
 
   // Listen to Supabase Realtime channel events
@@ -329,11 +360,13 @@ export default function WordChainGame({
     if (!channelRef?.current) return
     const channel = channelRef.current
 
-    const onBroadcast = async ({ payload }) => {
-      if (!payload) return
+    const onBroadcast = async (broadcastMsg) => {
+      if (!broadcastMsg) return
+      const payload = broadcastMsg.payload || broadcastMsg || {}
+      const eventName = broadcastMsg.event || payload.event || payload.type || ''
 
       // 1. Invitation broadcast received
-      if (payload.event === 'game:invite' || payload.type === 'invite') {
+      if (eventName === 'game:invite' || payload.type === 'invite') {
         if (payload.invitedMemberIds?.includes(currentMemberId) && payload.hostId !== currentMemberId && !inGame && !inWaitingRoom) {
           playCountdownSound(false, soundEnabled)
           checkForInvites()
@@ -342,43 +375,34 @@ export default function WordChainGame({
       }
 
       // 2. Member acceptance event in Waiting Room
-      if (payload.event === 'game:accepted' || payload.type === 'accepted') {
+      if (eventName === 'game:accepted' || payload.type === 'accepted') {
         if (payload.sessionId === sessionIdRef.current) {
           playOkSound(soundEnabled)
+          const newAccepted = {
+            id: payload.memberId,
+            name: payload.name,
+            avatar: payload.avatar,
+            status: 'accepted',
+          }
           setAcceptedMembers((prev) => ({
             ...prev,
-            [payload.memberId]: {
-              id: payload.memberId,
-              name: payload.name,
-              avatar: payload.avatar,
-              status: 'accepted',
-            },
+            [payload.memberId]: newAccepted,
           }))
+
+          // If payload also carries active starting state, apply it directly!
+          if (payload.state && payload.state.status === 'playing') {
+            applyRemoteState(payload.state, payload.sessionId)
+            triggerCountdown(payload.state.words?.[0]?.word || '')
+          }
         }
         return
       }
 
-      // 3. Game start event from Host
-      if (payload.event === 'game:start' || payload.type === 'start') {
+      // 3. Game start event from Host or Invitee
+      if (eventName === 'game:start' || payload.type === 'start') {
         if (payload.sessionId === sessionIdRef.current && payload.state) {
           applyRemoteState(payload.state, payload.sessionId)
-          setCountdown(3)
-          playCountdownSound(false, soundEnabled)
-          let count = 3
-          const cdTimer = setInterval(() => {
-            count -= 1
-            if (count > 0) {
-              setCountdown(count)
-              playCountdownSound(false, soundEnabled)
-            } else if (count === 0) {
-              setCountdown('GO!')
-              playCountdownSound(true, soundEnabled)
-              speakKorean(payload.state.words?.[0]?.word || '', { voiceEnabled })
-            } else {
-              clearInterval(cdTimer)
-              setCountdown(null)
-            }
-          }, 900)
+          triggerCountdown(payload.state.words?.[0]?.word || '')
         }
         return
       }
@@ -407,7 +431,7 @@ export default function WordChainGame({
       }
 
       // 6. Player left game notification
-      if (payload.event === 'game:leave' || payload.type === 'leave') {
+      if (eventName === 'game:leave' || payload.type === 'leave') {
         if (payload.sessionId === sessionIdRef.current && payload.memberId !== currentMemberId) {
           const person = payload.isHost ? '방장' : '상대방'
           const name = payload.memberName ? `${person}(${payload.memberName})` : person
@@ -435,7 +459,7 @@ export default function WordChainGame({
     channel.on('broadcast', { event: 'game:leave' }, onBroadcast)
 
     return () => {}
-  }, [channelRef, currentMemberId, inGame, inWaitingRoom, soundEnabled, voiceEnabled, supabase, checkForInvites, applyRemoteState])
+  }, [channelRef, currentMemberId, inGame, inWaitingRoom, soundEnabled, voiceEnabled, supabase, checkForInvites, applyRemoteState, triggerCountdown])
 
   // Polling sync to ensure resilience
   useEffect(() => {
@@ -479,7 +503,12 @@ export default function WordChainGame({
         channelRef?.current?.send({
           type: 'broadcast',
           event: eventType,
-          payload: { sessionId: activeSessionId, state: finalState },
+          payload: {
+            event: eventType,
+            type: eventType,
+            sessionId: activeSessionId,
+            state: finalState,
+          },
         })
       } catch (err) {
         console.error('❌ [원격 판 저장/전송 실패]', err)
@@ -599,6 +628,7 @@ export default function WordChainGame({
 
       setSessionId(activeSessionId)
       sessionIdRef.current = activeSessionId
+      lastStateVersionRef.current = 1
       setIsHost(true)
       setRoomTitle(finalRoomName)
       setHostInfo({ id: currentMemberId, name: currentMember.name, avatar: characterOf(currentMember) || '👑' })
@@ -682,7 +712,7 @@ export default function WordChainGame({
     }
   }
 
-  // Invitee accepts invite and enters the created room
+  // Invitee accepts invite and directly starts the game for both players
   async function acceptInvitation(invite = pendingInvite) {
     if (!invite) return
     setBusyRemote(true)
@@ -707,57 +737,106 @@ export default function WordChainGame({
         hostAvatar: invite.hostAvatar,
         gameMode: invite.gameMode,
         turnDuration: invite.turnDuration,
+        relayTarget: invite.relayTarget,
+        strictDict: invite.strictDict,
         invitedMemberIds: [invite.hostId, currentMemberId],
       }
 
-      const updatedAccepted = {
-        ...(st.acceptedMembers || {}),
-        [currentMemberId]: {
-          id: currentMemberId,
-          name: currentMember.name,
-          avatar: characterOf(currentMember) || '😊',
-          status: 'accepted',
-          isHost: false,
-        },
+      const hostPlayer = {
+        id: st.hostId || invite.hostId,
+        name: st.hostName || invite.hostName || '방장',
+        avatar: st.hostAvatar || invite.hostAvatar || '👑',
+        status: 'accepted',
+        isHost: true,
       }
 
-      const updatedState = {
+      const inviteePlayer = {
+        id: currentMemberId,
+        name: currentMember.name,
+        avatar: characterOf(currentMember) || '😊',
+        status: 'accepted',
+        isHost: false,
+      }
+
+      const fullPlayers = [hostPlayer, inviteePlayer]
+      const fullAlive = [hostPlayer.id, currentMemberId]
+
+      const seed = st.words?.[0]?.word || randomSeedWord()
+      const initialWords = [{ who: 'seed', byName: '시작 단어', avatar: '🌱', word: seed }]
+      const initialHead = lastCharOf(seed)
+
+      const updatedAccepted = {
+        ...(st.acceptedMembers || {}),
+        [hostPlayer.id]: hostPlayer,
+        [currentMemberId]: inviteePlayer,
+      }
+
+      const startingState = {
         ...st,
+        gameKey: 'wordchain',
+        gameMode: st.gameMode || invite.gameMode || 'family_versus',
+        roomName: st.roomName || invite.roomName || '가족 서바이벌',
+        status: 'playing',
+        hostId: hostPlayer.id,
+        hostName: hostPlayer.name,
+        hostAvatar: hostPlayer.avatar,
         acceptedMembers: updatedAccepted,
-        version: (st.version || 0) + 1,
+        players: fullPlayers,
+        alivePlayerIds: fullAlive,
+        activeTurnIdx: 0,
+        words: initialWords,
+        currentHead: initialHead,
+        turnDuration: st.turnDuration || invite.turnDuration || 15,
+        relayTarget: st.relayTarget || 20,
+        strictDict: st.strictDict !== undefined ? st.strictDict : true,
+        gameOver: null,
+        roundId: Date.now(),
+        version: (st.version || 0) + 2,
         updatedAt: new Date().toISOString(),
       }
 
-      if (supabase && currentSession) {
-        await pushState(supabase, invite.sessionId, {
-          state: updatedState,
-          turn: 'p1',
-        })
+      if (supabase && invite.sessionId) {
+        await supabase
+          .from('game_sessions')
+          .update({
+            p2_member_id: currentMemberId,
+            state: startingState,
+            turn: 'p1',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('session_id', invite.sessionId)
       }
 
       setIsHost(false)
       setSessionId(invite.sessionId)
       sessionIdRef.current = invite.sessionId
-      setRoomTitle(st.roomName || '가족 서바이벌')
-      setHostInfo({ id: st.hostId, name: st.hostName, avatar: st.hostAvatar })
+      lastStateVersionRef.current = startingState.version
+      setRoomTitle(startingState.roomName)
+      setHostInfo(hostPlayer)
       setAcceptedMembers(updatedAccepted)
-      setInvitedMembers(st.invitedMemberIds || [])
-      setInWaitingRoom(true)
-      setInGame(false)
+      setInvitedMembers(st.invitedMemberIds || [hostPlayer.id, currentMemberId])
       setPendingInvite(null)
 
-      // Broadcast acceptance
-      console.log('[WordChainGame] 📡 수락 브로드캐스트 전송...')
+      // Start locally for Invitee!
+      applyRemoteState(startingState, invite.sessionId)
+
+      // Broadcast game:start so Host ALSO immediately starts the game!
+      console.log('[WordChainGame] 🚀 수락 즉시 양방향 게임 시작 브로드캐스트 전송...')
       channelRef?.current?.send({
         type: 'broadcast',
-        event: 'game:accepted',
+        event: 'game:start',
         payload: {
+          event: 'game:start',
+          type: 'start',
           sessionId: invite.sessionId,
+          state: startingState,
           memberId: currentMemberId,
           name: currentMember.name,
-          avatar: characterOf(currentMember) || '😊',
         },
       })
+
+      // Run countdown on Invitee side
+      triggerCountdown(seed)
     } catch (err) {
       console.error('초대 수락 실패:', err)
     } finally {
@@ -797,6 +876,9 @@ export default function WordChainGame({
     setInWaitingRoom(false)
     setInGame(true)
 
+    const nextVer = (lastStateVersionRef.current || 0) + 1
+    lastStateVersionRef.current = nextVer
+
     const updatedState = {
       gameKey: 'wordchain',
       gameMode,
@@ -805,6 +887,7 @@ export default function WordChainGame({
       hostId: currentMemberId,
       hostName: hostInfo?.name || '방장',
       hostAvatar: hostInfo?.avatar || '👑',
+      acceptedMembers,
       players: acceptedList,
       activeTurnIdx: 0,
       alivePlayerIds: Array.from(initialAlive),
@@ -815,31 +898,14 @@ export default function WordChainGame({
       strictDict,
       gameOver: null,
       roundId: Date.now(),
-      version: (lastStateVersionRef.current || 0) + 1,
+      version: nextVer,
       updatedAt: new Date().toISOString(),
     }
 
     await broadcastAndSaveState(updatedState, 'game:start')
 
     // Local Countdown
-    setCountdown(3)
-    playCountdownSound(false, soundEnabled)
-
-    let count = 3
-    const cdTimer = setInterval(() => {
-      count -= 1
-      if (count > 0) {
-        setCountdown(count)
-        playCountdownSound(false, soundEnabled)
-      } else if (count === 0) {
-        setCountdown('GO!')
-        playCountdownSound(true, soundEnabled)
-        speakKorean(seed, { voiceEnabled })
-      } else {
-        clearInterval(cdTimer)
-        setCountdown(null)
-      }
-    }, 900)
+    triggerCountdown(seed)
   }
 
   // Single Player Bot Game Start
@@ -883,23 +949,7 @@ export default function WordChainGame({
     setInWaitingRoom(false)
     setInGame(true)
 
-    setCountdown(3)
-    playCountdownSound(false, soundEnabled)
-    let count = 3
-    const cdTimer = setInterval(() => {
-      count -= 1
-      if (count > 0) {
-        setCountdown(count)
-        playCountdownSound(false, soundEnabled)
-      } else if (count === 0) {
-        setCountdown('GO!')
-        playCountdownSound(true, soundEnabled)
-        speakKorean(seed, { voiceEnabled })
-      } else {
-        clearInterval(cdTimer)
-        setCountdown(null)
-      }
-    }, 900)
+    triggerCountdown(seed)
   }
 
   // Dismiss Invitation
@@ -1701,6 +1751,10 @@ export default function WordChainGame({
           {/* Action Buttons */}
           {isHost ? (
             <div className="flex flex-col gap-2">
+              <div className="p-3 bg-secondary/10 border border-secondary/30 rounded-xl text-center text-xs text-foreground font-semibold flex items-center justify-center gap-1.5">
+                <span>✨</span>
+                <span>상대방이 초대를 <strong>수락하는 즉시 자동으로 게임이 시작</strong>됩니다!</span>
+              </div>
               <button
                 type="button"
                 onClick={startMultiplayerGame}
@@ -1711,17 +1765,17 @@ export default function WordChainGame({
               </button>
               {acceptedCount < 2 && (
                 <p className="text-xs text-foreground-muted text-center">
-                  💡 다른 가족이 초대장을 수락하면 여기에 바로 표시됩니다. (혼자 연습할 수도 있어요!)
+                  💡 다른 가족이 초대장을 수락하면 자동으로 시작됩니다. (혼자 연습할 수도 있어요!)
                 </p>
               )}
             </div>
           ) : (
             <div className="text-center py-3 bg-surface-muted rounded-xl border border-border">
               <p className="font-display font-extrabold text-sm text-foreground">
-                방장(<strong>{hostInfo?.name}</strong>)님이 게임을 시작하기를 기다리고 있어요... ⏳
+                방장(<strong>{hostInfo?.name}</strong>)님과 게임을 준비하고 있어요... ⏳
               </p>
               <p className="text-xs text-foreground-muted mt-1">
-                방장이 시작 버튼을 누르면 곧바로 카운트다운이 시작됩니다!
+                수락 완료! 곧바로 3초 카운트다운과 함께 게임이 시작됩니다.
               </p>
             </div>
           )}
@@ -1999,7 +2053,7 @@ export default function WordChainGame({
           </div>
 
           {/* Turn Players Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {players.map((p, idx) => {
               const isTurn = idx === activeTurnIdx && !gameOver
               const isAlive = alivePlayerIds.has(p.id)
