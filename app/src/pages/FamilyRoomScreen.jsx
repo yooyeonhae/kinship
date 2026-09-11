@@ -1093,6 +1093,7 @@ function FamilyRoomScreen() {
             familyId={familyId}
             channelRef={channelRef}
             members={members}
+            onlineIds={onlineIds}
             currentMemberId={currentMemberId}
             onRecordWinner={(winnerId) =>
               finishRound(
