@@ -295,7 +295,7 @@ export default function WordChainGame({
 
       // ── ACTIVE GAME PHASE ──
       if (remoteState.status === 'playing') {
-        const isGameJustStarting = (!inGame || inWaitingRoom) && (!remoteState.words || remoteState.words.length <= 1)
+        const isGameJustStarting = (!inGame || inWaitingRoom || gameOverRef.current !== null) && (!remoteState.words || remoteState.words.length <= 1)
         setInWaitingRoom(false)
         setInGame(true)
         setPendingInvite(null)
@@ -950,6 +950,86 @@ export default function WordChainGame({
     setInGame(true)
 
     triggerCountdown(seed)
+  }
+
+  // Play Again (Rematch) with same room participants
+  async function handlePlayAgain() {
+    setGameOver(null)
+    gameOverRef.current = null
+
+    if (gameMode === 'bot') {
+      startBotGame()
+      return
+    }
+
+    const currentParticipants =
+      playersRef.current.length > 0
+        ? playersRef.current
+        : players.length > 0
+          ? players
+          : Object.values(acceptedMembers).filter((m) => m.status === 'accepted')
+
+    // If we have an active multiplayer session with participants, start rematch directly!
+    if (sessionIdRef.current && currentParticipants.length >= 1) {
+      console.log('[WordChainGame] 🔄 같은 방 가족과 재대결(다시하기) 시작:', currentParticipants)
+      const seed = randomSeedWord()
+      const initialWords = [{ who: 'seed', byName: '시작 단어', avatar: '🌱', word: seed }]
+      const initialHead = lastCharOf(seed)
+      const initialAlive = new Set(currentParticipants.map((p) => p.id))
+
+      playersRef.current = currentParticipants
+      alivePlayerIdsRef.current = initialAlive
+      activeTurnIdxRef.current = 0
+      wordsRef.current = initialWords
+      currentHeadRef.current = initialHead
+      isBotThinkingRef.current = false
+
+      setPlayers(currentParticipants)
+      setAlivePlayerIds(initialAlive)
+      setActiveTurnIdx(0)
+      setWords(initialWords)
+      setCurrentHead(initialHead)
+      setRemainTime(turnDuration > 0 ? turnDuration : 999)
+      setFeedback(null)
+      setHintWord('')
+      setWordInput('')
+      composer.reset()
+      setInWaitingRoom(false)
+      setInGame(true)
+
+      const nextVer = (lastStateVersionRef.current || 0) + 1
+      lastStateVersionRef.current = nextVer
+
+      const rematchState = {
+        gameKey: 'wordchain',
+        gameMode,
+        roomName: roomTitle,
+        status: 'playing',
+        hostId: hostInfo?.id || currentMemberId,
+        hostName: hostInfo?.name || currentMember.name,
+        hostAvatar: hostInfo?.avatar || '👑',
+        acceptedMembers,
+        players: currentParticipants,
+        alivePlayerIds: Array.from(initialAlive),
+        words: initialWords,
+        currentHead: initialHead,
+        activeTurnIdx: 0,
+        turnDuration,
+        relayTarget,
+        strictDict,
+        gameOver: null,
+        roundId: Date.now(),
+        version: nextVer,
+        updatedAt: new Date().toISOString(),
+      }
+
+      await broadcastAndSaveState(rematchState, 'game:start')
+      triggerCountdown(seed)
+      return
+    }
+
+    // Fallback if room was disconnected: open create room modal
+    handleOpenCreateModal()
   }
 
   // Dismiss Invitation
@@ -2316,16 +2396,7 @@ export default function WordChainGame({
             <div className="flex gap-2 w-full mt-2">
               <button
                 type="button"
-                onClick={() => {
-                  setGameOver(null)
-                  setInGame(false)
-                  setInWaitingRoom(false)
-                  if (gameMode === 'bot') {
-                    startBotGame()
-                  } else {
-                    handleOpenCreateModal()
-                  }
-                }}
+                onClick={handlePlayAgain}
                 className="flex-1 py-3 bg-primary text-on-primary rounded-xl font-display font-bold text-sm border-2 border-foreground shadow-sticker active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition"
               >
                 🔄 다시 하기
