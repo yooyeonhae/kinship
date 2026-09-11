@@ -215,6 +215,7 @@ function FamilyRoomScreen() {
   const [needsMigration, setNeedsMigration] = useState(false)
   const chatLogRef = useRef(null)
   const channelRef = useRef(null)
+  const [topInvite, setTopInvite] = useState(null)
 
   const [points, setPoints] = useState(null)
   // 할일 1개가 몇 점인지는 가족이 정한다(migration_21). 기본은 10p.
@@ -382,6 +383,12 @@ function FamilyRoomScreen() {
         const { data } = await fetchSession(supabase, payload.sessionId)
         if (data) applySessionRef.current?.(data)
         else setSession(null)
+      })
+      .on('broadcast', { event: 'game:invite' }, ({ payload }) => {
+        console.log('[FamilyRoom Screen] 실시간 게임 초대 수신:', payload)
+        if (payload?.invitedMemberIds?.includes(currentMemberId) && payload?.hostId !== currentMemberId) {
+          setTopInvite(payload)
+        }
       })
       .on('presence', { event: 'sync' }, () => {
         setOnlineIds(Object.keys(channel.presenceState()))
@@ -784,6 +791,45 @@ function FamilyRoomScreen() {
         <p className="text-foreground-muted text-[13px] leading-[18px] mt-1">부모님이 잠깐 자리를 비워도 가족끼리 대화하고 같이 놀 수 있어요.</p>
       </div>
 
+      {topInvite && (
+        <div className="bg-primary text-on-primary border-2 border-foreground rounded-xl shadow-sticker p-3.5 mb-5 flex items-center justify-between gap-3 animate-pop">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-2xl shrink-0">{topInvite.hostAvatar || '💌'}</span>
+            <div className="min-w-0">
+              <p className="font-display font-black text-sm truncate">
+                💌 {topInvite.hostName}님이 대전 방으로 초대했어요!
+              </p>
+              <p className="text-xs opacity-90 truncate">
+                방 이름: <strong>{topInvite.roomName || '가족 대전'}</strong>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveGame('wordchain')
+                setTopInvite(null)
+                setTimeout(() => {
+                  window.scrollTo({ top: 750, behavior: 'smooth' })
+                }, 100)
+              }}
+              className="px-3.5 py-2 bg-tape-yellow text-foreground font-display font-black text-xs rounded-lg shadow-sticker active:scale-95 transition"
+            >
+              👉 수락 & 입장
+            </button>
+            <button
+              type="button"
+              onClick={() => setTopInvite(null)}
+              className="p-1 text-on-primary/70 hover:text-on-primary text-xs"
+              title="닫기"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {needsMigration && (
         <div className="bg-destructive/10 border border-destructive rounded-md px-4 py-3 mb-4">
           <p className="text-[13px] text-destructive leading-[19px]">
@@ -850,6 +896,25 @@ function FamilyRoomScreen() {
                     <div className="inline-block bg-tape-yellow/70 rounded-lg rounded-tl-none px-3 py-2 max-w-full">
                       <p className="text-[14px] leading-[20px] text-foreground break-words">{m.content}</p>
                     </div>
+                    {m.content?.includes('[끝말잇기 초대]') && (
+                      <div className="mt-2 p-2.5 bg-surface border-2 border-primary/40 rounded-xl flex items-center justify-between gap-2 shadow-xs">
+                        <span className="text-xs font-bold text-primary flex items-center gap-1">
+                          🎮 끝말잇기 대전 초대장
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveGame('wordchain')
+                            setTimeout(() => {
+                              window.scrollTo({ top: 750, behavior: 'smooth' })
+                            }, 100)
+                          }}
+                          className="px-3 py-1.5 bg-primary text-on-primary font-display font-black text-xs rounded-lg shadow-sticker active:scale-95 transition"
+                        >
+                          👉 바로 입장하기
+                        </button>
+                      </div>
+                    )}
                     {time && <p className="text-[11px] text-foreground-muted mt-1">{time}</p>}
                   </div>
                 </div>

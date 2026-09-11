@@ -278,6 +278,22 @@ CREATE TABLE IF NOT EXISTS game_results (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- (14-1) 원격 실시간 턴제 대전 세션 테이블 (game_sessions)
+CREATE TABLE IF NOT EXISTS game_sessions (
+  session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
+  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain')),
+  p1_member_id UUID NOT NULL REFERENCES members (member_id) ON DELETE CASCADE,
+  p2_member_id UUID REFERENCES members (member_id) ON DELETE CASCADE,
+  state JSONB NOT NULL,
+  turn TEXT NOT NULL DEFAULT 'p1' CHECK (turn IN ('p1', 'p2')),
+  winner TEXT CHECK (winner IN ('p1', 'p2', 'draw')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS game_sessions_family_idx ON game_sessions (family_id, updated_at DESC);
+
 -- (15) 웹 푸시 구독 정보 (push_subscriptions)
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -772,6 +788,7 @@ ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorite_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE game_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
@@ -866,6 +883,11 @@ USING (family_id = current_family_id() AND is_parent());
 
 DROP POLICY IF EXISTS "game_results_all" ON game_results;
 CREATE POLICY "game_results_all" ON game_results FOR ALL TO anon, authenticated
+USING (family_id = current_family_id() OR current_family_id() IS NULL)
+WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
+
+DROP POLICY IF EXISTS "game_sessions_all" ON game_sessions;
+CREATE POLICY "game_sessions_all" ON game_sessions FOR ALL TO anon, authenticated
 USING (family_id = current_family_id() OR current_family_id() IS NULL)
 WITH CHECK (family_id = current_family_id() OR current_family_id() IS NULL);
 

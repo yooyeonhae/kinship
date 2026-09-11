@@ -13,6 +13,7 @@ import {
   speakKorean,
 } from '../lib/wordChainAudio'
 import { notifyFamily } from '../lib/push'
+import { sendChat, CHAT_EVENT } from '../lib/familyRoom'
 import {
   GAME_EVENT,
   createSession,
@@ -88,6 +89,8 @@ export default function WordChainGame({
   const [acceptedMembers, setAcceptedMembers] = useState({}) // { [memberId]: { id, name, avatar, status: 'accepted' } }
   const [invitedMembers, setInvitedMembers] = useState([])
   const [pendingInvite, setPendingInvite] = useState(null)
+  const [dispatchLogs, setDispatchLogs] = useState([])
+  const [dbWarning, setDbWarning] = useState(null)
   const [dismissedInviteIds, setDismissedInviteIds] = useState(new Set())
   const [inviteToast, setInviteToast] = useState(null)
   const [busyRemote, setBusyRemote] = useState(false)
@@ -479,8 +482,16 @@ export default function WordChainGame({
   async function handleConfirmCreateRoom() {
     setShowCreateModal(false)
     setBusyRemote(true)
+    setDbWarning(null)
     if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
     clearInterval(timerRef.current)
+
+    const logs = []
+    const addLog = (step, status, detail = '') => {
+      const item = { step, status, detail, time: new Date().toLocaleTimeString('ko-KR') }
+      logs.push(item)
+      setDispatchLogs([...logs])
+    }
 
     try {
       if (supabase) {
@@ -524,7 +535,17 @@ export default function WordChainGame({
         updatedAt: new Date().toISOString(),
       }
 
+      const invitedNames = selectedMemberIds
+        .map((id) => members.find((m) => m.member_id === id)?.name)
+        .filter(Boolean)
+        .join(', ')
+
+      let activeSessionId = null
+
+      // ── STEP 1: Supabase game_sessions DB 세션 생성 ──
       if (supabase && familyId) {
+        console.log('[WordChainGame] 🚀 [1/4] Supabase game_sessions 테이블에 세션 등록 시도...', sessionState)
+        addLog('1. 대전 세션 DB 등록', 'pending', 'Supabase에 세션 저장 중...')
         const { data, error } = await createSession(supabase, {
           familyId,
           gameKey: 'wordchain',
@@ -532,51 +553,105 @@ export default function WordChainGame({
           state: sessionState,
         })
 
-        if (data && !error) {
-          setSessionId(data.session_id)
-          sessionIdRef.current = data.session_id
-          setIsHost(true)
-          setRoomTitle(finalRoomName)
-          setHostInfo({ id: currentMemberId, name: currentMember.name, avatar: characterOf(currentMember) || '👑' })
-          setAcceptedMembers(initialAccepted)
-          setInvitedMembers(selectedMemberIds)
-          setInWaitingRoom(true)
-          setInGame(false)
+        if (error) {
+          console.error('[WordChainGame] ❌ [1/4] 세션 생성 실패:', error)
+          const isTableMissing = error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('game_sessions')
+          const warnText = isTableMissing
+            ? 'game_sessions 테이블이 Supabase에 없습니다. (SQL 마이그레이션 실행 필요)'
+            : `DB 오류: ${error.message}`
+          addLog('1. 대전 세션 DB 등록', 'error', warnText)
+          setDbWarning(warnText)
+          activeSessionId = `local_${Date.now()}`
+        } else if (data) {
+          activeSessionId = data.session_id
+          console.log('[WordChainGame] ✅ [1/4] 세션 생성 성공! ID:', activeSessionId)
+          addLog('1. 대전 세션 DB 등록', 'ok', `세션 생성 완료 (ID: ${activeSessionId.slice(0, 8)}...)`)
+        }
+      } else {
+        activeSessionId = `local_${Date.now()}`
+        addLog('1. 대전 세션 DB 등록', 'ok', '로컬 세션 준비 완료')
+      }
 
-          // Broadcast Invitation to family channel
+      setSessionId(activeSessionId)
+      sessionIdRef.current = activeSessionId
+      setIsHost(true)
+      setRoomTitle(finalRoomName)
+      setHostInfo({ id: currentMemberId, name: currentMember.name, avatar: characterOf(currentMember) || '👑' })
+      setAcceptedMembers(initialAccepted)
+      setInvitedMembers(selectedMemberIds)
+      setInWaitingRoom(true)
+      setInGame(false)
+
+      // ── STEP 2: 가족 단체 톡방(chat_messages)에 초대 메시지 발송 ──
+      if (supabase && familyId) {
+        console.log('[WordChainGame] 🚀 [2/4] 가족 단체 톡방에 초대 메시지 발송 시도...')
+        addLog('2. 가족 톡방 초대 메시지', 'pending', '가족 톡방에 등록 중...')
+        const inviteChatContent = `🎮 [끝말잇기 초대] '${finalRoomName}' 방으로 초대합니다! (초대 대상: ${invitedNames || '가족'})`
+        const chatRes = await sendChat(supabase, {
+          familyId,
+          memberId: currentMemberId,
+          senderName: currentMember.name,
+          content: inviteChatContent,
+        })
+        if (chatRes.error) {
+          console.warn('[WordChainGame] ⚠️ [2/4] 가족 톡 등록 실패:', chatRes.error)
+          addLog('2. 가족 톡방 초대 메시지', 'warn', chatRes.error.message || '채팅 전송 실패')
+        } else {
+          console.log('[WordChainGame] ✅ [2/4] 가족 톡 등록 성공:', chatRes.data)
+          addLog('2. 가족 톡방 초대 메시지', 'ok', '가족 톡방에 초대장 게시 완료')
           channelRef?.current?.send({
+            type: 'broadcast',
+            event: CHAT_EVENT,
+            payload: chatRes.data,
+          })
+        }
+      }
+
+      // ── STEP 3: 실시간 가족 채널(Broadcast game:invite) 전송 ──
+      console.log('[WordChainGame] 🚀 [3/4] 실시간 채널(game:invite) 브로드캐스트 발송...')
+      addLog('3. 실시간 초대 브로드캐스트', 'pending', '가족 기기로 실시간 신호 전송 중...')
+      let sendStatus = 'unknown'
+      if (channelRef?.current) {
+        try {
+          sendStatus = await channelRef.current.send({
             type: 'broadcast',
             event: 'game:invite',
             payload: {
-              sessionId: data.session_id,
+              sessionId: activeSessionId,
               type: 'invite',
               roomName: finalRoomName,
               hostId: currentMemberId,
               hostName: currentMember.name,
               hostAvatar: characterOf(currentMember) || '👑',
               gameMode,
+              turnDuration,
               invitedMemberIds: selectedMemberIds,
             },
           })
-
-          // Send Web Push notification
-          notifyFamily({
-            familyId,
-            senderName: currentMember.name,
-            excludeMemberId: currentMemberId,
-          })
-
-          const invitedNames = selectedMemberIds
-            .map((id) => members.find((m) => m.member_id === id)?.name)
-            .filter(Boolean)
-            .join(', ')
-
-          setInviteToast(`💌 '${finalRoomName}' 초대장을 ${invitedNames || '가족'}님께 보냈어요!`)
-          setTimeout(() => setInviteToast(null), 5000)
+        } catch (e) {
+          sendStatus = 'error'
+          console.error('[WordChainGame] ❌ [3/4] 브로드캐스트 에러:', e)
         }
       }
+      console.log('[WordChainGame] ✅ [3/4] 브로드캐스트 결과:', sendStatus)
+      addLog('3. 실시간 초대 브로드캐스트', sendStatus === 'ok' ? 'ok' : 'warn', `상태: ${sendStatus}`)
+
+      // ── STEP 4: 모바일 웹 푸시 알림 요청 ──
+      console.log('[WordChainGame] 🚀 [4/4] 모바일 웹 푸시 알림 요청...')
+      addLog('4. 모바일 푸시 알림', 'pending', '푸시 알림 서버 요청 중...')
+      notifyFamily({
+        familyId,
+        senderName: currentMember.name,
+        excludeMemberId: currentMemberId,
+      })
+      console.log('[WordChainGame] ✅ [4/4] 모바일 웹 푸시 요청 완료')
+      addLog('4. 모바일 푸시 알림', 'ok', '푸시 알림 발송 요청 완료')
+
+      setInviteToast(`💌 '${finalRoomName}' 초대장을 ${invitedNames || '가족'}님께 보냈어요!`)
+      setTimeout(() => setInviteToast(null), 6000)
     } catch (err) {
-      console.error('방 생성 실패:', err)
+      console.error('방 생성 처리 중 예외 발생:', err)
+      addLog('방 생성 프로세스', 'error', err.message || '오류 발생')
     } finally {
       setBusyRemote(false)
     }
@@ -584,17 +659,32 @@ export default function WordChainGame({
 
   // Invitee accepts invite and enters the created room
   async function acceptInvitation(invite = pendingInvite) {
-    if (!invite || !supabase) return
+    if (!invite) return
     setBusyRemote(true)
+    console.log('[WordChainGame] 🤝 초대 수락 진행:', invite)
     try {
-      const { data: currentSession } = await fetchSession(supabase, invite.sessionId)
-      if (!currentSession || currentSession.state?.gameOver) {
+      let currentSession = null
+      if (supabase && invite.sessionId && !invite.sessionId.startsWith('local_') && !invite.sessionId.startsWith('temp_')) {
+        const { data } = await fetchSession(supabase, invite.sessionId)
+        currentSession = data
+      }
+
+      if (currentSession?.state?.gameOver) {
         setFeedback({ ok: false, message: '이미 종료되었거나 취소된 게임방입니다.' })
         setPendingInvite(null)
         return
       }
 
-      const st = currentSession.state
+      const st = currentSession?.state || {
+        roomName: invite.roomName,
+        hostId: invite.hostId,
+        hostName: invite.hostName,
+        hostAvatar: invite.hostAvatar,
+        gameMode: invite.gameMode,
+        turnDuration: invite.turnDuration,
+        invitedMemberIds: [invite.hostId, currentMemberId],
+      }
+
       const updatedAccepted = {
         ...(st.acceptedMembers || {}),
         [currentMemberId]: {
@@ -613,10 +703,12 @@ export default function WordChainGame({
         updatedAt: new Date().toISOString(),
       }
 
-      await pushState(supabase, invite.sessionId, {
-        state: updatedState,
-        turn: 'p1',
-      })
+      if (supabase && currentSession) {
+        await pushState(supabase, invite.sessionId, {
+          state: updatedState,
+          turn: 'p1',
+        })
+      }
 
       setIsHost(false)
       setSessionId(invite.sessionId)
@@ -630,6 +722,7 @@ export default function WordChainGame({
       setPendingInvite(null)
 
       // Broadcast acceptance
+      console.log('[WordChainGame] 📡 수락 브로드캐스트 전송...')
       channelRef?.current?.send({
         type: 'broadcast',
         event: 'game:accepted',
@@ -1475,6 +1568,54 @@ export default function WordChainGame({
                   )
                 })}
             </div>
+
+            {/* Realtime Dispatch Logs */}
+            {dispatchLogs.length > 0 && (
+              <div className="mt-2 p-3.5 rounded-xl bg-surface border border-border text-xs flex flex-col gap-2 shadow-xs">
+                <div className="flex items-center justify-between font-bold text-foreground-muted pb-1.5 border-b border-border/50">
+                  <span className="flex items-center gap-1.5 text-foreground font-display">
+                    <span>📡</span> 초대장 전송 상태 로그
+                  </span>
+                  <span className="text-[11px] font-normal text-foreground-muted">실시간 확인</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {dispatchLogs.map((log, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        {log.status === 'ok' && <span className="text-secondary font-black shrink-0">✅</span>}
+                        {log.status === 'error' && <span className="text-destructive font-black shrink-0">❌</span>}
+                        {log.status === 'warn' && <span className="text-tape-yellow font-black shrink-0">⚠️</span>}
+                        {log.status === 'pending' && <span className="text-primary font-black shrink-0 animate-spin">⏳</span>}
+                        <span className="font-semibold text-foreground truncate">{log.step}</span>
+                      </span>
+                      <span
+                        className={`text-[11px] shrink-0 ${
+                          log.status === 'error'
+                            ? 'text-destructive font-bold'
+                            : log.status === 'warn'
+                              ? 'text-tape-yellow font-bold'
+                              : 'text-foreground-muted'
+                        }`}
+                      >
+                        {log.detail || (log.status === 'ok' ? '성공' : '')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* DB Warning Alert */}
+            {dbWarning && (
+              <div className="mt-2 p-3 bg-destructive/10 border-2 border-destructive/40 rounded-xl text-xs text-destructive flex flex-col gap-1">
+                <p className="font-bold flex items-center gap-1">
+                  <span>⚠️</span> {dbWarning}
+                </p>
+                <p className="text-[11px] text-foreground-muted leading-relaxed">
+                  Supabase SQL Editor에서 <code>migration_16_game_sessions.sql</code>(또는 최신 <code>full_schema.sql</code>)을 실행하시면 대전 판이 영구 보존됩니다. (현재는 실시간 웹소켓 채널로 정상 대전이 가능합니다.)
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
