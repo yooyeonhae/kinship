@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import FamilyRewards from '../components/FamilyRewards'
+import WordChainGame from '../components/WordChainGame'
 import { characterOf } from '../lib/avatars'
 import { allowedHeads, checkWord, lastCharOf, randomSeedWord } from '../lib/wordChain'
 import { DEFAULT_SETTINGS, SETTINGS_EVENT, loadSettings } from '../lib/settings'
@@ -616,41 +617,6 @@ function FamilyRoomScreen() {
   const myTurn = !session || isMyTurn(session, currentMemberId)
   const remoteRole = roleOf(session, currentMemberId)
 
-  function handleWordSubmit(e) {
-    e.preventDefault()
-    const raw = wordInput
-    let accepted = false
-    setChain((prev) => {
-      if (prev.winner) return prev
-      const used = prev.words.map((w) => w.word)
-      const res = checkWord(raw, { lastChar: lastCharOf(used[used.length - 1]), used })
-      // 규칙에 안 맞는 말은 차례를 넘기지 않는다. 오타 한 번에 지면 아이들이 억울하다.
-      if (!res.ok) return { ...prev, feedback: { ok: false, reason: res.reason, word: raw.trim() } }
-      accepted = true
-      return {
-        ...prev,
-        words: [...prev.words, { who: prev.turn, word: res.word }],
-        feedback: { ok: true, word: res.word, who: prev.turn },
-        turn: prev.turn === 'p1' ? 'p2' : 'p1',
-      }
-    })
-    if (accepted) setWordInput('')
-  }
-
-  // 못 이으면 스스로 넘긴다. 사전이 없으니 "막혔다"를 앱이 판정할 수 없고,
-  // 시간 제한을 두면 반응속도 게임이 되어 PRD가 일부러 뺀 쪽으로 간다.
-  function handleGiveUp() {
-    setChain((prev) => {
-      if (prev.winner) return prev
-      return { ...prev, winner: prev.turn === 'p1' ? 'p2' : 'p1', endedBy: 'giveup', feedback: null }
-    })
-  }
-
-  function resetChain() {
-    setChain((prev) => newWordChainState(prev.winner === 'p1' ? 'p2' : 'p1'))
-    setWordInput('')
-  }
-
   function handleBingoClick(owner, idx) {
     setBingo((prev) => {
       if (prev.winner || owner !== prev.turn) return prev
@@ -790,11 +756,6 @@ function FamilyRoomScreen() {
   const myRooms = sessions.filter(
     (row) => roleOf(row, currentMemberId) || !row.p2_member_id
   )
-
-  // 지금 이어야 하는 글자. 두음법칙으로 바꿔 시작해도 되는 글자까지 보여준다 —
-  // 안 보여주면 "락으로 시작하는 말이 없다"에서 판이 멈춘다.
-  const chainLast = lastCharOf(chain.words[chain.words.length - 1]?.word)
-  const chainHeads = allowedHeads(chainLast)
 
   // 지금 숫자를 부를 사람의 범위. 원격이면 항상 차례인 쪽이 곧 나다.
   const updownRange = updown.ranges[updown.turn]
@@ -1045,66 +1006,68 @@ function FamilyRoomScreen() {
         {/* 선수 줄이 곧 차례 표시다. 원격 대전에서는 선수가 세션에 박혀 있어서
             고를 수 있는 값이 아니다 — 예전에는 눌리지 않는 select가 남아 있어서
             대전 상대와 다른 이름이 그대로 보였다. */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {['p1', 'p2'].map((key) => {
-            const memberId = session
-              ? key === 'p1'
-                ? session.p1_member_id
-                : session.p2_member_id
-              : key === 'p1'
-                ? player1Id
-                : player2Id
-            const waiting = Boolean(session) && !memberId
-            const isTurn = !activeState.winner && activeState.turn === key && !waiting
-            const isMe = Boolean(memberId) && memberId === currentMemberId
-            const won = activeState.winner === key
-            return (
-              <div
-                key={key}
-                className={`rounded-md border-2 px-2.5 py-2 transition duration-150 ${
-                  won
-                    ? 'border-foreground bg-secondary-dark text-on-secondary shadow-sticker'
-                    : isTurn
-                      ? isMe
-                        ? 'border-foreground bg-primary text-on-primary shadow-sticker'
-                        : 'border-foreground bg-pastel-sky'
-                      : 'border-border bg-surface-muted'
-                }`}
-              >
-                <p className="text-[11px] font-display font-bold opacity-80">
-                  {key === 'p1' ? '선수1' : '선수2'}
-                  {won ? ' · 승리!' : isTurn ? (isMe ? ' · 내 차례!' : ' · 지금 차례') : ''}
-                </p>
-                {session ? (
-                  <p className="font-display font-bold text-[14px] truncate">
-                    {waiting ? (
-                      '참가를 기다려요'
-                    ) : (
-                      <>
-                        <span aria-hidden="true">
-                          {characterOf(members.find((m) => m.member_id === memberId))}
-                        </span>{' '}
-                        {memberName(memberId)}
-                      </>
-                    )}
+        {activeGame !== 'wordchain' && (
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {['p1', 'p2'].map((key) => {
+              const memberId = session
+                ? key === 'p1'
+                  ? session.p1_member_id
+                  : session.p2_member_id
+                : key === 'p1'
+                  ? player1Id
+                  : player2Id
+              const waiting = Boolean(session) && !memberId
+              const isTurn = !activeState.winner && activeState.turn === key && !waiting
+              const isMe = Boolean(memberId) && memberId === currentMemberId
+              const won = activeState.winner === key
+              return (
+                <div
+                  key={key}
+                  className={`rounded-md border-2 px-2.5 py-2 transition duration-150 ${
+                    won
+                      ? 'border-foreground bg-secondary-dark text-on-secondary shadow-sticker'
+                      : isTurn
+                        ? isMe
+                          ? 'border-foreground bg-primary text-on-primary shadow-sticker'
+                          : 'border-foreground bg-pastel-sky'
+                        : 'border-border bg-surface-muted'
+                  }`}
+                >
+                  <p className="text-[11px] font-display font-bold opacity-80">
+                    {key === 'p1' ? '선수1' : '선수2'}
+                    {won ? ' · 승리!' : isTurn ? (isMe ? ' · 내 차례!' : ' · 지금 차례') : ''}
                   </p>
-                ) : (
-                  <select
-                    value={memberId}
-                    onChange={(e) => (key === 'p1' ? setPlayer1Id(e.target.value) : setPlayer2Id(e.target.value))}
-                    className="w-full bg-surface rounded-md px-1.5 py-1 text-[13px] font-display font-bold text-foreground border border-border outline-none"
-                  >
-                    {members.map((m) => (
-                      <option key={m.member_id} value={m.member_id}>
-                        {characterOf(m)} {m.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                  {session ? (
+                    <p className="font-display font-bold text-[14px] truncate">
+                      {waiting ? (
+                        '참가를 기다려요'
+                      ) : (
+                        <>
+                          <span aria-hidden="true">
+                            {characterOf(members.find((m) => m.member_id === memberId))}
+                          </span>{' '}
+                          {memberName(memberId)}
+                        </>
+                      )}
+                    </p>
+                  ) : (
+                    <select
+                      value={memberId}
+                      onChange={(e) => (key === 'p1' ? setPlayer1Id(e.target.value) : setPlayer2Id(e.target.value))}
+                      className="w-full bg-surface rounded-md px-1.5 py-1 text-[13px] font-display font-bold text-foreground border border-border outline-none"
+                    >
+                      {members.map((m) => (
+                        <option key={m.member_id} value={m.member_id}>
+                          {characterOf(m)} {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2 mb-4">
           {GAME_TABS.map((tab) => (
@@ -1125,95 +1088,17 @@ function FamilyRoomScreen() {
         </div>
 
         {activeGame === 'wordchain' && (
-          <div>
-            <p className="text-[13px] text-foreground-muted mb-3">
-              앞 사람이 말한 낱말의 <strong>끝 글자</strong>로 시작하는 낱말을 번갈아 말해요. 두 글자 이상, 이미 나온 낱말은
-              안 돼요. 더 이을 말이 없으면 <strong>모르겠어요</strong>를 눌러요 — 그러면 상대가 승리!
-            </p>
-
-            <div className="bg-surface-muted rounded-md px-4 py-3 text-center mb-3">
-              <p className="text-[13px] text-foreground-muted">이 글자로 시작하는 낱말</p>
-              <p className="font-display font-extrabold text-[32px] leading-tight">
-                {chainHeads.join(' 또는 ')}
-              </p>
-              {chainHeads.length > 1 && (
-                <p className="text-[12px] text-foreground-muted">둘 중 아무 글자로 시작해도 돼요</p>
-              )}
-            </div>
-
-            {chain.feedback && !chain.winner && (
-              <p
-                className={`text-[13px] font-display font-bold text-center mb-3 ${
-                  chain.feedback.ok ? 'text-secondary' : 'text-destructive'
-                }`}
-              >
-                {chain.feedback.ok
-                  ? `${chain.feedback.who === 'p1' ? player1 : player2}: ${chain.feedback.word} 좋아요!`
-                  : chain.feedback.reason === 'head'
-                    ? `${chainHeads.join(' 또는 ')}(으)로 시작해야 해요.`
-                    : chain.feedback.reason === 'used'
-                      ? `${chain.feedback.word}은(는) 이미 나온 낱말이에요.`
-                      : chain.feedback.reason === 'short'
-                        ? '두 글자 이상으로 말해주세요.'
-                        : '한글 낱말로 말해주세요.'}
-              </p>
-            )}
-
-            <form onSubmit={handleWordSubmit} className="flex items-center gap-2 mb-3">
-              <input
-                type="text"
-                value={wordInput}
-                onChange={(e) => setWordInput(e.target.value)}
-                disabled={!!chain.winner || !myTurn}
-                placeholder={`${chainHeads[0] || ''}...으로 시작하는 낱말`}
-                className="flex-1 bg-surface rounded-md px-3 py-2.5 text-[15px] border border-border outline-none focus:border-foreground transition duration-150 min-w-0"
-                autoComplete="off"
-              />
-              <button
-                type="submit"
-                disabled={!!chain.winner || !myTurn}
-                className="px-4 h-11 rounded-md bg-primary text-on-primary border-2 border-foreground shadow-sticker font-display font-bold text-[14px] shrink-0 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all duration-150 disabled:opacity-60"
-              >
-                말하기
-              </button>
-            </form>
-
-            <ul className="flex flex-col gap-1.5 mb-3 max-h-40 overflow-y-auto pr-1">
-              {chain.words.map((w, i) => (
-                <li key={i} className="flex items-center justify-between bg-surface-muted rounded-md px-3 py-1.5">
-                  <span className="text-[14px] font-display font-bold">{w.word}</span>
-                  <span className="text-[12px] text-foreground-muted">
-                    {w.who === 'seed' ? '시작 낱말' : w.who === 'p1' ? player1 : player2}
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              type="button"
-              onClick={handleGiveUp}
-              disabled={!!chain.winner || !myTurn}
-              className="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] mb-2 active:scale-[0.97] transition duration-150 disabled:opacity-50"
-            >
-              더 이을 말이 없어요 (모르겠어요)
-            </button>
-
-            <p className="text-[12px] text-foreground-muted text-center mb-3">
-              실제로 있는 낱말인지는 가족이 함께 판단해요. 앱은 끝 글자·글자 수·중복만 확인해요.
-            </p>
-            <p className="text-[14px] font-display font-bold text-center mb-3">
-              {chain.winner
-                ? `${chain.winner === 'p1' ? player1 : player2} 승리! ${chain.words.length - 1}개까지 이었어요.`
-                : ' '}
-            </p>
-            <button
-              type="button"
-              onClick={resetChain}
-              className="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-[0.97] transition duration-150"
-            >
-              새 게임
-            </button>
-          </div>
+          <WordChainGame
+            members={members}
+            currentMemberId={currentMemberId}
+            onRecordWinner={(winnerId) =>
+              finishRound(
+                'wordchain',
+                nextRoundId++,
+                winnerId === player1Id ? 'p1' : winnerId === player2Id ? 'p2' : 'p1'
+              )
+            }
+          />
         )}
 
         {activeGame === 'bingo' && (

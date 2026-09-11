@@ -140,3 +140,31 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 @keyframes dice-roll { 0% { transform: rotate(0deg) scale(1); } 40% { transform: rotate(200deg) scale(1.15); } 100% { transform: rotate(360deg) scale(1); } }
 .dice-rolling { animation: dice-roll 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 @media (prefers-reduced-motion: reduce) { .dice-rolling { animation: none; } }
+
+/* Word Chain Game Animations */
+@keyframes bounce-up {
+  0% { opacity: 0; transform: translateY(20px) scale(0.6); }
+  20% { opacity: 1; transform: translateY(0) scale(1.2); }
+  80% { opacity: 1; transform: translateY(-80px) scale(1); }
+  100% { opacity: 0; transform: translateY(-140px) scale(0.8); }
+}
+.animate-bounce-up {
+  animation: bounce-up 2.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.7); opacity: 0; }
+  70% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+  animation: pop-in 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fade-in 0.25s ease-out forwards;
+}

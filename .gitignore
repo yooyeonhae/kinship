@@ -4,3 +4,7 @@ dist/
 *.log
 .claude/settings.local.json
 .env
+scratch/
+app/public/images/candidates*/
+app/public/preview.html
+
