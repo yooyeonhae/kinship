@@ -1089,6 +1089,9 @@ function FamilyRoomScreen() {
 
         {activeGame === 'wordchain' && (
           <WordChainGame
+            supabase={supabase}
+            familyId={familyId}
+            channelRef={channelRef}
             members={members}
             currentMemberId={currentMemberId}
             onRecordWinner={(winnerId) =>

@@ -12,6 +12,17 @@ import {
   playCheerSound,
   speakKorean,
 } from '../lib/wordChainAudio'
+import { notifyFamily } from '../lib/push'
+import {
+  GAME_EVENT,
+  createSession,
+  loadSessions,
+  joinSession,
+  pushState,
+  fetchSession,
+  leaveSession,
+  removeMyOpenSessions,
+} from '../lib/gameSession'
 
 const BOT_DIFFICULTIES = [
   { key: 'easy', label: '🐣 아기 로봇', desc: '쉬운 단어 위주, 가끔 항복 (어린이용)', icon: 'ph-baby' },
@@ -40,6 +51,9 @@ const KEY_ROWS = [
 const SHIFT_MAP = { 'ㅂ': 'ㅃ', 'ㅈ': 'ㅉ', 'ㄷ': 'ㄸ', 'ㄱ': 'ㄲ', 'ㅅ': 'ㅆ', 'ㅐ': 'ㅒ', 'ㅔ': 'ㅖ' }
 
 export default function WordChainGame({
+  supabase = null,
+  familyId = null,
+  channelRef = null,
   members = [],
   currentMemberId = '',
   onRecordWinner = () => {},
@@ -47,6 +61,7 @@ export default function WordChainGame({
   // Setup & Settings State
   const [inGame, setInGame] = useState(false)
   const [gameMode, setGameMode] = useState('bot') // 'bot' | 'family_versus' | 'family_relay'
+  const [playStyle, setPlayStyle] = useState('online') // 'online' (각자 기기로 초대) | 'local' (한 기기로 패스)
   const [botDiff, setBotDiff] = useState('normal') // 'easy' | 'normal' | 'boss'
   const [selectedMemberIds, setSelectedMemberIds] = useState(() =>
     members.map((m) => m.member_id)
@@ -59,7 +74,7 @@ export default function WordChainGame({
   const [showKeypad, setShowKeypad] = useState(false)
 
   // In-Game Active State
-  const [players, setPlayers] = useState([]) // Array of player objects { id, name, avatar, color }
+  const [players, setPlayers] = useState([]) // [{ id, name, avatar, isBot }]
   const [activeTurnIdx, setActiveTurnIdx] = useState(0)
   const [alivePlayerIds, setAlivePlayerIds] = useState(new Set())
   const [words, setWords] = useState([]) // [{ who, byName, avatar, word }]
@@ -72,6 +87,14 @@ export default function WordChainGame({
   const [gameOver, setGameOver] = useState(null) // { winner, winnerName, reason, totalWords }
   const [hintWord, setHintWord] = useState('')
 
+  // Multiplayer Session & Invitation State
+  const [sessionId, setSessionId] = useState(null)
+  const [isHost, setIsHost] = useState(false)
+  const [pendingInvite, setPendingInvite] = useState(null) // Active invitation for this member
+  const [dismissedInviteIds, setDismissedInviteIds] = useState(new Set())
+  const [inviteToast, setInviteToast] = useState(null)
+  const [busyRemote, setBusyRemote] = useState(false)
+
   // Text / Keypad Input
   const [wordInput, setWordInput] = useState('')
   const [composer] = useState(() => new HangulComposer())
@@ -80,7 +103,7 @@ export default function WordChainGame({
   // Floating Reactions / Spectator Cheers
   const [reactions, setReactions] = useState([])
 
-  // State synchronization refs to prevent stale closure in async bot callbacks
+  // State synchronization refs to prevent stale closures
   const activeTurnIdxRef = useRef(0)
   const wordsRef = useRef([])
   const currentHeadRef = useRef('')
@@ -89,6 +112,9 @@ export default function WordChainGame({
   const gameOverRef = useRef(null)
   const isBotThinkingRef = useRef(false)
   const botTimeoutRef = useRef(null)
+  const sessionIdRef = useRef(null)
+  const isHostRef = useRef(false)
+  const lastStateVersionRef = useRef(0)
 
   const chainScrollRef = useRef(null)
   const timerRef = useRef(null)
@@ -123,6 +149,14 @@ export default function WordChainGame({
     isBotThinkingRef.current = isBotThinking
   }, [isBotThinking])
 
+  useEffect(() => {
+    sessionIdRef.current = sessionId
+  }, [sessionId])
+
+  useEffect(() => {
+    isHostRef.current = isHost
+  }, [isHost])
+
   // Clear timers on unmount
   useEffect(() => {
     return () => {
@@ -150,16 +184,249 @@ export default function WordChainGame({
   const isMyTurn =
     !gameOver &&
     activePlayer &&
-    (gameMode === 'bot' ? activePlayer.id !== 'bot' : activePlayer.id === currentMemberId || !currentMemberId)
+    (gameMode === 'bot'
+      ? activePlayer.id !== 'bot'
+      : playStyle === 'local'
+        ? true
+        : activePlayer.id === currentMemberId || !currentMemberId)
+
   const isSpectator =
-    gameMode !== 'bot' && currentMemberId && !players.some((p) => p.id === currentMemberId)
+    gameMode !== 'bot' &&
+    playStyle === 'online' &&
+    currentMemberId &&
+    !players.some((p) => p.id === currentMemberId)
+
+  // ─────────────────────────────────────────────────────────────
+  // 📡 Realtime Invitation & Session Synchronization
+  // ─────────────────────────────────────────────────────────────
+
+  // Check for active invites / sessions periodically and on broadcast
+  const checkForInvites = useCallback(async () => {
+    if (!supabase || !familyId || !currentMemberId || inGame) return
+    try {
+      const res = await loadSessions(supabase)
+      if (res.error || !res.data) return
+
+      // Find an active wordchain session that invites current member
+      const activeWordChain = res.data.find((s) => {
+        if (s.game_key !== 'wordchain') return false
+        const st = s.state
+        if (!st || st.status !== 'playing' || st.gameOver) return false
+        // Exclude dismissed sessions
+        if (dismissedInviteIds.has(s.session_id)) return false
+        // Check if I am invited and not the host
+        const isInvited = st.invitedMemberIds?.includes(currentMemberId) || s.p2_member_id === currentMemberId
+        const isNotHost = st.hostId !== currentMemberId
+        return isInvited && isNotHost
+      })
+
+      if (activeWordChain) {
+        setPendingInvite({
+          sessionId: activeWordChain.session_id,
+          hostId: activeWordChain.state.hostId,
+          hostName: activeWordChain.state.hostName || '가족',
+          hostAvatar: activeWordChain.state.hostAvatar || '👑',
+          gameMode: activeWordChain.state.gameMode || 'family_versus',
+          players: activeWordChain.state.players || [],
+          startWord: activeWordChain.state.words?.[0]?.word || '',
+          turnDuration: activeWordChain.state.turnDuration || 15,
+        })
+      } else {
+        setPendingInvite(null)
+      }
+    } catch {
+      // ignore
+    }
+  }, [supabase, familyId, currentMemberId, inGame, dismissedInviteIds])
+
+  useEffect(() => {
+    checkForInvites()
+    const interval = setInterval(checkForInvites, 3000)
+    return () => clearInterval(interval)
+  }, [checkForInvites])
+
+  // Apply full remote session state when received
+  const applyRemoteState = useCallback(
+    (remoteState, newSessionId) => {
+      if (!remoteState) return
+      if (remoteState.version && remoteState.version <= lastStateVersionRef.current) {
+        return
+      }
+      lastStateVersionRef.current = remoteState.version || Date.now()
+
+      console.log('📡 [원격 상태 수신 및 동기화]', remoteState)
+
+      if (newSessionId && sessionIdRef.current !== newSessionId) {
+        setSessionId(newSessionId)
+      }
+
+      setGameMode(remoteState.gameMode || 'family_versus')
+      setPlayStyle('online')
+      if (remoteState.turnDuration !== undefined) setTurnDuration(remoteState.turnDuration)
+      if (remoteState.relayTarget !== undefined) setRelayTarget(remoteState.relayTarget)
+      if (remoteState.strictDict !== undefined) setStrictDict(remoteState.strictDict)
+
+      if (remoteState.players) setPlayers(remoteState.players)
+      if (remoteState.alivePlayerIds) {
+        const nextAlive = new Set(remoteState.alivePlayerIds)
+        setAlivePlayerIds(nextAlive)
+        alivePlayerIdsRef.current = nextAlive
+      }
+
+      if (remoteState.words) {
+        const prevCount = wordsRef.current.length
+        const nextWords = remoteState.words
+        setWords(nextWords)
+        wordsRef.current = nextWords
+
+        // If a new word was submitted by another player, trigger sound and voice
+        if (nextWords.length > prevCount && prevCount > 0) {
+          const lastWordObj = nextWords[nextWords.length - 1]
+          if (lastWordObj && lastWordObj.who !== currentMemberId) {
+            playOkSound(soundEnabled)
+            speakKorean(lastWordObj.word, { voiceEnabled })
+            setFeedback({ ok: true, message: `👏 ${lastWordObj.byName}: [${lastWordObj.word}] 이어감!` })
+          }
+        }
+      }
+
+      if (remoteState.currentHead) {
+        setCurrentHead(remoteState.currentHead)
+        currentHeadRef.current = remoteState.currentHead
+      }
+
+      if (remoteState.activeTurnIdx !== undefined) {
+        setActiveTurnIdx(remoteState.activeTurnIdx)
+        activeTurnIdxRef.current = remoteState.activeTurnIdx
+        setRemainTime(remoteState.turnDuration > 0 ? remoteState.turnDuration : 999)
+        composer.reset()
+        setWordInput('')
+      }
+
+      if (remoteState.gameOver) {
+        finishGameLocally(remoteState.gameOver)
+      } else {
+        setGameOver(null)
+        gameOverRef.current = null
+      }
+
+      setInGame(true)
+      setPendingInvite(null)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentMemberId, soundEnabled, voiceEnabled]
+  )
+
+  // Listen to Supabase Realtime channel for live moves and invitations
+  useEffect(() => {
+    if (!channelRef?.current) return
+
+    const channel = channelRef.current
+    const onBroadcast = async ({ payload }) => {
+      if (!payload) return
+
+      // Invitation broadcast received
+      if (payload.event === 'game:invite' || payload.type === 'invite') {
+        if (payload.invitedMemberIds?.includes(currentMemberId) && payload.hostId !== currentMemberId && !inGame) {
+          playCountdownSound(false, soundEnabled)
+          checkForInvites()
+        }
+        return
+      }
+
+      // Live game state update
+      if (payload.sessionId && (payload.sessionId === sessionIdRef.current || !inGame)) {
+        if (payload.state) {
+          applyRemoteState(payload.state, payload.sessionId)
+        } else if (supabase) {
+          const { data } = await fetchSession(supabase, payload.sessionId)
+          if (data?.state) {
+            applyRemoteState(data.state, data.session_id)
+          }
+        }
+      }
+
+      // Spectator reaction broadcast
+      if (payload.type === 'reaction' && payload.reaction) {
+        const { emoji, label, xPos } = payload.reaction
+        const id = Date.now() + Math.random()
+        setReactions((prev) => [...prev, { id, emoji, label, xPos }])
+        playCheerSound(soundEnabled)
+        setTimeout(() => {
+          setReactions((prev) => prev.filter((r) => r.id !== id))
+        }, 2400)
+      }
+    }
+
+    channel.on('broadcast', { event: GAME_EVENT }, onBroadcast)
+    channel.on('broadcast', { event: 'game:invite' }, onBroadcast)
+    channel.on('broadcast', { event: 'game:reaction' }, onBroadcast)
+
+    return () => {
+      // cleanup is handled on unmount
+    }
+  }, [channelRef, currentMemberId, inGame, soundEnabled, supabase, checkForInvites, applyRemoteState])
+
+  // Periodic poll to keep online live game 100% synchronized even under unstable network
+  useEffect(() => {
+    if (!supabase || !sessionId || !inGame || gameMode === 'bot') return
+
+    const syncInterval = setInterval(async () => {
+      try {
+        const { data } = await fetchSession(supabase, sessionId)
+        if (data?.state) {
+          applyRemoteState(data.state, data.session_id)
+        }
+      } catch {
+        // ignore
+      }
+    }, 2500)
+
+    return () => clearInterval(syncInterval)
+  }, [supabase, sessionId, inGame, gameMode, applyRemoteState])
+
+  // Push updated state to Supabase & Realtime Broadcast
+  const broadcastAndSaveState = useCallback(
+    async (updatedState) => {
+      const activeSessionId = sessionIdRef.current
+      if (!supabase || !activeSessionId) return
+
+      const version = (lastStateVersionRef.current || 0) + 1
+      lastStateVersionRef.current = version
+      const finalState = {
+        ...updatedState,
+        version,
+        updatedAt: new Date().toISOString(),
+      }
+
+      try {
+        await pushState(supabase, activeSessionId, {
+          state: finalState,
+          turn: 'p1',
+          winner: finalState.gameOver?.winner || null,
+        })
+
+        channelRef?.current?.send({
+          type: 'broadcast',
+          event: GAME_EVENT,
+          payload: { sessionId: activeSessionId, state: finalState },
+        })
+      } catch (err) {
+        console.error('❌ [원격 판 저장/전송 실패]', err)
+      }
+    },
+    [supabase, channelRef]
+  )
+
+  // ─────────────────────────────────────────────────────────────
+  // 🎮 Game Loop & Logic
+  // ─────────────────────────────────────────────────────────────
 
   // Timer Tick Handling
   useEffect(() => {
     if (!inGame || countdown !== null || gameOver || turnDuration === 0) return
 
     if (activePlayer && activePlayer.id === 'bot') {
-      // Bot turn does not decrement player timer
       return
     }
 
@@ -172,14 +439,14 @@ export default function WordChainGame({
         }
         const next = prev - 0.1
         if (next > 0 && Math.abs(next - Math.round(next)) < 0.06 && Math.round(next) <= 3) {
-          playTickSound(soundEnabled)
+          if (isMyTurn) playTickSound(soundEnabled)
         }
         return next
       })
     }, 100)
 
     return () => clearInterval(timerRef.current)
-  }, [inGame, countdown, gameOver, activeTurnIdx, activePlayer, turnDuration, soundEnabled])
+  }, [inGame, countdown, gameOver, activeTurnIdx, activePlayer, turnDuration, soundEnabled, isMyTurn])
 
   // Handle Time Expired
   const handleTimeUp = useCallback(() => {
@@ -188,25 +455,30 @@ export default function WordChainGame({
     const currPl = playersRef.current[currentTurn]
     if (!currPl) return
 
+    // In online match, only the active player or host resolves timeout
+    if (playStyle === 'online' && !isMyTurn && !isHostRef.current) {
+      return
+    }
+
     playErrSound(soundEnabled)
 
     if (gameMode === 'bot') {
-      // Player ran out of time against bot
-      finishGame({
+      const res = {
         winner: 'bot',
         winnerName: '끝판왕 로봇',
         reason: '시간 초과로 로봇이 승리했습니다!',
         totalWords: wordsRef.current.length - 1,
-      })
+      }
+      finishGame(res)
       speakKorean('시간 초과! 로봇의 승리입니다.', { voiceEnabled })
     } else if (gameMode === 'family_relay') {
-      // Co-op failed
-      finishGame({
+      const res = {
         winner: null,
         winnerName: '릴레이 종료',
         reason: `${currPl.name} 님의 시간 초과로 릴레이가 멈췄어요!`,
         totalWords: wordsRef.current.length - 1,
-      })
+      }
+      finishGame(res)
     } else {
       // Survival mode: eliminate active player
       const nextAlive = new Set(alivePlayerIdsRef.current)
@@ -217,28 +489,30 @@ export default function WordChainGame({
       if (nextAlive.size <= 1) {
         const survivorId = Array.from(nextAlive)[0]
         const survivor = playersRef.current.find((p) => p.id === survivorId) || currPl
-        finishGame({
+        const res = {
           winner: survivor.id,
           winnerName: survivor.name,
           reason: `시간 초과로 ${currPl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님!`,
           totalWords: wordsRef.current.length - 1,
-        })
+        }
+        finishGame(res)
       } else {
         setFeedback({ ok: false, message: `⏰ 시간 초과! ${currPl.name} 님 탈락!` })
         advanceTurn(currentTurn, nextAlive)
       }
     }
-  }, [gameMode, soundEnabled, voiceEnabled])
+  }, [gameMode, playStyle, isMyTurn, soundEnabled, voiceEnabled])
 
-  // Start a New Game
-  function startGame() {
+  // Start a New Game (Host / Local)
+  async function startGame() {
     if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
     clearInterval(timerRef.current)
     const seed = randomSeedWord()
 
+    const me = members.find((m) => m.member_id === currentMemberId) || members[0] || { name: '나', member_id: 'p1' }
     let participants = []
+
     if (gameMode === 'bot') {
-      const me = members.find((m) => m.member_id === currentMemberId) || members[0] || { name: '나', member_id: 'p1' }
       participants = [
         { id: me.member_id, name: me.name || '플레이어', avatar: characterOf(me) || '👨‍💻', isBot: false },
         {
@@ -272,6 +546,7 @@ export default function WordChainGame({
     currentHeadRef.current = initialHead
     gameOverRef.current = null
     isBotThinkingRef.current = false
+    setIsHost(true)
 
     setPlayers(participants)
     setAlivePlayerIds(initialAlive)
@@ -288,10 +563,86 @@ export default function WordChainGame({
     setBotQuote(BOT_QUOTES.intro[Math.floor(Math.random() * BOT_QUOTES.intro.length)])
     setInGame(true)
 
+    // Online Multiplayer Invitation Creation & Dispatch
+    if (gameMode !== 'bot' && playStyle === 'online' && supabase && familyId) {
+      setBusyRemote(true)
+      try {
+        await removeMyOpenSessions(supabase, currentMemberId)
+
+        const sessionState = {
+          gameKey: 'wordchain',
+          gameMode,
+          playStyle: 'online',
+          hostId: currentMemberId,
+          hostName: me.name,
+          hostAvatar: characterOf(me) || '👑',
+          invitedMemberIds: selectedMemberIds,
+          players: participants,
+          activeTurnIdx: 0,
+          alivePlayerIds: Array.from(initialAlive),
+          words: initialWords,
+          currentHead: initialHead,
+          turnDuration,
+          relayTarget,
+          strictDict,
+          gameOver: null,
+          status: 'playing',
+          roundId: Date.now(),
+          version: 1,
+          updatedAt: new Date().toISOString(),
+        }
+
+        const { data, error } = await createSession(supabase, {
+          familyId,
+          gameKey: 'wordchain',
+          memberId: currentMemberId,
+          state: sessionState,
+        })
+
+        if (data && !error) {
+          setSessionId(data.session_id)
+          sessionIdRef.current = data.session_id
+
+          // Send Realtime Broadcast
+          channelRef?.current?.send({
+            type: 'broadcast',
+            event: 'game:invite',
+            payload: {
+              sessionId: data.session_id,
+              type: 'invite',
+              hostId: currentMemberId,
+              hostName: me.name,
+              gameMode,
+              invitedMemberIds: selectedMemberIds,
+            },
+          })
+
+          // Send Push Notification
+          const invitedNames = participants
+            .filter((p) => p.id !== currentMemberId)
+            .map((p) => p.name)
+            .join(', ')
+          notifyFamily({
+            familyId,
+            senderName: me.name,
+            excludeMemberId: currentMemberId,
+          })
+
+          setInviteToast(
+            `💌 ${invitedNames || '가족'}님께 초대장을 보냈어요! 상대방 기기에서 초대 수락 시 함께 진행됩니다.`
+          )
+          setTimeout(() => setInviteToast(null), 6000)
+        }
+      } catch (err) {
+        console.error('초대장 생성 실패:', err)
+      } finally {
+        setBusyRemote(false)
+      }
+    }
+
     // Countdown animation
     setCountdown(3)
     playCountdownSound(false, soundEnabled)
-    console.log('🎮 [끝말잇기 시작]', { seed, participants: participants.map(p => p.name) })
 
     let count = 3
     const cdTimer = setInterval(() => {
@@ -308,6 +659,44 @@ export default function WordChainGame({
         setCountdown(null)
       }
     }, 900)
+  }
+
+  // Accept Online Invitation (Invitee flow)
+  async function acceptInvitation(invite = pendingInvite) {
+    if (!invite || !supabase) return
+    setBusyRemote(true)
+    try {
+      const { data, error } = await joinSession(supabase, { session_id: invite.sessionId }, currentMemberId)
+      if (error || !data) {
+        setFeedback({ ok: false, message: '이미 종료되었거나 진행 중인 방입니다.' })
+        setPendingInvite(null)
+        return
+      }
+
+      setIsHost(false)
+      setSessionId(data.session_id)
+      sessionIdRef.current = data.session_id
+      applyRemoteState(data.state, data.session_id)
+
+      // Broadcast join event
+      channelRef?.current?.send({
+        type: 'broadcast',
+        event: GAME_EVENT,
+        payload: { sessionId: data.session_id, joined: currentMemberId },
+      })
+    } catch (err) {
+      console.error('초대 수락 실패:', err)
+    } finally {
+      setBusyRemote(false)
+    }
+  }
+
+  // Dismiss Invitation
+  function dismissInvitation() {
+    if (pendingInvite) {
+      setDismissedInviteIds((prev) => new Set([...prev, pendingInvite.sessionId]))
+      setPendingInvite(null)
+    }
   }
 
   // Turn Advancement
@@ -334,15 +723,32 @@ export default function WordChainGame({
     setActiveTurnIdx(nextIdx)
 
     const nextPlayer = currentPlayers[nextIdx]
-    console.log(`🔄 [턴 전환] ${currentPlayers[fromIdx]?.name} (인덱스 ${fromIdx}) ➔ ${nextPlayer?.name} (인덱스 ${nextIdx})`)
+    console.log(`🔄 [턴 전환] ${currentPlayers[fromIdx]?.name} ➔ ${nextPlayer?.name}`)
+
+    // If in online match, broadcast updated turn to all devices
+    if (playStyle === 'online' && sessionIdRef.current) {
+      broadcastAndSaveState({
+        gameMode,
+        players: currentPlayers,
+        alivePlayerIds: Array.from(currentAlive),
+        words: wordsRef.current,
+        currentHead: currentHeadRef.current,
+        activeTurnIdx: nextIdx,
+        turnDuration,
+        relayTarget,
+        strictDict,
+        gameOver: null,
+      })
+    }
 
     if (nextPlayer && nextPlayer.id === 'bot') {
-      // Bot's turn!
       runBotTurn(nextIdx)
     } else {
       setIsBotThinking(false)
       isBotThinkingRef.current = false
-      setTimeout(() => inputRef.current?.focus(), 100)
+      if (nextPlayer.id === currentMemberId) {
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
     }
   }
 
@@ -356,7 +762,6 @@ export default function WordChainGame({
 
     const delay = 900 + Math.random() * 800
     const head = currentHeadRef.current
-    console.log(`🤖 [로봇 생각 중] 시작 글자: '${head}', 난이도: ${botDiff}`)
 
     botTimeoutRef.current = setTimeout(() => {
       if (gameOverRef.current) return
@@ -370,12 +775,11 @@ export default function WordChainGame({
       isBotThinkingRef.current = false
 
       if (!chosenWord) {
-        // Bot surrenders / failed!
+        // Bot surrenders / failed
         playWinSound(soundEnabled)
         const quote = BOT_QUOTES.defeat[Math.floor(Math.random() * BOT_QUOTES.defeat.length)]
         setBotQuote(quote)
         speakKorean(quote, { voiceEnabled })
-        console.log(`🤖 [로봇 단어 없음 - 항복]`)
 
         finishGame({
           winner: playersRef.current[0].id,
@@ -386,10 +790,9 @@ export default function WordChainGame({
         return
       }
 
-      // Bot successfully played a word
+      // Bot played word
       playOkSound(soundEnabled)
       speakKorean(chosenWord, { voiceEnabled })
-      console.log(`🤖 [로봇 단어 제출] '${chosenWord}', 다음 시작 글자: '${lastCharOf(chosenWord)}'`)
 
       const isAttack = chosenWord.endsWith('륨') || chosenWord.endsWith('늄') || chosenWord.endsWith('슘') || chosenWord.endsWith('듐') || chosenWord.endsWith('쁨')
       const quoteList = isAttack ? BOT_QUOTES.attack : BOT_QUOTES.defend
@@ -410,7 +813,6 @@ export default function WordChainGame({
 
       setFeedback({ ok: true, message: `로봇: [${chosenWord}] 제출 완료!` })
 
-      // Pass turn to the next player (from botIdx)
       advanceTurn(botIdx, alivePlayerIdsRef.current)
     }, delay)
   }
@@ -420,6 +822,12 @@ export default function WordChainGame({
     const currentTurn = activeTurnIdxRef.current
     const activePl = playersRef.current[currentTurn]
     if (gameOverRef.current || countdown !== null || isBotThinkingRef.current || !activePl) return
+
+    // In online match, only the active player can submit
+    if (playStyle === 'online' && !isMyTurn) {
+      setFeedback({ ok: false, message: `⏳ 지금은 ${activePl.name} 님의 차례입니다.` })
+      return
+    }
 
     const trimmed = (rawText || wordInput || composer.text).trim()
     if (!trimmed) {
@@ -452,14 +860,12 @@ export default function WordChainGame({
         msg = '올바른 한글 단어를 입력해 주세요.'
       }
       setFeedback({ ok: false, message: msg })
-      console.warn(`❌ [단어 판정 실패] 입력: '${trimmed}', 이유: ${result.reason}`)
       return
     }
 
     // Success!
     playOkSound(soundEnabled)
     speakKorean(result.word, { voiceEnabled })
-    console.log(`🗣️ [단어 제출 성공] ${activePl.name}: '${result.word}' (다음 글자: '${lastCharOf(result.word)}')`)
 
     const newHead = lastCharOf(result.word)
     currentHeadRef.current = newHead
@@ -479,12 +885,13 @@ export default function WordChainGame({
     // Check Co-op Relay target
     if (gameMode === 'family_relay' && newWords.length - 1 >= relayTarget) {
       playWinSound(soundEnabled)
-      finishGame({
+      const res = {
         winner: 'team',
         winnerName: '온 가족 원팀',
         reason: `대단해요! 온 가족이 힘을 합쳐 목표 ${relayTarget}단어를 모두 이었어요! 🎉`,
         totalWords: newWords.length - 1,
-      })
+      }
+      finishGame(res)
       return
     }
 
@@ -498,22 +905,26 @@ export default function WordChainGame({
     const activePl = playersRef.current[currentTurn]
     if (!activePl) return
 
+    if (playStyle === 'online' && !isMyTurn) return
+
     playErrSound(soundEnabled)
 
     if (gameMode === 'bot') {
-      finishGame({
+      const res = {
         winner: 'bot',
         winnerName: '끝판왕 로봇',
         reason: `${activePl.name} 님이 모르겠어요를 눌렀습니다. 로봇 승리!`,
         totalWords: wordsRef.current.length - 1,
-      })
+      }
+      finishGame(res)
     } else if (gameMode === 'family_relay') {
-      finishGame({
+      const res = {
         winner: null,
         winnerName: '릴레이 종료',
         reason: `${activePl.name} 님이 포기하여 릴레이가 끝났습니다.`,
         totalWords: wordsRef.current.length - 1,
-      })
+      }
+      finishGame(res)
     } else {
       // Survival mode: eliminate active player
       const nextAlive = new Set(alivePlayerIdsRef.current)
@@ -524,12 +935,13 @@ export default function WordChainGame({
       if (nextAlive.size <= 1) {
         const survivorId = Array.from(nextAlive)[0]
         const survivor = playersRef.current.find((p) => p.id === survivorId) || activePl
-        finishGame({
+        const res = {
           winner: survivor.id,
           winnerName: survivor.name,
           reason: `${activePl.name} 님 탈락! 최후의 승자는 ${survivor.name} 님!`,
           totalWords: wordsRef.current.length - 1,
-        })
+        }
+        finishGame(res)
       } else {
         setFeedback({ ok: false, message: `🏳️ ${activePl.name} 님 탈락!` })
         advanceTurn(currentTurn, nextAlive)
@@ -537,18 +949,41 @@ export default function WordChainGame({
     }
   }
 
-  // Finish Game & Record Score
-  function finishGame(result) {
+  // Finish Game Locally
+  function finishGameLocally(result) {
     if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
     clearInterval(timerRef.current)
     gameOverRef.current = result
     setGameOver(result)
     setIsBotThinking(false)
     isBotThinkingRef.current = false
+    playWinSound(soundEnabled)
+  }
+
+  // Finish Game & Record Score
+  function finishGame(result) {
+    finishGameLocally(result)
+
+    if (playStyle === 'online' && sessionIdRef.current) {
+      broadcastAndSaveState({
+        gameMode,
+        players: playersRef.current,
+        alivePlayerIds: Array.from(alivePlayerIdsRef.current),
+        words: wordsRef.current,
+        currentHead: currentHeadRef.current,
+        activeTurnIdx: activeTurnIdxRef.current,
+        turnDuration,
+        relayTarget,
+        strictDict,
+        gameOver: result,
+      })
+    }
 
     if (result.winner && result.winner !== 'bot') {
-      playWinSound(soundEnabled)
-      onRecordWinner(result.winner, result.totalWords)
+      // Only host or winner records points to prevent duplicates
+      if (isHost || playStyle === 'local') {
+        onRecordWinner(result.winner, result.totalWords)
+      }
     }
   }
 
@@ -568,8 +1003,18 @@ export default function WordChainGame({
   function sendReaction(emoji, label) {
     playCheerSound(soundEnabled)
     const id = Date.now() + Math.random()
-    const xPos = 20 + Math.random() * 60 // 20% ~ 80% horizontal
+    const xPos = 20 + Math.random() * 60 // 20% ~ 80%
     setReactions((prev) => [...prev, { id, emoji, label, xPos }])
+
+    // Broadcast reaction in online game
+    if (playStyle === 'online' && channelRef?.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'game:reaction',
+        payload: { reaction: { emoji, label, xPos } },
+      })
+    }
+
     setTimeout(() => {
       setReactions((prev) => prev.filter((r) => r.id !== id))
     }, 2400)
@@ -598,6 +1043,19 @@ export default function WordChainGame({
     )
   }
 
+  // Leave / Quit Game
+  async function handleExitGame() {
+    if (window.confirm('게임을 종료하고 로비로 돌아갈까요?')) {
+      clearInterval(timerRef.current)
+      if (sessionId && isHost && supabase) {
+        await leaveSession(supabase, sessionId)
+      }
+      setSessionId(null)
+      setInGame(false)
+      setGameOver(null)
+    }
+  }
+
   return (
     <div className="relative w-full max-w-2xl mx-auto flex flex-col gap-3 font-body">
       {/* Floating Reaction Animation Elements */}
@@ -609,10 +1067,75 @@ export default function WordChainGame({
             className="absolute bottom-24 text-3xl animate-bounce-up select-none flex flex-col items-center"
           >
             <span>{r.emoji}</span>
-            {r.label && <span className="text-[11px] font-bold bg-foreground text-surface px-2 py-0.5 rounded-full mt-1">{r.label}</span>}
+            {r.label && (
+              <span className="text-[11px] font-bold bg-foreground text-surface px-2 py-0.5 rounded-full mt-1">
+                {r.label}
+              </span>
+            )}
           </div>
         ))}
       </div>
+
+      {/* Floating Toast Notification */}
+      {inviteToast && (
+        <div className="bg-foreground text-surface px-4 py-2.5 rounded-xl shadow-sticker text-sm font-bold flex items-center justify-between gap-2 animate-pop border-2 border-tape-yellow">
+          <span>{inviteToast}</span>
+          <button
+            type="button"
+            onClick={() => setInviteToast(null)}
+            className="text-xs text-tape-yellow font-extrabold px-1.5 py-0.5 rounded hover:bg-white/10"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ── 💌 INCOMING INVITATION BANNER (상대방 화면에 즉시 노출) ── */}
+      {pendingInvite && !inGame && (
+        <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-primary p-4 rounded-xl text-white shadow-sticker border-2 border-foreground mb-1 animate-pop">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{pendingInvite.hostAvatar}</span>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 bg-white/25 rounded-full text-[11px] font-extrabold">
+                    💌 초대장 도착!
+                  </span>
+                </div>
+                <p className="font-display font-extrabold text-[15px] mt-0.5">
+                  <strong>{pendingInvite.hostName}</strong> 님이{' '}
+                  <span className="underline decoration-tape-yellow">
+                    {pendingInvite.gameMode === 'family_relay' ? '🤝 온 가족 릴레이' : '⚔️ 가족 서바이벌'}
+                  </span>
+                  에 초대했어요!
+                </p>
+                <p className="text-xs text-white/90 mt-0.5">
+                  참가 가족: {pendingInvite.players?.map((p) => p.name).join(', ')} · 턴 제한{' '}
+                  {pendingInvite.turnDuration}초
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => acceptInvitation(pendingInvite)}
+                disabled={busyRemote}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-surface text-foreground font-display font-extrabold text-sm rounded-lg shadow-sticker border-2 border-foreground active:scale-95 transition disabled:opacity-50"
+              >
+                🎮 초대 수락 & 바로 입장
+              </button>
+              <button
+                type="button"
+                onClick={dismissInvitation}
+                className="px-3 py-2.5 bg-black/25 text-white text-xs font-bold rounded-lg hover:bg-black/40 transition"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SETUP / LOBBY SCREEN */}
       {!inGame && (
@@ -622,7 +1145,7 @@ export default function WordChainGame({
               <span>👑</span> 끝말잇기 챔피언십
             </h2>
             <p className="text-sm text-foreground-muted mt-1">
-              인공지능 로봇 대결부터 온 가족 전원 릴레이까지! 139,000+ 표준 명사 사전 탑재
+              인공지능 로봇 대결부터 온 가족 실시간 서바이벌까지! 139,000+ 표준 명사 사전 탑재
             </p>
           </div>
 
@@ -671,6 +1194,37 @@ export default function WordChainGame({
             </div>
           ) : (
             <div className="bg-surface-muted rounded-lg p-3.5 border border-border flex flex-col gap-3">
+              {/* Play Style Toggle (각자 기기 vs 한 기기) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+                <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
+                  📡 대전 방식 선택
+                </span>
+                <div className="flex items-center gap-1.5 bg-surface p-1 rounded-lg border border-border text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPlayStyle('online')}
+                    className={`px-3 py-1.5 rounded-md font-bold transition ${
+                      playStyle === 'online'
+                        ? 'bg-primary text-on-primary shadow-xs'
+                        : 'text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    📡 각자 폰으로 대전 (초대장 발송)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlayStyle('local')}
+                    className={`px-3 py-1.5 rounded-md font-bold transition ${
+                      playStyle === 'local'
+                        ? 'bg-secondary text-on-secondary shadow-xs'
+                        : 'text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    📱 한 기기로 번갈아 하기
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
                   👥 참가 가족 멤버 선택 ({selectedMemberIds.length}명 참여)
@@ -705,6 +1259,13 @@ export default function WordChainGame({
                   )
                 })}
               </div>
+
+              {playStyle === 'online' && (
+                <p className="text-[12px] text-primary bg-primary/10 px-3 py-2 rounded-md border border-primary/20">
+                  💡 <strong>초대장 발송 안내</strong>: 시작 버튼을 누르면 선택한 가족 멤버의 화면과 휴대폰으로 실시간
+                  초대장이 전송되어 각자의 폰에서 바로 함께 플레이할 수 있습니다.
+                </p>
+              )}
 
               {gameMode === 'family_relay' && (
                 <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
@@ -791,9 +1352,14 @@ export default function WordChainGame({
           <button
             type="button"
             onClick={startGame}
-            className="w-full py-4 rounded-xl bg-primary text-on-primary font-display font-extrabold text-lg border-2 border-foreground shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+            disabled={busyRemote}
+            className="w-full py-4 rounded-xl bg-primary text-on-primary font-display font-extrabold text-lg border-2 border-foreground shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50"
           >
-            🚀 끝말잇기 시작하기
+            {gameMode === 'bot'
+              ? '🚀 로봇 대결 시작하기'
+              : playStyle === 'online'
+                ? '💌 가족 초대하고 실시간 대전 시작'
+                : '🚀 한 기기로 시작하기'}
           </button>
         </div>
       )}
@@ -806,19 +1372,20 @@ export default function WordChainGame({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('게임을 종료하고 로비로 돌아갈까요?')) {
-                    clearInterval(timerRef.current)
-                    setInGame(false)
-                  }
-                }}
+                onClick={handleExitGame}
                 className="px-2.5 py-1 text-xs font-bold rounded-md bg-surface-muted hover:bg-destructive/10 text-destructive border border-border transition"
               >
-                ✕ 게임 나가기
+                ✕ 나가기
               </button>
               {isSpectator && (
                 <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-pastel-mint text-foreground border border-border animate-pulse">
-                  👀 관전(참관) 중
+                  👀 관전 중
+                </span>
+              )}
+              {playStyle === 'online' && sessionId && (
+                <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-primary/10 text-primary border border-primary/30 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                  실시간 대전 중
                 </span>
               )}
             </div>
@@ -851,6 +1418,7 @@ export default function WordChainGame({
             {players.map((p, idx) => {
               const isTurn = idx === activeTurnIdx && !gameOver
               const isAlive = alivePlayerIds.has(p.id)
+              const isMe = p.id === currentMemberId
               return (
                 <div
                   key={p.id}
@@ -864,11 +1432,11 @@ export default function WordChainGame({
                 >
                   <span className="text-2xl">{p.avatar}</span>
                   <span className="text-xs font-bold font-display truncate max-w-[80px] mt-0.5">
-                    {p.name}
+                    {p.name} {isMe && <span className="text-primary">(나)</span>}
                   </span>
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full mt-1 ${
-                      isTurn ? 'bg-primary text-on-primary' : 'bg-surface-muted text-foreground-muted'
+                      isTurn ? 'bg-primary text-on-primary' : isAlive ? 'bg-surface-muted text-foreground-muted' : 'bg-destructive/10 text-destructive'
                     }`}
                   >
                     {isTurn ? '🔥 턴 진행' : isAlive ? '대기' : '탈락'}
@@ -947,7 +1515,7 @@ export default function WordChainGame({
           {/* Feedback & Hint Message */}
           {feedback && (
             <div
-              className={`text-center text-xs font-bold py-1 px-2 rounded-md ${
+              className={`text-center text-xs font-bold py-1.5 px-2 rounded-md ${
                 feedback.ok ? 'text-secondary bg-secondary/10' : 'text-destructive bg-destructive/10'
               }`}
             >
@@ -974,7 +1542,7 @@ export default function WordChainGame({
                   isBotThinking
                     ? '🤖 로봇이 단어를 고르는 중입니다...'
                     : !isMyTurn
-                      ? `⏳ ${activePlayer?.name || '상대방'}의 차례입니다...`
+                      ? `⏳ ${activePlayer?.name || '상대방'} 님이 생각 중입니다...`
                       : `'${getReqCharDisplay(currentHead)}'로 시작하는 단어 입력`
                 }
                 className="flex-1 bg-surface border-2 border-border focus:border-primary rounded-xl px-4 py-3 text-base font-bold outline-none transition disabled:opacity-50"
@@ -1018,7 +1586,16 @@ export default function WordChainGame({
                 <div key={rIdx} className="flex gap-1 justify-center">
                   {row.map((k) => {
                     const isUtil = k === 'SHIFT' || k === 'DEL'
-                    const label = k === 'SHIFT' ? (kbShift ? '⇧ 확정' : '⇧ 쉬프트') : k === 'DEL' ? '⌫ 지움' : kbShift && SHIFT_MAP[k] ? SHIFT_MAP[k] : k
+                    const label =
+                      k === 'SHIFT'
+                        ? kbShift
+                          ? '⇧ 확정'
+                          : '⇧ 쉬프트'
+                        : k === 'DEL'
+                          ? '⌫ 지움'
+                          : kbShift && SHIFT_MAP[k]
+                            ? SHIFT_MAP[k]
+                            : k
                     return (
                       <button
                         key={k}
@@ -1111,6 +1688,7 @@ export default function WordChainGame({
                 onClick={() => {
                   setGameOver(null)
                   setInGame(false)
+                  setSessionId(null)
                 }}
                 className="px-4 py-3 bg-surface-muted text-foreground rounded-xl font-display font-bold text-sm border border-border hover:bg-surface transition"
               >
