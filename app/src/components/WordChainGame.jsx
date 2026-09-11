@@ -59,55 +59,60 @@ export default function WordChainGame({
   currentMemberId = '',
   onRecordWinner = () => {},
 }) {
-  // Setup & Settings State
+  const currentMember = members.find((m) => m.member_id === currentMemberId) || members[0] || { name: '나', member_id: currentMemberId }
+
+  // Navigation / Phase State
   const [inGame, setInGame] = useState(false)
-  const [inWaitingRoom, setInWaitingRoom] = useState(false) // 대기실 상태
+  const [inWaitingRoom, setInWaitingRoom] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Settings & Configuration
   const [gameMode, setGameMode] = useState('bot') // 'bot' | 'family_versus' | 'family_relay'
   const [botDiff, setBotDiff] = useState('normal') // 'easy' | 'normal' | 'boss'
+  const [roomNameInput, setRoomNameInput] = useState('')
   const [selectedMemberIds, setSelectedMemberIds] = useState(() =>
     members.filter((m) => m.member_id !== currentMemberId).map((m) => m.member_id)
   )
-  const [turnDuration, setTurnDuration] = useState(15) // seconds, 0 = unlimited
-  const [relayTarget, setRelayTarget] = useState(20) // target words for co-op
-  const [strictDict, setStrictDict] = useState(true) // dictionary check
+  const [turnDuration, setTurnDuration] = useState(15)
+  const [relayTarget, setRelayTarget] = useState(20)
+  const [strictDict, setStrictDict] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [showKeypad, setShowKeypad] = useState(false)
 
-  // In-Game Active State
-  const [players, setPlayers] = useState([]) // [{ id, name, avatar, isBot }]
-  const [activeTurnIdx, setActiveTurnIdx] = useState(0)
-  const [alivePlayerIds, setAlivePlayerIds] = useState(new Set())
-  const [words, setWords] = useState([]) // [{ who, byName, avatar, word }]
-  const [currentHead, setCurrentHead] = useState('') // required head characters
-  const [remainTime, setRemainTime] = useState(15)
-  const [feedback, setFeedback] = useState(null) // { ok, message }
-  const [botQuote, setBotQuote] = useState('')
-  const [isBotThinking, setIsBotThinking] = useState(false)
-  const [countdown, setCountdown] = useState(null) // null | 3 | 2 | 1 | 'GO'
-  const [gameOver, setGameOver] = useState(null) // { winner, winnerName, reason, totalWords }
-  const [hintWord, setHintWord] = useState('')
-
-  // Multiplayer Session & Invitation State
+  // Multiplayer Room Session State
   const [sessionId, setSessionId] = useState(null)
   const [isHost, setIsHost] = useState(false)
   const [hostInfo, setHostInfo] = useState(null)
+  const [roomTitle, setRoomTitle] = useState('')
   const [acceptedMembers, setAcceptedMembers] = useState({}) // { [memberId]: { id, name, avatar, status: 'accepted' } }
   const [invitedMembers, setInvitedMembers] = useState([])
-  const [pendingInvite, setPendingInvite] = useState(null) // Received invitation for current user
+  const [pendingInvite, setPendingInvite] = useState(null)
   const [dismissedInviteIds, setDismissedInviteIds] = useState(new Set())
   const [inviteToast, setInviteToast] = useState(null)
   const [busyRemote, setBusyRemote] = useState(false)
 
-  // Text / Keypad Input
+  // Active Game State
+  const [players, setPlayers] = useState([]) // [{ id, name, avatar, isBot }]
+  const [activeTurnIdx, setActiveTurnIdx] = useState(0)
+  const [alivePlayerIds, setAlivePlayerIds] = useState(new Set())
+  const [words, setWords] = useState([]) // [{ who, byName, avatar, word }]
+  const [currentHead, setCurrentHead] = useState('')
+  const [remainTime, setRemainTime] = useState(15)
+  const [feedback, setFeedback] = useState(null)
+  const [botQuote, setBotQuote] = useState('')
+  const [isBotThinking, setIsBotThinking] = useState(false)
+  const [countdown, setCountdown] = useState(null)
+  const [gameOver, setGameOver] = useState(null)
+  const [hintWord, setHintWord] = useState('')
+
+  // Text & Keypad Input
   const [wordInput, setWordInput] = useState('')
   const [composer] = useState(() => new HangulComposer())
   const [kbShift, setKbShift] = useState(false)
-
-  // Floating Reactions / Spectator Cheers
   const [reactions, setReactions] = useState([])
 
-  // State synchronization refs
+  // State synchronization refs to avoid stale closures
   const activeTurnIdxRef = useRef(0)
   const wordsRef = useRef([])
   const currentHeadRef = useRef('')
@@ -124,42 +129,16 @@ export default function WordChainGame({
   const timerRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Sync state to refs
-  useEffect(() => {
-    activeTurnIdxRef.current = activeTurnIdx
-  }, [activeTurnIdx])
-
-  useEffect(() => {
-    wordsRef.current = words
-  }, [words])
-
-  useEffect(() => {
-    currentHeadRef.current = currentHead
-  }, [currentHead])
-
-  useEffect(() => {
-    playersRef.current = players
-  }, [players])
-
-  useEffect(() => {
-    alivePlayerIdsRef.current = alivePlayerIds
-  }, [alivePlayerIds])
-
-  useEffect(() => {
-    gameOverRef.current = gameOver
-  }, [gameOver])
-
-  useEffect(() => {
-    isBotThinkingRef.current = isBotThinking
-  }, [isBotThinking])
-
-  useEffect(() => {
-    sessionIdRef.current = sessionId
-  }, [sessionId])
-
-  useEffect(() => {
-    isHostRef.current = isHost
-  }, [isHost])
+  // Synchronize state values to refs
+  useEffect(() => { activeTurnIdxRef.current = activeTurnIdx }, [activeTurnIdx])
+  useEffect(() => { wordsRef.current = words }, [words])
+  useEffect(() => { currentHeadRef.current = currentHead }, [currentHead])
+  useEffect(() => { playersRef.current = players }, [players])
+  useEffect(() => { alivePlayerIdsRef.current = alivePlayerIds }, [alivePlayerIds])
+  useEffect(() => { gameOverRef.current = gameOver }, [gameOver])
+  useEffect(() => { isBotThinkingRef.current = isBotThinking }, [isBotThinking])
+  useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
+  useEffect(() => { isHostRef.current = isHost }, [isHost])
 
   // Clear timers on unmount
   useEffect(() => {
@@ -177,14 +156,14 @@ export default function WordChainGame({
     }
   }, [members, currentMemberId, selectedMemberIds.length])
 
-  // Scroll chain ribbon to end when words change
+  // Auto-scroll ribbon on words change
   useEffect(() => {
     if (chainScrollRef.current) {
       chainScrollRef.current.scrollLeft = chainScrollRef.current.scrollWidth
     }
   }, [words])
 
-  // Current active player object
+  // Determine active turn status
   const activePlayer = players[activeTurnIdx] || null
   const isMyTurn =
     !gameOver &&
@@ -200,14 +179,13 @@ export default function WordChainGame({
   // 📡 Realtime Invitation & Session Synchronization
   // ─────────────────────────────────────────────────────────────
 
-  // Check for active invites / sessions periodically
+  // Check for active invites in Supabase periodically
   const checkForInvites = useCallback(async () => {
     if (!supabase || !familyId || !currentMemberId || inGame || inWaitingRoom) return
     try {
       const res = await loadSessions(supabase)
       if (res.error || !res.data) return
 
-      // Find an active wordchain session that invites current member
       const activeWordChain = res.data.find((s) => {
         if (s.game_key !== 'wordchain') return false
         const st = s.state
@@ -222,6 +200,7 @@ export default function WordChainGame({
       if (activeWordChain) {
         setPendingInvite({
           sessionId: activeWordChain.session_id,
+          roomName: activeWordChain.state.roomName || '가족 서바이벌',
           hostId: activeWordChain.state.hostId,
           hostName: activeWordChain.state.hostName || '가족',
           hostAvatar: activeWordChain.state.hostAvatar || '👑',
@@ -247,7 +226,7 @@ export default function WordChainGame({
     return () => clearInterval(interval)
   }, [checkForInvites])
 
-  // Apply full remote session state when received from Supabase / Broadcast
+  // Apply remote session state to local component
   const applyRemoteState = useCallback(
     (remoteState, newSessionId) => {
       if (!remoteState) return
@@ -256,13 +235,12 @@ export default function WordChainGame({
       }
       lastStateVersionRef.current = remoteState.version || Date.now()
 
-      console.log('📡 [원격 상태 수신 및 동기화]', remoteState)
-
       if (newSessionId && sessionIdRef.current !== newSessionId) {
         setSessionId(newSessionId)
       }
 
       setGameMode(remoteState.gameMode || 'family_versus')
+      if (remoteState.roomName) setRoomTitle(remoteState.roomName)
       if (remoteState.turnDuration !== undefined) setTurnDuration(remoteState.turnDuration)
       if (remoteState.relayTarget !== undefined) setRelayTarget(remoteState.relayTarget)
       if (remoteState.strictDict !== undefined) setStrictDict(remoteState.strictDict)
@@ -277,7 +255,7 @@ export default function WordChainGame({
         setInvitedMembers(remoteState.invitedMemberIds)
       }
 
-      // ── Status: WAITING (대기실) ──
+      // ── WAITING ROOM PHASE ──
       if (remoteState.status === 'waiting') {
         setInWaitingRoom(true)
         setInGame(false)
@@ -285,7 +263,7 @@ export default function WordChainGame({
         return
       }
 
-      // ── Status: PLAYING (실시간 게임 진행) ──
+      // ── ACTIVE GAME PHASE ──
       if (remoteState.status === 'playing') {
         setInWaitingRoom(false)
         setInGame(true)
@@ -339,15 +317,15 @@ export default function WordChainGame({
     [currentMemberId, soundEnabled, voiceEnabled]
   )
 
-  // Listen to Supabase Realtime channel for live invites, acceptances and moves
+  // Listen to Supabase Realtime channel events
   useEffect(() => {
     if (!channelRef?.current) return
-
     const channel = channelRef.current
+
     const onBroadcast = async ({ payload }) => {
       if (!payload) return
 
-      // 1. Invitation broadcast
+      // 1. Invitation broadcast received
       if (payload.event === 'game:invite' || payload.type === 'invite') {
         if (payload.invitedMemberIds?.includes(currentMemberId) && payload.hostId !== currentMemberId && !inGame && !inWaitingRoom) {
           playCountdownSound(false, soundEnabled)
@@ -356,7 +334,7 @@ export default function WordChainGame({
         return
       }
 
-      // 2. Member acceptance broadcast (대기실 실시간 수락)
+      // 2. Member acceptance event in Waiting Room
       if (payload.event === 'game:accepted' || payload.type === 'accepted') {
         if (payload.sessionId === sessionIdRef.current) {
           playOkSound(soundEnabled)
@@ -373,7 +351,7 @@ export default function WordChainGame({
         return
       }
 
-      // 3. Game start broadcast
+      // 3. Game start event from Host
       if (payload.event === 'game:start' || payload.type === 'start') {
         if (payload.sessionId === sessionIdRef.current && payload.state) {
           applyRemoteState(payload.state, payload.sessionId)
@@ -431,7 +409,7 @@ export default function WordChainGame({
     return () => {}
   }, [channelRef, currentMemberId, inGame, inWaitingRoom, soundEnabled, voiceEnabled, supabase, checkForInvites, applyRemoteState])
 
-  // Periodic poll to keep waiting room and game synchronized
+  // Polling sync to ensure resilience
   useEffect(() => {
     if (!supabase || !sessionId || gameMode === 'bot') return
 
@@ -483,24 +461,27 @@ export default function WordChainGame({
   )
 
   // ─────────────────────────────────────────────────────────────
-  // 💌 Invitation & Lobby Waiting Room Handlers
+  // 💌 Invitation & Room Creation Handlers
   // ─────────────────────────────────────────────────────────────
 
-  // Step 1: Host creates Waiting Room & sends Invitations
-  async function createWaitingRoomAndInvite() {
-    if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
-    clearInterval(timerRef.current)
-
-    const me = members.find((m) => m.member_id === currentMemberId) || members[0] || { name: '나', member_id: 'p1' }
-
+  // Open Room Creation Modal
+  function handleOpenCreateModal() {
     if (gameMode === 'bot') {
-      // Single Player against Bot
       startBotGame()
       return
     }
+    const defaultName = `🔥 ${currentMember.name}의 ${gameMode === 'family_relay' ? '온 가족 릴레이' : '가족 서바이벌'}!`
+    setRoomNameInput(defaultName)
+    setShowCreateModal(true)
+  }
 
-    // Multiplayer Family Match: Create Session in WAITING status
+  // Host confirms room name and sends final invites
+  async function handleConfirmCreateRoom() {
+    setShowCreateModal(false)
     setBusyRemote(true)
+    if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
+    clearInterval(timerRef.current)
+
     try {
       if (supabase) {
         await removeMyOpenSessions(supabase, currentMemberId)
@@ -509,12 +490,13 @@ export default function WordChainGame({
       const seed = randomSeedWord()
       const initialWords = [{ who: 'seed', byName: '시작 단어', avatar: '🌱', word: seed }]
       const initialHead = lastCharOf(seed)
+      const finalRoomName = roomNameInput.trim() || `🔥 ${currentMember.name}의 가족 대전!`
 
       const initialAccepted = {
         [currentMemberId]: {
           id: currentMemberId,
-          name: me.name,
-          avatar: characterOf(me) || '👑',
+          name: currentMember.name,
+          avatar: characterOf(currentMember) || '👑',
           status: 'accepted',
           isHost: true,
         },
@@ -523,10 +505,11 @@ export default function WordChainGame({
       const sessionState = {
         gameKey: 'wordchain',
         gameMode,
-        status: 'waiting', // Waiting for invitees to accept
+        roomName: finalRoomName,
+        status: 'waiting',
         hostId: currentMemberId,
-        hostName: me.name,
-        hostAvatar: characterOf(me) || '👑',
+        hostName: currentMember.name,
+        hostAvatar: characterOf(currentMember) || '👑',
         invitedMemberIds: selectedMemberIds,
         acceptedMembers: initialAccepted,
         players: [initialAccepted[currentMemberId]],
@@ -553,31 +536,33 @@ export default function WordChainGame({
           setSessionId(data.session_id)
           sessionIdRef.current = data.session_id
           setIsHost(true)
-          setHostInfo({ id: currentMemberId, name: me.name, avatar: characterOf(me) || '👑' })
+          setRoomTitle(finalRoomName)
+          setHostInfo({ id: currentMemberId, name: currentMember.name, avatar: characterOf(currentMember) || '👑' })
           setAcceptedMembers(initialAccepted)
           setInvitedMembers(selectedMemberIds)
           setInWaitingRoom(true)
           setInGame(false)
 
-          // Broadcast Invitation Event to all connected family members
+          // Broadcast Invitation to family channel
           channelRef?.current?.send({
             type: 'broadcast',
             event: 'game:invite',
             payload: {
               sessionId: data.session_id,
               type: 'invite',
+              roomName: finalRoomName,
               hostId: currentMemberId,
-              hostName: me.name,
-              hostAvatar: characterOf(me) || '👑',
+              hostName: currentMember.name,
+              hostAvatar: characterOf(currentMember) || '👑',
               gameMode,
               invitedMemberIds: selectedMemberIds,
             },
           })
 
-          // Web Push Notification to mobile devices
+          // Send Web Push notification
           notifyFamily({
             familyId,
-            senderName: me.name,
+            senderName: currentMember.name,
             excludeMemberId: currentMemberId,
           })
 
@@ -586,22 +571,20 @@ export default function WordChainGame({
             .filter(Boolean)
             .join(', ')
 
-          setInviteToast(`💌 ${invitedNames || '가족'}님께 초대장을 보냈어요! 수락 시 대기실에 입장합니다.`)
+          setInviteToast(`💌 '${finalRoomName}' 초대장을 ${invitedNames || '가족'}님께 보냈어요!`)
           setTimeout(() => setInviteToast(null), 5000)
         }
       }
     } catch (err) {
-      console.error('대기실 생성 실패:', err)
+      console.error('방 생성 실패:', err)
     } finally {
       setBusyRemote(false)
     }
   }
 
-  // Step 2: Invitee Accepts Invitation & joins Waiting Room
+  // Invitee accepts invite and enters the created room
   async function acceptInvitation(invite = pendingInvite) {
     if (!invite || !supabase) return
-    const me = members.find((m) => m.member_id === currentMemberId) || { name: '나', member_id: currentMemberId }
-
     setBusyRemote(true)
     try {
       const { data: currentSession } = await fetchSession(supabase, invite.sessionId)
@@ -616,8 +599,8 @@ export default function WordChainGame({
         ...(st.acceptedMembers || {}),
         [currentMemberId]: {
           id: currentMemberId,
-          name: me.name,
-          avatar: characterOf(me) || '😊',
+          name: currentMember.name,
+          avatar: characterOf(currentMember) || '😊',
           status: 'accepted',
           isHost: false,
         },
@@ -630,16 +613,15 @@ export default function WordChainGame({
         updatedAt: new Date().toISOString(),
       }
 
-      // Update Session in Supabase
       await pushState(supabase, invite.sessionId, {
         state: updatedState,
         turn: 'p1',
       })
 
-      // Set local state
       setIsHost(false)
       setSessionId(invite.sessionId)
       sessionIdRef.current = invite.sessionId
+      setRoomTitle(st.roomName || '가족 서바이벌')
       setHostInfo({ id: st.hostId, name: st.hostName, avatar: st.hostAvatar })
       setAcceptedMembers(updatedAccepted)
       setInvitedMembers(st.invitedMemberIds || [])
@@ -647,15 +629,15 @@ export default function WordChainGame({
       setInGame(false)
       setPendingInvite(null)
 
-      // Broadcast acceptance to Host & other members
+      // Broadcast acceptance
       channelRef?.current?.send({
         type: 'broadcast',
         event: 'game:accepted',
         payload: {
           sessionId: invite.sessionId,
           memberId: currentMemberId,
-          name: me.name,
-          avatar: characterOf(me) || '😊',
+          name: currentMember.name,
+          avatar: characterOf(currentMember) || '😊',
         },
       })
     } catch (err) {
@@ -665,7 +647,7 @@ export default function WordChainGame({
     }
   }
 
-  // Step 3: Host launches Game with all Accepted Members
+  // Host launches game with all accepted members
   async function startMultiplayerGame() {
     const acceptedList = Object.values(acceptedMembers).filter((m) => m.status === 'accepted')
     if (acceptedList.length === 0) return
@@ -700,6 +682,7 @@ export default function WordChainGame({
     const updatedState = {
       gameKey: 'wordchain',
       gameMode,
+      roomName: roomTitle,
       status: 'playing',
       hostId: currentMemberId,
       hostName: hostInfo?.name || '방장',
@@ -718,10 +701,9 @@ export default function WordChainGame({
       updatedAt: new Date().toISOString(),
     }
 
-    // Broadcast Game Start to all accepted participants
     await broadcastAndSaveState(updatedState, 'game:start')
 
-    // Local Countdown animation
+    // Local Countdown
     setCountdown(3)
     playCountdownSound(false, soundEnabled)
 
@@ -744,9 +726,8 @@ export default function WordChainGame({
 
   // Single Player Bot Game Start
   function startBotGame() {
-    const me = members.find((m) => m.member_id === currentMemberId) || members[0] || { name: '나', member_id: 'p1' }
     const botParticipants = [
-      { id: me.member_id, name: me.name || '플레이어', avatar: characterOf(me) || '👨‍💻', isBot: false },
+      { id: currentMember.member_id, name: currentMember.name || '플레이어', avatar: characterOf(currentMember) || '👨‍💻', isBot: false },
       {
         id: 'bot',
         name: botDiff === 'easy' ? '아기 로봇' : botDiff === 'boss' ? '끝판왕 로봇' : '똘똘한 로봇',
@@ -811,7 +792,7 @@ export default function WordChainGame({
     }
   }
 
-  // Leave Waiting Room / Exit
+  // Leave Waiting Room
   async function handleLeaveWaitingRoom() {
     if (sessionId && isHost && supabase) {
       await leaveSession(supabase, sessionId)
@@ -859,7 +840,6 @@ export default function WordChainGame({
     const currPl = playersRef.current[currentTurn]
     if (!currPl) return
 
-    // In online match, only the active player or host resolves timeout
     if (gameMode !== 'bot' && !isMyTurn && !isHostRef.current) {
       return
     }
@@ -884,7 +864,6 @@ export default function WordChainGame({
       }
       finishGame(res)
     } else {
-      // Survival mode: eliminate active player
       const nextAlive = new Set(alivePlayerIdsRef.current)
       nextAlive.delete(currPl.id)
       alivePlayerIdsRef.current = nextAlive
@@ -921,7 +900,6 @@ export default function WordChainGame({
     let nextIdx = (fromIdx + 1) % currentPlayers.length
     let loopCount = 0
 
-    // Skip eliminated players in survival mode
     while (!currentAlive.has(currentPlayers[nextIdx].id) && loopCount < currentPlayers.length) {
       nextIdx = (nextIdx + 1) % currentPlayers.length
       loopCount++
@@ -932,10 +910,10 @@ export default function WordChainGame({
 
     const nextPlayer = currentPlayers[nextIdx]
 
-    // Broadcast turn update in online game
     if (gameMode !== 'bot' && sessionIdRef.current) {
       broadcastAndSaveState({
         gameMode,
+        roomName: roomTitle,
         status: 'playing',
         players: currentPlayers,
         alivePlayerIds: Array.from(currentAlive),
@@ -967,7 +945,6 @@ export default function WordChainGame({
     isBotThinkingRef.current = true
 
     if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
-
     const delay = 900 + Math.random() * 800
 
     botTimeoutRef.current = setTimeout(() => {
@@ -1066,7 +1043,6 @@ export default function WordChainGame({
       return
     }
 
-    // Success!
     playOkSound(soundEnabled)
     speakKorean(result.word, { voiceEnabled })
 
@@ -1085,7 +1061,6 @@ export default function WordChainGame({
     setWordInput('')
     composer.reset()
 
-    // Check Co-op Relay target
     if (gameMode === 'family_relay' && newWords.length - 1 >= relayTarget) {
       playWinSound(soundEnabled)
       const res = {
@@ -1109,7 +1084,6 @@ export default function WordChainGame({
     if (!activePl) return
 
     if (gameMode !== 'bot' && !isMyTurn) return
-
     playErrSound(soundEnabled)
 
     if (gameMode === 'bot') {
@@ -1169,6 +1143,7 @@ export default function WordChainGame({
     if (gameMode !== 'bot' && sessionIdRef.current) {
       broadcastAndSaveState({
         gameMode,
+        roomName: roomTitle,
         status: 'playing',
         players: playersRef.current,
         alivePlayerIds: Array.from(alivePlayerIdsRef.current),
@@ -1306,10 +1281,7 @@ export default function WordChainGame({
                 </span>
                 <h4 className="text-base sm:text-lg font-display font-black mt-1">
                   <strong>{pendingInvite.hostName}</strong> 님이{' '}
-                  <span className="underline decoration-tape-yellow">
-                    {pendingInvite.gameMode === 'family_relay' ? '🤝 온 가족 릴레이' : '⚔️ 가족 서바이벌'}
-                  </span>
-                  에 초대했어요!
+                  <span className="underline decoration-tape-yellow">'{pendingInvite.roomName}'</span>에 초대했어요!
                 </h4>
                 <p className="text-xs text-white/90 mt-0.5">
                   참가 가족: {pendingInvite.invitedNames} · 턴 제한 {pendingInvite.turnDuration}초
@@ -1338,6 +1310,80 @@ export default function WordChainGame({
         </div>
       )}
 
+      {/* ── 🏠 ROOM CREATION MODAL (방 제목 입력 및 초대 발송) ── */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-foreground/75 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface border-4 border-foreground rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-sticker flex flex-col gap-4 animate-pop">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-xl font-display font-black text-foreground flex items-center gap-2">
+                <span>🏠</span> 대전 방 만들기 & 초대장 발송
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="text-foreground-muted hover:text-foreground font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
+                🏷️ 방 제목 (초대 메시지에 표시됩니다)
+              </label>
+              <input
+                type="text"
+                value={roomNameInput}
+                onChange={(e) => setRoomNameInput(e.target.value)}
+                placeholder="예: 우리 가족 끝말잇기 한판!"
+                maxLength={40}
+                className="bg-surface-muted border-2 border-border focus:border-primary rounded-xl px-4 py-3 text-base font-bold outline-none transition"
+                autoFocus
+              />
+            </div>
+
+            <div className="bg-surface-muted p-3 rounded-xl border border-border flex flex-col gap-1.5 text-xs">
+              <span className="font-bold text-foreground-muted">📨 초대받을 가족 멤버:</span>
+              <div className="flex flex-wrap gap-1.5 mt-0.5">
+                {selectedMemberIds.map((id) => {
+                  const m = members.find((x) => x.member_id === id)
+                  if (!m) return null
+                  const isOnline = onlineIds.includes(id)
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 bg-surface border border-border px-2.5 py-1 rounded-full text-xs font-bold shadow-xs"
+                    >
+                      <span>{characterOf(m)}</span>
+                      <span>{m.name}</span>
+                      {isOnline && <span className="w-2 h-2 rounded-full bg-secondary" />}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={handleConfirmCreateRoom}
+                disabled={busyRemote || !roomNameInput.trim()}
+                className="flex-1 py-3.5 bg-primary text-on-primary font-display font-extrabold text-sm rounded-xl border-2 border-foreground shadow-sticker active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition disabled:opacity-50"
+              >
+                🚀 방 생성 & 초대장 발송
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-3.5 bg-surface-muted text-foreground font-bold text-sm rounded-xl border border-border hover:bg-surface transition"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── ⏳ MULTIPLAYER WAITING ROOM (대기실) ── */}
       {inWaitingRoom && (
         <div className="bg-surface border-4 border-foreground rounded-2xl p-5 md:p-6 shadow-sticker flex flex-col gap-4 animate-pop">
@@ -1346,8 +1392,8 @@ export default function WordChainGame({
               <span className="text-xs font-extrabold text-primary px-2.5 py-0.5 bg-primary/10 rounded-full">
                 {gameMode === 'family_relay' ? '🤝 온 가족 릴레이' : '⚔️ 가족 서바이벌'}
               </span>
-              <h3 className="text-xl md:text-2xl font-display font-black mt-1">
-                🎮 가족 게임 대기실
+              <h3 className="text-xl md:text-2xl font-display font-black mt-1 flex items-center gap-2">
+                <span>🏠</span> {roomTitle || '가족 대전 대기실'}
               </h3>
             </div>
             <button
@@ -1362,7 +1408,7 @@ export default function WordChainGame({
           <div className="bg-surface-muted rounded-xl p-4 border border-border flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
-                👥 초대 및 수락 현황 ({acceptedCount}명 수락 완료)
+                👥 초대 및 수락 현황 ({acceptedCount}명 입장 완료)
               </span>
               <span className="text-xs font-bold text-secondary flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-secondary animate-ping" />
@@ -1431,7 +1477,7 @@ export default function WordChainGame({
             </div>
           </div>
 
-          {/* Action Buttons for Host vs Invitee */}
+          {/* Action Buttons */}
           {isHost ? (
             <div className="flex flex-col gap-2">
               <button
@@ -1449,7 +1495,7 @@ export default function WordChainGame({
               )}
             </div>
           ) : (
-            <div className="text-center py-2 bg-surface-muted rounded-xl border border-border">
+            <div className="text-center py-3 bg-surface-muted rounded-xl border border-border">
               <p className="font-display font-extrabold text-sm text-foreground">
                 방장(<strong>{hostInfo?.name}</strong>)님이 게임을 시작하기를 기다리고 있어요... ⏳
               </p>
@@ -1486,7 +1532,7 @@ export default function WordChainGame({
                     : 'border-border bg-surface-muted text-foreground-muted hover:border-foreground/30'
                 }`}
               >
-                <span className="text-sm font-display">{m.label}</span>
+                <span className="text-sm font-display font-extrabold">{m.label}</span>
                 <span className="text-[11px] opacity-75 mt-0.5 hidden sm:inline">{m.sub}</span>
               </button>
             ))}
@@ -1510,14 +1556,14 @@ export default function WordChainGame({
                         : 'border-border bg-surface/50 text-foreground-muted'
                     }`}
                   >
-                    <span className="text-sm font-display">{d.label}</span>
+                    <span className="text-sm font-display font-bold">{d.label}</span>
                     <span className="text-[10px] leading-tight opacity-80">{d.desc}</span>
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="bg-surface-muted rounded-lg p-3.5 border border-border flex flex-col gap-3">
+            <div className="bg-surface-muted rounded-xl p-3.5 sm:p-4 border border-border flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
                   👥 초대할 가족 멤버 선택 (접속 상태 확인)
@@ -1533,8 +1579,8 @@ export default function WordChainGame({
                 </button>
               </div>
 
-              {/* Family Member Grid with Live Online/Login Indicators */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {/* Family Member Grid - Horizontal Layout to Prevent Text Wrapping */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {members.map((m) => {
                   const isMe = m.member_id === currentMemberId
                   const isOnline = onlineIds.includes(m.member_id)
@@ -1546,24 +1592,24 @@ export default function WordChainGame({
                       type="button"
                       disabled={isMe}
                       onClick={() => toggleMemberSelection(m.member_id)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border-2 text-left transition-all ${
+                      className={`flex items-center justify-between p-3 rounded-xl border-2 text-left transition-all ${
                         isMe
                           ? 'border-primary bg-primary/15 opacity-90 cursor-default'
                           : isSelected
-                            ? 'border-primary bg-primary/10 text-foreground shadow-sm'
+                            ? 'border-primary bg-primary/10 text-foreground shadow-xs'
                             : 'border-border bg-surface/60 text-foreground-muted opacity-60'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-2xl">{characterOf(m)}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl shrink-0">{characterOf(m)}</span>
                         <div className="min-w-0">
                           <p className="font-display font-bold text-sm truncate">
-                            {m.name} {isMe && <span className="text-[11px] text-primary font-bold">(나 👑)</span>}
+                            {m.name} {isMe && <span className="text-xs text-primary font-bold">(나 👑)</span>}
                           </p>
-                          <p className="text-[11px] font-bold mt-0.5">
+                          <p className="text-xs font-bold mt-0.5 whitespace-nowrap">
                             {isOnline ? (
                               <span className="text-secondary font-extrabold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-secondary" /> 🟢 접속 중
+                                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" /> 🟢 접속 중
                               </span>
                             ) : (
                               <span className="text-foreground-muted">⚪ 오프라인</span>
@@ -1573,7 +1619,7 @@ export default function WordChainGame({
                       </div>
                       {!isMe && (
                         <span
-                          className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border ${
                             isSelected ? 'bg-primary text-on-primary border-primary' : 'border-border bg-surface'
                           }`}
                         >
@@ -1585,9 +1631,9 @@ export default function WordChainGame({
                 })}
               </div>
 
-              <p className="text-[12px] text-primary bg-primary/10 px-3 py-2 rounded-md border border-primary/20 leading-relaxed">
-                💡 <strong>실시간 초대 방식</strong>: 초대하기 버튼을 누르면 선택한 가족 멤버들의 휴대폰으로 초대 알림이
-                발송되며, 상대방이 <strong>초대를 수락하면 대기실에 입장</strong>하여 함께 대전이 시작됩니다.
+              <p className="text-[12px] text-primary bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 leading-relaxed">
+                💡 <strong>실시간 초대 방식</strong>: 방 만들기 버튼을 누르면 방 제목을 정하고 가족들에게 초대장을 발송합니다.
+                상대방이 <strong>수락하면 대기실에 자동 입장</strong>하여 함께 대전이 시작됩니다.
               </p>
 
               {gameMode === 'family_relay' && (
@@ -1671,12 +1717,12 @@ export default function WordChainGame({
             </div>
           </div>
 
-          {/* Start Game / Invite Button */}
+          {/* Start Game / Create Room Button */}
           <button
             type="button"
-            onClick={createWaitingRoomAndInvite}
+            onClick={handleOpenCreateModal}
             disabled={busyRemote}
-            className="w-full py-4 rounded-xl bg-primary text-on-primary font-display font-extrabold text-lg border-2 border-foreground shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50"
+            className="w-full py-4 rounded-xl bg-primary text-on-primary font-display font-black text-lg border-2 border-foreground shadow-sticker active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50"
           >
             {gameMode === 'bot' ? '🚀 로봇 대결 시작하기' : '💌 가족 초대하기 & 방 만들기'}
           </button>
@@ -1709,7 +1755,6 @@ export default function WordChainGame({
               )}
             </div>
 
-            {/* Quick Audio & Keypad Toggles */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1732,7 +1777,7 @@ export default function WordChainGame({
             </div>
           </div>
 
-          {/* Turn Players Strip / Carousel */}
+          {/* Turn Players Strip */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {players.map((p, idx) => {
               const isTurn = idx === activeTurnIdx && !gameOver
@@ -1773,13 +1818,12 @@ export default function WordChainGame({
             </div>
           )}
 
-          {/* Center Screen Display (대형 전광판) */}
+          {/* Center Screen Display */}
           <div className="bg-foreground text-surface rounded-2xl p-5 text-center shadow-lg border-2 border-foreground relative overflow-hidden flex flex-col items-center justify-center gap-1.5 min-h-[140px]">
             <div className="text-xs text-tape-yellow font-extrabold tracking-wider uppercase">
               이 글자로 시작하는 낱말!
             </div>
 
-            {/* Glowing Big Prompt Character */}
             <div className="text-4xl sm:text-5xl font-display font-black text-tape-yellow tracking-tight animate-pulse drop-shadow-md">
               {getReqCharDisplay(currentHead)}
             </div>
@@ -1807,7 +1851,7 @@ export default function WordChainGame({
             </div>
           )}
 
-          {/* Word Chain History Ribbon (가로 스크롤 타일) */}
+          {/* Word Chain History Ribbon */}
           <div
             ref={chainScrollRef}
             className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 bg-surface-muted/60 rounded-xl border border-border min-h-[46px]"
@@ -2004,7 +2048,7 @@ export default function WordChainGame({
                   if (gameMode === 'bot') {
                     startBotGame()
                   } else {
-                    createWaitingRoomAndInvite()
+                    handleOpenCreateModal()
                   }
                 }}
                 className="flex-1 py-3 bg-primary text-on-primary rounded-xl font-display font-bold text-sm border-2 border-foreground shadow-sticker active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition"
