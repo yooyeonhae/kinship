@@ -254,6 +254,8 @@ CREATE TABLE IF NOT EXISTS favorite_links (
 
 ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS title TEXT DEFAULT '';
 ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS order_index INT DEFAULT 0;
+ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS link_type TEXT NOT NULL DEFAULT 'video';
+ALTER TABLE favorite_links ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 
 -- (13) 가족 채팅 메시지 (chat_messages)
 CREATE TABLE IF NOT EXISTS chat_messages (

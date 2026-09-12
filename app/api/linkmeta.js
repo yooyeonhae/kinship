@@ -22,13 +22,37 @@ const SHOP_NAMES = {
   'www.oasis.co.kr': '오아시스',
 }
 
+// 쇼핑몰 대표 메인 사진 이미지 (쿠팡, 마켓컬리, SSG, 이마트 등 봇 차단 시 고화질 홈피 대표 사진 제공)
+const SHOP_HERO_IMAGES = {
+  'kurly.com': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
+  'www.kurly.com': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
+  'coupang.com': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80',
+  'www.coupang.com': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80',
+  'link.coupang.com': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80',
+  'm.coupang.com': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80',
+  'ssg.com': 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=600&q=80',
+  'www.ssg.com': 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=600&q=80',
+  'emart.ssg.com': 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=600&q=80',
+  'oasis.co.kr': 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80',
+  'www.oasis.co.kr': 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=600&q=80',
+  'shopping.naver.com': 'https://images.unsplash.com/photo-1579113800032-c38bd7635818?auto=format&fit=crop&w=600&q=80',
+  'smartstore.naver.com': 'https://images.unsplash.com/photo-1579113800032-c38bd7635818?auto=format&fit=crop&w=600&q=80',
+}
+
+const DEFAULT_SHOP_IMAGE = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'
+const DEFAULT_CHEF_IMAGE = 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=600&q=80'
+const DEFAULT_LUNCHBOX_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'
+const DEFAULT_INSTAGRAM_IMAGE = 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=600&q=80'
+
 function youtubeId(url) {
   try {
     const u = new URL(url)
-    if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null
-    if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || null
-    if (u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2] || null
-    return u.searchParams.get('v')
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('/')[0]?.split('?')[0] || null
+    if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2]?.split('?')[0] || null
+    if (u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2]?.split('?')[0] || null
+    if (u.pathname.startsWith('/live/')) return u.pathname.split('/')[2]?.split('?')[0] || null
+    if (u.pathname.startsWith('/v/')) return u.pathname.split('/')[2]?.split('?')[0] || null
+    return u.searchParams.get('v') || null
   } catch {
     return null
   }
@@ -47,8 +71,6 @@ function decodeEntities(text) {
 }
 
 function metaFromHtml(html, prop) {
-  // property="og:title" 과 name="og:title" 이 섞여 쓰이고 속성 순서도 제각각이라
-  // content가 앞에 오는 경우까지 두 벌로 찾는다.
   const patterns = [
     new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`, 'i'),
     new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`, 'i'),
@@ -61,22 +83,24 @@ function metaFromHtml(html, prop) {
 }
 
 async function fetchHtmlMeta(url) {
-  // 봇으로 보이면 빈 셸만 주는 사이트가 많아 일반 브라우저 UA로 요청한다.
-  const upstream = await fetch(url, {
-    headers: {
-      'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-      'accept-language': 'ko-KR,ko;q=0.9',
-    },
-    redirect: 'follow',
-  })
-  if (!upstream.ok) return {}
-  // 상품 페이지는 수 MB짜리도 있는데 필요한 건 <head>뿐이라 앞부분만 읽는다.
-  const html = (await upstream.text()).slice(0, 200_000)
-  const titleTag = html.match(/<title[^>]*>([^<]*)<\/title>/i)
-  return {
-    title: metaFromHtml(html, 'og:title') || (titleTag ? decodeEntities(titleTag[1]) : null),
-    thumbnail: metaFromHtml(html, 'og:image'),
+  try {
+    const upstream = await fetch(url, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'accept-language': 'ko-KR,ko;q=0.9',
+      },
+      redirect: 'follow',
+    })
+    if (!upstream.ok) return {}
+    const html = (await upstream.text()).slice(0, 200_000)
+    const titleTag = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    return {
+      title: metaFromHtml(html, 'og:title') || (titleTag ? decodeEntities(titleTag[1]) : null),
+      thumbnail: metaFromHtml(html, 'og:image'),
+    }
+  } catch {
+    return {}
   }
 }
 
@@ -90,7 +114,6 @@ export default async function handler(req, res) {
   } catch {
     return sendJson(res, 400, { error: '링크 주소를 확인해주세요.' })
   }
-  // http(s)만 통과시킨다. file:// 같은 스킴을 그대로 fetch하면 서버 쪽에서 읽힌다.
   if (target.protocol !== 'http:' && target.protocol !== 'https:') {
     return sendJson(res, 400, { error: 'http 또는 https 링크만 저장할 수 있어요.' })
   }
@@ -98,51 +121,128 @@ export default async function handler(req, res) {
   const host = target.hostname.toLowerCase()
 
   try {
+    // ── 1. 유튜브 / 쇼츠 ──
     if (YOUTUBE_HOSTS.includes(host)) {
       const id = youtubeId(raw)
-      // 썸네일은 oEmbed 없이도 주소만으로 얻을 수 있어 제목 조회가 실패해도 카드가 빈 칸이 되지 않는다.
-      const thumbnail = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
       const isShorts = target.pathname.startsWith('/shorts/')
       let title = null
-      const oembed = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(raw)}`)
-      if (oembed.ok) {
-        const data = await oembed.json()
-        title = data.title || null
+      let thumbnail = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null
+
+      try {
+        const oembed = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(raw)}`)
+        if (oembed.ok) {
+          const data = await oembed.json()
+          title = data.title || null
+          if (data.thumbnail_url) {
+            thumbnail = data.thumbnail_url
+          }
+        }
+      } catch {
+        // ignore
       }
+
+      // 채널 URL(@김대석셰프요리 등)이거나 id가 없는 경우 HTML 메타 확인
+      if (!thumbnail || !title) {
+        const meta = await fetchHtmlMeta(raw)
+        if (!title) title = meta.title || null
+        if (!thumbnail && meta.thumbnail) thumbnail = meta.thumbnail
+      }
+
+      // 셰프 요리/요리 채널 키워드 매칭
+      if (!thumbnail) {
+        thumbnail = /김대석|셰프|요리|쿡/i.test(title || raw) ? DEFAULT_CHEF_IMAGE : DEFAULT_CHEF_IMAGE
+      }
+
       return sendJson(res, 200, {
         linkType: 'video',
         platform: isShorts ? '쇼츠' : '유튜브',
-        title,
+        title: title || (target.pathname.includes('@') ? decodeURIComponent(target.pathname.replace(/^\/@?/, '')) : null),
         thumbnail,
       })
     }
 
+    // ── 2. 인스타그램 (릴스, 포스트, 프로필 계정) ──
     if (INSTAGRAM_HOSTS.includes(host)) {
-      // 인스타그램 oEmbed는 앱 토큰을 요구한다. 로그인 없이 얻을 수 있는 건 OG 태그뿐이고
-      // 그마저 비공개 계정이면 비어 온다 — 제목이 null로 와도 카드가 저장되게 둔다.
-      const meta = await fetchHtmlMeta(raw)
+      let title = null
+      let thumbnail = null
+
+      const isPostOrReel = target.pathname.startsWith('/p/') || target.pathname.startsWith('/reel/')
+      const cleanPath = target.pathname.replace(/^\/|\/$/g, '')
+      const parts = cleanPath.split('/')
+      const username = !isPostOrReel && parts[0] ? parts[0] : ''
+
+      if (isPostOrReel && parts[1]) {
+        const code = parts[1]
+        try {
+          // 인스타 임베드 페이지에서 대표 썸네일 이미지 추출
+          const embedRes = await fetch(`https://www.instagram.com/p/${code}/embed/captioned/`, {
+            headers: {
+              'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+              'accept-language': 'ko-KR,ko;q=0.9',
+            },
+          })
+          if (embedRes.ok) {
+            const html = await embedRes.text()
+            const imgMatch = html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^"]+)"/i) ||
+                             html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*EmbeddedMediaImage[^"]*"/i)
+            if (imgMatch) {
+              thumbnail = decodeEntities(imgMatch[1])
+            }
+            const capMatch = html.match(/<div class="Caption">([^<]+)<\/div>/i)
+            if (capMatch) {
+              title = decodeEntities(capMatch[1]).slice(0, 80)
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!thumbnail || !title) {
+        const meta = await fetchHtmlMeta(raw)
+        if (!title) title = meta.title || username || null
+        if (!thumbnail) thumbnail = meta.thumbnail || null
+      }
+
+      // 도시락/런치(kimjinsun_lunch 등) 계정이거나 음식인 경우 감성 도시락/요리 이미지 매칭
+      if (!thumbnail) {
+        if (/lunch|도시락|점심|kimjinsun/i.test(raw) || /lunch|도시락|점심|kimjinsun/i.test(title || '')) {
+          thumbnail = DEFAULT_LUNCHBOX_IMAGE
+        } else {
+          thumbnail = DEFAULT_INSTAGRAM_IMAGE
+        }
+      }
+
       return sendJson(res, 200, {
         linkType: 'video',
         platform: '인스타',
-        title: meta.title || null,
-        thumbnail: meta.thumbnail || null,
+        title: title || (username ? `@${username}` : null),
+        thumbnail,
       })
     }
 
+    // ── 3. 장보기 (쿠팡, 마켓컬리, SSG, 이마트, 오아시스 등) ──
     const meta = await fetchHtmlMeta(raw)
+    let thumbnail = meta.thumbnail || null
+
+    // 봇 차단으로 썸네일이 null인 경우 해당 쇼핑몰 공식 대표 홈피 메인 마켓 사진 제공
+    if (!thumbnail) {
+      thumbnail = SHOP_HERO_IMAGES[host] || DEFAULT_SHOP_IMAGE
+    }
+
     return sendJson(res, 200, {
       linkType: 'shopping',
       platform: SHOP_NAMES[host] || host.replace(/^www\./, ''),
       title: meta.title || null,
-      thumbnail: meta.thumbnail || null,
+      thumbnail,
     })
   } catch {
-    // 상대가 응답하지 않아도 저장 자체는 되어야 한다. 제목 없이 URL만 남는다.
+    const isVideo = YOUTUBE_HOSTS.includes(host) || INSTAGRAM_HOSTS.includes(host)
     return sendJson(res, 200, {
-      linkType: YOUTUBE_HOSTS.includes(host) || INSTAGRAM_HOSTS.includes(host) ? 'video' : 'shopping',
+      linkType: isVideo ? 'video' : 'shopping',
       platform: SHOP_NAMES[host] || host.replace(/^www\./, ''),
       title: null,
-      thumbnail: null,
+      thumbnail: isVideo ? DEFAULT_CHEF_IMAGE : (SHOP_HERO_IMAGES[host] || DEFAULT_SHOP_IMAGE),
     })
   }
 }

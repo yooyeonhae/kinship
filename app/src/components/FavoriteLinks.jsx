@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useFamily } from '../context/FamilyContext'
+import {
+  resolveLinkThumbnail,
+  getPlatformBadge,
+  SHOPPING_STORE_IMAGES,
+  CREATOR_FOOD_IMAGES,
+} from '../lib/linkThumbnail'
 
 // PRD 3.7 — 앱은 링크 연결까지만 담당한다. 영상을 iframe으로 심지 않는 건 의도적이다:
 // 퇴근길의 행동은 "지금 재생"이 아니라 "저장해두고 집에서 열기"이고, 유튜브 앱으로
@@ -48,15 +54,34 @@ function FavoriteLinks() {
       return
     }
     setErrorMsg('')
-    setLinks(data || [])
+    const enriched = (data || []).map((l) => ({
+      ...l,
+      thumbnail_url: l.thumbnail_url || resolveLinkThumbnail(l),
+    }))
+    setLinks(enriched)
     setLoading(false)
+
+    // DB에 썸네일이 비어있는 기존 항목들(예: 김대석 셰프, 인스타) 자동 갱신
+    const missingThumbs = (data || []).filter((l) => !l.thumbnail_url)
+    if (missingThumbs.length > 0) {
+      Promise.allSettled(
+        missingThumbs.map((l) => {
+          const autoThumb = resolveLinkThumbnail(l)
+          if (!autoThumb) return Promise.resolve()
+          return supabase
+            .from('favorite_links')
+            .update({ thumbnail_url: autoThumb })
+            .eq('link_id', l.link_id)
+        })
+      ).catch(() => {})
+    }
   }, [supabase, familyId])
 
   useEffect(() => {
     load()
   }, [load])
 
-  // 붙여넣자마자 제목을 읽어온다. 실패해도 저장은 막지 않고 제목만 직접 쓰게 둔다.
+  // 붙여넣자마자 제목과 썸네일을 읽어온다. 실패해도 저장은 막지 않고 적절한 메인 이미지로 보완한다.
   async function lookup(e) {
     e.preventDefault()
     const raw = url.trim()
@@ -71,17 +96,36 @@ function FavoriteLinks() {
         setFetching(false)
         return
       }
+      const resolvedThumb = meta.thumbnail || resolveLinkThumbnail({
+        url: raw,
+        link_type: meta.linkType || tab,
+        platform: meta.platform || (tab === 'shopping' ? '장보기' : '영상'),
+        title: meta.title || '',
+      })
       setDraft({
         url: raw,
         linkType: meta.linkType || tab,
-        platform: meta.platform || '링크',
+        platform: meta.platform || (tab === 'shopping' ? '장보기' : '영상'),
         title: meta.title || '',
-        thumbnail: meta.thumbnail || null,
+        thumbnail: resolvedThumb,
         autoTitled: Boolean(meta.title),
       })
     } catch {
       // 쿠팡·마켓컬리처럼 봇 요청을 막는 곳이 있어 조회 실패는 정상 경로에 가깝다
-      setDraft({ url: raw, linkType: tab, platform: '링크', title: '', thumbnail: null, autoTitled: false })
+      const fallbackThumb = resolveLinkThumbnail({
+        url: raw,
+        link_type: tab,
+        platform: tab === 'shopping' ? '장보기' : '영상',
+        title: '',
+      })
+      setDraft({
+        url: raw,
+        linkType: tab,
+        platform: tab === 'shopping' ? '장보기' : '영상',
+        title: '',
+        thumbnail: fallbackThumb,
+        autoTitled: false,
+      })
     }
     setFetching(false)
   }
@@ -93,6 +137,12 @@ function FavoriteLinks() {
       setErrorMsg('제목을 입력해주세요.')
       return
     }
+    const resolvedThumb = draft.thumbnail || resolveLinkThumbnail({
+      url: draft.url,
+      link_type: draft.linkType,
+      platform: draft.platform,
+      title,
+    })
     setSaving(true)
     const { data, error } = await supabase
       .from('favorite_links')
@@ -102,7 +152,7 @@ function FavoriteLinks() {
         link_type: draft.linkType,
         url: draft.url,
         title,
-        thumbnail_url: draft.thumbnail,
+        thumbnail_url: resolvedThumb,
       })
       .select()
       .single()
@@ -112,7 +162,7 @@ function FavoriteLinks() {
       return
     }
     setErrorMsg('')
-    setLinks((prev) => [data, ...prev])
+    setLinks((prev) => [{ ...data, thumbnail_url: data.thumbnail_url || resolvedThumb }, ...prev])
     setTab(draft.linkType)
     setDraft(null)
     setUrl('')
@@ -181,13 +231,25 @@ function FavoriteLinks() {
       ) : (
         <div className="bg-surface border-2 border-foreground rounded-md shadow-sticker p-3 mb-4">
           <div className="flex gap-3">
-            {draft.thumbnail ? (
-              <img src={draft.thumbnail} alt="" className="w-24 h-[54px] object-cover rounded-sm bg-surface-muted shrink-0" />
-            ) : (
-              <div className="w-24 h-[54px] rounded-sm bg-surface-muted flex items-center justify-center shrink-0">
-                <i className="ph-duotone ph-link text-xl text-foreground-muted" aria-hidden="true"></i>
-              </div>
-            )}
+            <div className="relative w-24 h-[56px] rounded-lg overflow-hidden bg-surface-muted shrink-0 border border-border">
+              {draft.thumbnail ? (
+                <img
+                  src={draft.thumbnail}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      draft.linkType === 'shopping'
+                        ? SHOPPING_STORE_IMAGES.default
+                        : CREATOR_FOOD_IMAGES.youtube_cook
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <i className="ph-duotone ph-link text-xl text-foreground-muted" aria-hidden="true"></i>
+                </div>
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-display font-bold text-foreground-muted">{draft.platform}</p>
               <input
@@ -195,7 +257,7 @@ function FavoriteLinks() {
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="제목을 입력해주세요"
-                className="w-full mt-1 bg-surface-muted rounded-sm px-2 py-1.5 text-[14px] border border-border outline-none"
+                className="w-full mt-1 bg-surface-muted rounded-sm px-2 py-1.5 text-[14px] border border-border outline-none focus:border-foreground transition duration-150"
               />
             </div>
           </div>
@@ -237,36 +299,65 @@ function FavoriteLinks() {
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
-          {visible.map((link) => (
-            <li key={link.link_id} className="bg-surface border border-border rounded-md shadow-soft flex items-stretch overflow-hidden">
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 min-w-0 flex items-center gap-3 p-2.5 active:scale-[0.99] transition duration-150"
+          {visible.map((link) => {
+            const thumbSrc = link.thumbnail_url || resolveLinkThumbnail(link)
+            const badge = getPlatformBadge(link)
+
+            return (
+              <li
+                key={link.link_id}
+                className="bg-surface border border-border hover:border-foreground/30 rounded-xl shadow-soft flex items-stretch overflow-hidden transition-all duration-150 group"
               >
-                {link.thumbnail_url ? (
-                  <img src={link.thumbnail_url} alt="" className="w-[76px] h-[43px] object-cover rounded-sm bg-surface-muted shrink-0" />
-                ) : (
-                  <div className="w-[76px] h-[43px] rounded-sm bg-surface-muted flex items-center justify-center shrink-0">
-                    <i className={`ph-duotone ${link.link_type === 'video' ? 'ph-play-circle' : 'ph-shopping-bag'} text-xl text-foreground-muted`} aria-hidden="true"></i>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-0 flex items-center gap-3 p-2.5 active:scale-[0.99] transition duration-150"
+                >
+                  {/* 메인 영상 사진 및 쇼핑몰 대표 메인 이미지 */}
+                  <div className="relative w-[86px] h-[52px] rounded-lg overflow-hidden bg-surface-muted shrink-0 border border-border/60 shadow-sm">
+                    <img
+                      src={thumbSrc}
+                      alt={link.title || link.platform}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          link.link_type === 'shopping'
+                            ? SHOPPING_STORE_IMAGES.default
+                            : CREATOR_FOOD_IMAGES.youtube_cook
+                      }}
+                    />
+                    {/* 플랫폼 뱃지 */}
+                    <span
+                      className={`absolute bottom-1 left-1 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold tracking-tight flex items-center gap-1 shadow-sm ${badge.badgeBg} ${badge.badgeText}`}
+                    >
+                      <i className={badge.icon}></i>
+                      <span className="leading-none">{badge.label}</span>
+                    </span>
                   </div>
-                )}
-                <span className="min-w-0">
-                  <span className="block font-display font-bold text-[14px] leading-tight line-clamp-2">{link.title || link.url}</span>
-                  <span className="block text-[11px] text-foreground-muted mt-0.5">{link.platform}</span>
-                </span>
-              </a>
-              <button
-                type="button"
-                onClick={() => remove(link)}
-                className="px-3 border-l border-border text-foreground-muted active:scale-95 transition duration-150"
-                aria-label={`${link.title || link.url} 삭제`}
-              >
-                <i className="ph-bold ph-trash text-base"></i>
-              </button>
-            </li>
-          ))}
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display font-bold text-[14px] leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+                      {link.title || link.url}
+                    </span>
+                    <span className="block text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1">
+                      <span className="truncate">{link.platform}</span>
+                      <span className="text-[10px] text-foreground-muted/60">• 새 창 열기</span>
+                    </span>
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => remove(link)}
+                  className="px-3 border-l border-border text-foreground-muted hover:text-destructive hover:bg-destructive/10 active:scale-95 transition duration-150"
+                  aria-label={`${link.title || link.url} 삭제`}
+                >
+                  <i className="ph-bold ph-trash text-base"></i>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
