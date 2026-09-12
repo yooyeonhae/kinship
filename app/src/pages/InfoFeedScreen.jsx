@@ -3,7 +3,8 @@ import { fetchNews } from '../lib/news'
 import { useFamily } from '../context/FamilyContext'
 import TodayInHistoryCard from '../components/infofeed/TodayInHistoryCard'
 import ScienceTriviaCard from '../components/infofeed/ScienceTriviaCard'
-import WordOfTheDayCard from '../components/infofeed/WordOfTheDayCard'
+import KoreanWordsCard from '../components/infofeed/KoreanWordsCard'
+import EnglishWordCard from '../components/infofeed/EnglishWordCard'
 import QuizAndThoughtCard from '../components/infofeed/QuizAndThoughtCard'
 
 // 성인/부모 기본 카테고리 (경제, 주식, 정책, 스포츠)
@@ -14,20 +15,22 @@ export const DEFAULT_ADULT_CATEGORIES = [
   { id: 'c4', type: 'news', label: '스포츠', icon: 'ph-basketball', query: '프로야구' },
 ]
 
-// 아이들 전용 4대 기본 카테고리 (역사 속 오늘, 과학·우주, 순우리말/영어, 퀴즈&생각질문)
+// 아이들 전용 기본 카테고리 (역사 속 오늘, 과학·우주, 생각질문&퀴즈, 순우리말·고사성어·속담, 실생활 영어)
 export const DEFAULT_KID_CATEGORIES = [
   { id: 'kid_history', type: 'kid_history', label: '역사 속 오늘', icon: 'ph-hourglass-high' },
   { id: 'kid_science', type: 'kid_science', label: '과학 · 우주', icon: 'ph-planet' },
-  { id: 'kid_word', type: 'kid_word', label: '순우리말 · 영단어', icon: 'ph-translate' },
-  { id: 'kid_quiz', type: 'kid_quiz', label: '퀴즈 & 생각 질문', icon: 'ph-lightbulb' },
+  { id: 'kid_quiz', type: 'kid_quiz', label: '생각 질문 & 퀴즈', icon: 'ph-lightbulb' },
+  { id: 'kid_korean', type: 'kid_korean', label: '순우리말 · 고사성어 · 속담', icon: 'ph-translate' },
+  { id: 'kid_english', type: 'kid_english', label: '실생활 영어 표현', icon: 'ph-globe' },
 ]
 
 // 빠른 추가 추천 목록
 const QUICK_RECOMMENDED_OPTIONS = [
   { id: 'kid_history', type: 'kid_history', label: '📜 역사 속 오늘' },
   { id: 'kid_science', type: 'kid_science', label: '🚀 과학 · 우주 한 줄' },
-  { id: 'kid_word', type: 'kid_word', label: '🌸 순우리말 · 영단어' },
-  { id: 'kid_quiz', type: 'kid_quiz', label: '🤣 퀴즈 & 생각 질문' },
+  { id: 'kid_quiz', type: 'kid_quiz', label: '💭 생각 질문 & 퀴즈' },
+  { id: 'kid_korean', type: 'kid_korean', label: '🌸 순우리말 · 고사성어 · 속담' },
+  { id: 'kid_english', type: 'kid_english', label: '🔤 실생활 영어 표현' },
   { id: 'rec_economy', type: 'news', label: '📈 경제 헤드라인', query: '경제', icon: 'ph-chart-line-up' },
   { id: 'rec_stock', type: 'news', label: '📊 주식 (코스피)', query: '코스피', icon: 'ph-trend-up' },
   { id: 'rec_policy', type: 'news', label: '🏛️ 육아 혜택 · 정책', query: '육아 지원 정책', icon: 'ph-bank' },
@@ -50,7 +53,30 @@ function loadCategoriesFromLocal(memberId, isChild) {
     const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (isChild) {
+          const hasEnglish = parsed.some((c) => c.type === 'kid_english' || c.id === 'kid_english')
+          const updated = parsed.map((c) => {
+            if (c.id === 'kid_word' || c.type === 'kid_word') {
+              return { ...c, id: 'kid_korean', type: 'kid_korean', label: '순우리말 · 고사성어 · 속담' }
+            }
+            if (c.id === 'kid_quiz' || c.type === 'kid_quiz') {
+              return { ...c, label: '생각 질문 & 퀴즈' }
+            }
+            return c
+          })
+          if (!hasEnglish) {
+            updated.push({
+              id: 'kid_english',
+              type: 'kid_english',
+              label: '실생활 영어 표현',
+              icon: 'ph-globe',
+            })
+          }
+          return updated
+        }
+        return parsed
+      }
     }
   } catch {}
   return isChild ? DEFAULT_KID_CATEGORIES : DEFAULT_ADULT_CATEGORIES
@@ -316,20 +342,30 @@ function InfoFeedScreen() {
               )
             }
 
-            // 2-3. 순우리말 · 영단어 카드
-            if (cat.type === 'kid_word') {
+            // 2-3. 생각 질문 & 넌센스 퀴즈 카드 (생각 질문 우선 표시)
+            if (cat.type === 'kid_quiz') {
               return (
-                <WordOfTheDayCard
+                <QuizAndThoughtCard
                   key={cat.id}
                   onRemove={() => removeCategory(cat.id)}
                 />
               )
             }
 
-            // 2-4. 넌센스 퀴즈 & 생각 질문 카드
-            if (cat.type === 'kid_quiz') {
+            // 2-4. 순우리말 · 고사성어 · 속담 카드
+            if (cat.type === 'kid_korean' || cat.type === 'kid_word') {
               return (
-                <QuizAndThoughtCard
+                <KoreanWordsCard
+                  key={cat.id}
+                  onRemove={() => removeCategory(cat.id)}
+                />
+              )
+            }
+
+            // 2-5. 실생활 영어 표현 카드 (완전 분리된 독립 카드)
+            if (cat.type === 'kid_english') {
+              return (
+                <EnglishWordCard
                   key={cat.id}
                   onRemove={() => removeCategory(cat.id)}
                 />
