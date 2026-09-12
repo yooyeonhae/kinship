@@ -75,103 +75,193 @@ export default function WorldPuzzleGame({
 }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
   const [showOriginalModal, setShowOriginalModal] = useState(false)
-  const [showNumberHints, setShowNumberHints] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  // 번호 힌트 1회 제한 및 카운트다운 타이머 (6초간 표시)
+  const [hintActive, setHintActive] = useState(false)
+  const [hintSecondsLeft, setHintSecondsLeft] = useState(0)
 
   const landmark = getLandmarkById(state?.destinationId)
   const gridSize = state?.gridSize || 3
   const tiles = state?.tiles || []
   const progress = calcProgress(tiles)
 
-  // 타이머 (진행 중일 때만 증가)
+  const mode = state?.mode || 'solo' // 'solo' (혼자 즐기기) | 'battle' (2인 이동횟수 대결)
+  const battleStage = state?.battleStage || 'p1' // 'p1' | 'p2_ready' | 'p2' | 'result'
+  const isComplete = progress.isComplete
+
+  // 경과 시간 타이머
   useEffect(() => {
-    if (state?.winner || progress.isComplete) return
+    if (state?.winner || isComplete || battleStage === 'p2_ready' || battleStage === 'result') return
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(timer)
-  }, [state?.winner, progress.isComplete, state?.roundId])
+  }, [state?.winner, isComplete, battleStage, state?.roundId])
 
-  // 새 라운드 시작 시 타이머 및 선택 상태 리셋
+  // 새 라운드 시작 시 리셋
   useEffect(() => {
     setElapsedSeconds(0)
     setSelectedIdx(null)
-  }, [state?.roundId])
+    setHintActive(false)
+    setHintSecondsLeft(0)
+  }, [state?.roundId, battleStage])
 
-  // 퍼즐 타일 클릭 시 처리
+  // 번호 힌트 카운트다운 (6초)
+  useEffect(() => {
+    if (!hintActive) return
+    if (hintSecondsLeft <= 0) {
+      setHintActive(false)
+      return
+    }
+    const t = setTimeout(() => {
+      setHintSecondsLeft((prev) => prev - 1)
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [hintActive, hintSecondsLeft])
+
+  // 번호 힌트 사용 처리 (판당 1회)
+  const handleUseNumberHint = () => {
+    if (state?.hintUsed || hintActive || isComplete || state?.winner) return
+    setHintActive(true)
+    setHintSecondsLeft(6)
+    onStateChange({
+      ...state,
+      hintUsed: true,
+    })
+  }
+
+  // 모드 전환
+  const handleSwitchMode = (newMode) => {
+    if (mode === newMode) return
+    const newTiles = shuffleTiles(3)
+    setSelectedIdx(null)
+    setElapsedSeconds(0)
+    setHintActive(false)
+    onStateChange({
+      ...state,
+      mode: newMode,
+      tiles: newTiles,
+      moves: 0,
+      winner: null,
+      battleStage: 'p1',
+      p1Result: null,
+      p2Result: null,
+      hintUsed: false,
+    })
+  }
+
+  // 퍼즐 조각 클릭 인터랙션
   const handleTileClick = (clickedIdx) => {
-    if (state?.winner || progress.isComplete || !myTurn) return
+    if (state?.winner || isComplete || !myTurn || battleStage === 'p2_ready') return
 
     if (selectedIdx === null) {
-      // 첫 번째 타일 선택
       setSelectedIdx(clickedIdx)
       playChime('swap')
       return
     }
 
     if (selectedIdx === clickedIdx) {
-      // 같은 타일 다시 클릭 시 선택 해제
       setSelectedIdx(null)
       return
     }
 
-    // 두 번째 타일 클릭 시 두 조각의 위치 맞교환 (Swap)
+    // 타일 스왑
     const newTiles = [...tiles]
     const firstVal = newTiles[selectedIdx]
     const secondVal = newTiles[clickedIdx]
     newTiles[selectedIdx] = secondVal
     newTiles[clickedIdx] = firstVal
 
-    // 이번 스왑으로 새롭게 제자리를 찾은 조각 수 계산
-    const beforeFirstMatch = firstVal === selectedIdx
-    const beforeSecondMatch = secondVal === clickedIdx
-    const afterFirstMatch = newTiles[selectedIdx] === selectedIdx
-    const afterSecondMatch = newTiles[clickedIdx] === clickedIdx
+    // 정답 위치 확인
+    const wasFirstCorrect = firstVal === selectedIdx
+    const wasSecondCorrect = secondVal === clickedIdx
+    const isFirstCorrect = newTiles[selectedIdx] === selectedIdx
+    const isSecondCorrect = newTiles[clickedIdx] === clickedIdx
 
-    let gainedPoints = 0
-    if (!beforeFirstMatch && afterFirstMatch) gainedPoints++
-    if (!beforeSecondMatch && afterSecondMatch) gainedPoints++
+    let newlyMatched = 0
+    if (!wasFirstCorrect && isFirstCorrect) newlyMatched++
+    if (!wasSecondCorrect && isSecondCorrect) newlyMatched++
 
-    if (gainedPoints > 0) {
+    if (newlyMatched > 0) {
       playChime('match')
     } else {
       playChime('swap')
     }
 
-    const curTurn = state.turn || 'p1'
-    const nextTurn = curTurn === 'p1' ? 'p2' : 'p1'
-    const updatedScores = {
-      ...state.scores,
-      [curTurn]: (state.scores?.[curTurn] || 0) + gainedPoints,
-    }
-
+    const nextMoves = (state.moves || 0) + 1
     const nextProgress = calcProgress(newTiles)
-    let winner = null
+    setSelectedIdx(null)
+
+    // 퍼즐 100% 완성 체크
     if (nextProgress.isComplete) {
       playChime('win')
-      if (state.mode === 'coop') {
-        winner = 'draw' // 협동 모드는 가족 모두의 승리
-      } else {
-        const p1Score = updatedScores.p1 || 0
-        const p2Score = updatedScores.p2 || 0
-        if (p1Score > p2Score) winner = 'p1'
-        else if (p2Score > p1Score) winner = 'p2'
-        else winner = curTurn // 동점일 경우 마지막 조각을 완성한 사람이 승리
-      }
-    }
 
+      if (mode === 'solo') {
+        // 1인 모드: 완성 시 승리 처리 및 가족 포인트 획득
+        onStateChange({
+          ...state,
+          tiles: newTiles,
+          moves: nextMoves,
+          winner: 'p1',
+          clearTime: elapsedSeconds,
+        })
+      } else if (mode === 'battle') {
+        if (battleStage === 'p1') {
+          // 2인 대결 1단계 완료 (선수1 기록 저장)
+          onStateChange({
+            ...state,
+            tiles: newTiles,
+            moves: nextMoves,
+            battleStage: 'p2_ready',
+            p1Result: {
+              moves: nextMoves,
+              seconds: elapsedSeconds,
+            },
+          })
+        } else if (battleStage === 'p2') {
+          // 2인 대결 2단계 완료 (선수2 기록 저장 후 이동 횟수 비교하여 승자 결정)
+          const p1Moves = state.p1Result?.moves || 999
+          const p2Moves = nextMoves
+          let winner = 'draw'
+          if (p1Moves < p2Moves) winner = 'p1'
+          else if (p2Moves < p1Moves) winner = 'p2'
+
+          onStateChange({
+            ...state,
+            tiles: newTiles,
+            moves: nextMoves,
+            battleStage: 'result',
+            winner,
+            p2Result: {
+              moves: p2Moves,
+              seconds: elapsedSeconds,
+            },
+          })
+        }
+      }
+    } else {
+      // 진행 중
+      onStateChange({
+        ...state,
+        tiles: newTiles,
+        moves: nextMoves,
+      })
+    }
+  }
+
+  // 2인 대결 모드에서 선수2 도전 시작
+  const handleStartP2Battle = () => {
+    const newTiles = shuffleTiles(3)
     setSelectedIdx(null)
+    setElapsedSeconds(0)
+    setHintActive(false)
     onStateChange({
       ...state,
       tiles: newTiles,
-      scores: updatedScores,
-      moves: (state.moves || 0) + 1,
-      turn: winner ? curTurn : nextTurn,
-      winner,
-      lastAction: {
-        who: curTurn,
-        gainedPoints,
-      },
+      moves: 0,
+      battleStage: 'p2',
+      hintUsed: false,
     })
   }
 
@@ -184,7 +274,7 @@ export default function WorldPuzzleGame({
     const nextLandmark = WORLD_LANDMARKS[nextIndex]
 
     if (onNewGame) {
-      onNewGame(nextLandmark.id)
+      onNewGame(nextLandmark.id, mode)
     }
   }
 
@@ -196,6 +286,32 @@ export default function WorldPuzzleGame({
 
   return (
     <div className="w-full flex flex-col items-center">
+      {/* 게임 모드 선택 탭 (1인 맞추기 vs 2인 이동횟수 대결) */}
+      <div className="w-full grid grid-cols-2 gap-1.5 p-1 bg-surface-muted border border-border rounded-xl mb-3 shadow-xs">
+        <button
+          type="button"
+          onClick={() => handleSwitchMode('solo')}
+          className={`py-2 rounded-lg font-display font-bold text-[12px] flex items-center justify-center gap-1.5 transition ${
+            mode === 'solo'
+              ? 'bg-primary text-on-primary shadow-xs'
+              : 'text-foreground-muted hover:text-foreground'
+          }`}
+        >
+          <i className="ph-bold ph-user text-[14px]"></i> 1인 모드 (혼자 즐기기)
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSwitchMode('battle')}
+          className={`py-2 rounded-lg font-display font-bold text-[12px] flex items-center justify-center gap-1.5 transition ${
+            mode === 'battle'
+              ? 'bg-secondary-dark text-on-secondary shadow-xs'
+              : 'text-foreground-muted hover:text-foreground'
+          }`}
+        >
+          <i className="ph-bold ph-sword text-[14px]"></i> 2인 대결 (이동 횟수 경쟁)
+        </button>
+      </div>
+
       {/* 여행지 정보 헤더 */}
       <div className="w-full bg-surface-muted/80 border border-border rounded-xl p-3.5 mb-3 shadow-xs">
         <div className="flex items-center justify-between gap-2 mb-2">
@@ -256,86 +372,122 @@ export default function WorldPuzzleGame({
           ></div>
         </div>
 
-        {/* 게임 상태 바 (시간, 이동 횟수, 턴 대전 현황) */}
+        {/* 게임 상태 바 (시간, 이동 횟수) */}
         <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/60 text-[12px]">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 text-foreground-muted">
+            <span className="flex items-center gap-1 text-foreground-muted font-medium">
               <i className="ph-bold ph-timer"></i> {formatTime(elapsedSeconds)}
             </span>
-            <span className="flex items-center gap-1 text-foreground-muted">
+            <span className="flex items-center gap-1 text-foreground-muted font-medium">
               <i className="ph-bold ph-arrows-clockwise"></i> {state?.moves || 0}회 이동
             </span>
           </div>
 
-          {/* 2인 턴 대전 점수 현황 */}
-          {state?.mode !== 'coop' ? (
+          {/* 대결 모드 기록 현황 표시 */}
+          {mode === 'battle' ? (
             <div className="flex items-center gap-2">
               <span
                 className={`px-2 py-0.5 rounded-md font-display font-bold text-[11px] ${
-                  state?.turn === 'p1' && !state?.winner
+                  battleStage === 'p1'
                     ? 'bg-primary text-on-primary ring-2 ring-primary/30'
                     : 'bg-surface text-foreground-muted border border-border'
                 }`}
               >
-                {player1}: {state?.scores?.p1 || 0}점
+                {player1}: {state?.p1Result ? `${state.p1Result.moves}회` : '도전 전'}
               </span>
               <span
                 className={`px-2 py-0.5 rounded-md font-display font-bold text-[11px] ${
-                  state?.turn === 'p2' && !state?.winner
-                    ? 'bg-accent text-white ring-2 ring-accent/30'
+                  battleStage === 'p2'
+                    ? 'bg-secondary-dark text-on-secondary ring-2 ring-secondary/30'
                     : 'bg-surface text-foreground-muted border border-border'
                 }`}
               >
-                {player2}: {state?.scores?.p2 || 0}점
+                {player2}: {state?.p2Result ? `${state.p2Result.moves}회` : '대기 중'}
               </span>
             </div>
           ) : (
-            <span className="text-primary font-bold text-[11px] flex items-center gap-1">
-              <i className="ph-bold ph-users-three"></i> 가족 협동 완성 중
+            <span className="text-foreground-muted text-[11px] font-bold flex items-center gap-1">
+              <i className="ph-bold ph-star text-amber-500"></i> 최소 이동으로 맞춰보세요
             </span>
           )}
         </div>
       </div>
 
-      {/* 안내 텍스트: 내 차례 여부 & 조각 맞바꾸기 안내 */}
+      {/* 대결 모드 단계별 안내 배너 */}
+      {mode === 'battle' && (
+        <div className="w-full bg-surface border border-border rounded-xl p-2.5 mb-2.5 text-center shadow-xs">
+          {battleStage === 'p1' && (
+            <p className="text-[12px] font-bold text-foreground">
+              ⚔️ <strong className="text-primary">{player1}</strong>님의 차례! 몇 번 만에 맞출 수 있을까요?
+            </p>
+          )}
+          {battleStage === 'p2_ready' && (
+            <div className="flex flex-col items-center gap-2 py-1 animate-fade-in">
+              <p className="text-[13px] font-display font-black text-foreground">
+                🎉 {player1}님 완료! <span className="text-primary font-bold">{state?.p1Result?.moves}회 이동</span> ({formatTime(state?.p1Result?.seconds || 0)})
+              </p>
+              <button
+                type="button"
+                onClick={handleStartP2Battle}
+                className="w-full py-2 bg-secondary-dark text-on-secondary rounded-lg font-display font-bold text-[13px] active:scale-95 transition shadow-xs"
+              >
+                👉 이제 {player2}님 도전하기! ({player1}님의 {state?.p1Result?.moves}회 깨기)
+              </button>
+            </div>
+          )}
+          {battleStage === 'p2' && (
+            <p className="text-[12px] font-bold text-foreground">
+              ⚔️ <strong className="text-secondary-dark">{player2}</strong>님의 차례! {player1}님의 <span className="text-primary font-bold">{state?.p1Result?.moves}회</span>보다 적게 성공해보세요!
+            </p>
+          )}
+          {battleStage === 'result' && (
+            <p className="text-[12px] font-bold text-foreground">
+              🏁 대결 종료! {player1}: {state?.p1Result?.moves}회 vs {player2}: {state?.p2Result?.moves}회
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 안내 텍스트 및 힌트 버튼들 */}
       <div className="flex items-center justify-between w-full px-1 mb-2">
-        <p className="text-[12px] font-bold text-foreground">
-          {state?.winner ? (
+        <p className="text-[12px] font-bold text-foreground truncate mr-2">
+          {isComplete || state?.winner ? (
             <span className="text-primary font-extrabold">🎉 여행지 퍼즐 완성!</span>
           ) : (
-            <span>
-              {state?.mode === 'coop' ? (
-                '조각 두 개를 차례로 탭해 제자리를 찾아보세요!'
-              ) : (
-                <>
-                  <strong className={state?.turn === 'p1' ? 'text-primary' : 'text-accent'}>
-                    {state?.turn === 'p1' ? player1 : player2}
-                  </strong>
-                  님의 차례 — 조각 2개를 골라 맞바꿔요!
-                </>
-              )}
-            </span>
+            <span>조각 2개를 골라 맞바꾸며 제자리를 찾아보세요!</span>
           )}
         </p>
 
         {/* 힌트 버튼들 */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* 번호 힌트 (한 게임당 1회 제한) */}
           <button
             type="button"
-            onClick={() => setShowNumberHints((prev) => !prev)}
-            className={`px-2 py-1 rounded-md text-[11px] font-bold border transition ${
-              showNumberHints
-                ? 'bg-secondary-dark text-on-secondary border-secondary-dark'
-                : 'bg-surface text-foreground-muted border-border hover:bg-surface-muted'
+            onClick={handleUseNumberHint}
+            disabled={state?.hintUsed || hintActive || isComplete || !!state?.winner}
+            className={`px-2 py-1 rounded-md text-[11px] font-bold border transition flex items-center gap-1 ${
+              hintActive
+                ? 'bg-amber-500 text-white border-amber-500 animate-pulse'
+                : state?.hintUsed
+                  ? 'bg-surface-muted text-foreground-muted border-border/60 opacity-50 cursor-not-allowed'
+                  : 'bg-surface text-foreground border-border hover:bg-surface-muted active:scale-95'
             }`}
-            title="조각 번호 힌트 보기"
+            title={state?.hintUsed ? '이번 판 힌트를 이미 사용했습니다' : '한 게임당 1회 6초간 번호가 보여요'}
           >
-            🔢 번호 힌트
+            {hintActive ? (
+              <>🔢 번호 ({hintSecondsLeft}초)</>
+            ) : state?.hintUsed ? (
+              <>🔢 힌트완료(0/1)</>
+            ) : (
+              <>🔢 번호힌트(1회)</>
+            )}
           </button>
+
+          {/* 원본 사진 힌트 보기 */}
           <button
             type="button"
             onClick={() => setShowOriginalModal(true)}
-            className="px-2.5 py-1 bg-surface text-primary border border-primary/30 hover:bg-primary/5 rounded-md text-[11px] font-bold flex items-center gap-1 transition shadow-xs"
+            className="px-2.5 py-1 bg-surface text-primary border border-primary/30 hover:bg-primary/5 rounded-md text-[11px] font-bold flex items-center gap-1 transition shadow-xs active:scale-95"
           >
             <i className="ph-bold ph-image"></i> 원본 힌트
           </button>
@@ -355,7 +507,6 @@ export default function WorldPuzzleGame({
             const isCorrect = tileVal === slotIdx
             const isSelected = selectedIdx === slotIdx
 
-            // 원래 위치(행, 열) 계산하여 배경 위치 매핑
             const origRow = Math.floor(tileVal / gridSize)
             const origCol = tileVal % gridSize
             const posX = (origCol / (gridSize - 1)) * 100
@@ -366,7 +517,7 @@ export default function WorldPuzzleGame({
                 key={slotIdx}
                 type="button"
                 onClick={() => handleTileClick(slotIdx)}
-                disabled={!!state?.winner || !myTurn}
+                disabled={!!state?.winner || isComplete || !myTurn || battleStage === 'p2_ready'}
                 className={`relative w-full h-full rounded-lg overflow-hidden transition-all duration-200 active:scale-95 focus:outline-none ${
                   isSelected
                     ? 'ring-4 ring-amber-400 scale-[1.04] z-10 shadow-lg'
@@ -387,9 +538,9 @@ export default function WorldPuzzleGame({
                   </div>
                 )}
 
-                {/* 번호 힌트 오버레이 (1~9) */}
-                {showNumberHints && (
-                  <div className="absolute bottom-1 left-1 bg-black/60 backdrop-blur-xs text-white px-1.5 py-0.5 rounded text-[10px] font-extrabold">
+                {/* 1회 한정 번호 힌트 활성화 시 표시 (6초 카운트다운) */}
+                {hintActive && (
+                  <div className="absolute bottom-1 left-1 bg-black/75 backdrop-blur-xs text-amber-300 px-1.5 py-0.5 rounded text-[10px] font-extrabold border border-amber-400/50 animate-pop">
                     {tileVal + 1}
                   </div>
                 )}
@@ -403,16 +554,18 @@ export default function WorldPuzzleGame({
       </div>
 
       {/* 승리 / 완성 메시지 영역 */}
-      {state?.winner && (
-        <div className="w-full bg-pastel-mint/30 border border-pastel-mint rounded-xl p-3 text-center mb-3 animate-fade-in">
+      {(state?.winner || (mode === 'solo' && isComplete)) && (
+        <div className="w-full bg-pastel-mint/30 border border-pastel-mint rounded-xl p-3.5 text-center mb-3 animate-fade-in shadow-xs">
           <p className="text-[15px] font-display font-black text-foreground mb-1">
-            {state?.mode === 'coop'
-              ? `축하합니다! 가족이 힘을 합쳐 ${landmark.name}을(를) 완성했어요!`
-              : state?.winner === 'draw'
-                ? `무승부! 두 사람 모두 멋지게 퍼즐을 완성했어요!`
-                : `축하합니다! ${state?.winner === 'p1' ? player1 : player2} 승리! 더 많은 조각을 맞췄어요.`}
+            {mode === 'solo' ? (
+              <>🎉 축하합니다! {state?.moves || 0}번의 이동으로 {formatTime(elapsedSeconds)} 만에 {landmark.name}을(를) 완성했어요!</>
+            ) : state?.winner === 'draw' ? (
+              <>🤝 무승부! 둘 다 {state?.p1Result?.moves}번 만에 똑같이 멋지게 완성했어요!</>
+            ) : (
+              <>🏆 축하합니다! {state?.winner === 'p1' ? player1 : player2} 승리! ({state?.winner === 'p1' ? `${player1} ${state?.p1Result?.moves}회 vs ${player2} ${state?.p2Result?.moves}회` : `${player2} ${state?.p2Result?.moves}회 vs ${player1} ${state?.p1Result?.moves}회`}) 더 적은 이동 횟수로 퍼즐을 완성했어요!</>
+            )}
           </p>
-          <p className="text-[12px] text-foreground-muted">{landmark.trivia}</p>
+          <p className="text-[12px] text-foreground-muted leading-relaxed mt-1">{landmark.trivia}</p>
         </div>
       )}
 
@@ -420,7 +573,7 @@ export default function WorldPuzzleGame({
       <div className="w-full grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => onNewGame && onNewGame(landmark.id)}
+          onClick={() => onNewGame && onNewGame(landmark.id, mode)}
           className="bg-surface-muted border border-border text-foreground hover:bg-surface rounded-xl py-2.5 flex items-center justify-center gap-1.5 font-display font-bold text-[13px] active:scale-[0.97] transition duration-150"
         >
           <i className="ph-bold ph-arrow-counter-clockwise text-[15px]"></i> 다시 섞기

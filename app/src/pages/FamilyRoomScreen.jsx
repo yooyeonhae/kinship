@@ -144,8 +144,8 @@ function newBingoState(firstTurn = 'p1') {
 }
 
 // 세계여행 퍼즐킹. 전 세계 랜드마크 사진을 3x3 퍼즐 조각으로 나눠 맞추는 게임.
-// 조각을 탭하여 위치를 서로 바꾸며(Swap), 제자리에 맞춘 조각마다 점수를 얻는다.
-function newWorldPuzzleState(firstTurn = 'p1', destinationId = null) {
+// 1인 모드(혼자 자유롭게 맞추기)와 2인 대결 모드(각자 완성 후 이동 횟수 경쟁) 지원.
+function newWorldPuzzleState(firstTurn = 'p1', destinationId = null, mode = 'solo') {
   const landmark = destinationId ? getLandmarkById(destinationId) : getRandomLandmark()
   const tiles = shuffleTiles(3)
   return {
@@ -153,12 +153,14 @@ function newWorldPuzzleState(firstTurn = 'p1', destinationId = null) {
     destinationId: landmark.id,
     gridSize: 3,
     tiles,
-    scores: { p1: 0, p2: 0 },
     moves: 0,
     turn: firstTurn,
     winner: null,
-    mode: 'turn',
-    lastAction: null,
+    mode,
+    battleStage: 'p1',
+    p1Result: null,
+    p2Result: null,
+    hintUsed: false,
   }
 }
 
@@ -1163,8 +1165,8 @@ function FamilyRoomScreen() {
             player1={player1}
             player2={player2}
             myTurn={myTurn}
-            onNewGame={(destinationId) =>
-              setPuzzle(newWorldPuzzleState(puzzle.winner === 'p1' ? 'p2' : 'p1', destinationId))
+            onNewGame={(destinationId, mode) =>
+              setPuzzle(newWorldPuzzleState(puzzle.winner === 'p1' ? 'p2' : 'p1', destinationId, mode || puzzle.mode))
             }
           />
         )}
