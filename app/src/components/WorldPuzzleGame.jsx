@@ -200,7 +200,11 @@ export default function WorldPuzzleGame({
       <div className="w-full bg-surface-muted/80 border border-border rounded-xl p-3.5 mb-3 shadow-xs">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-2xl" role="img" aria-label={landmark.country}>
+            <span
+              className="text-sm font-black px-2 py-1 rounded-lg bg-surface border border-border shadow-xs shrink-0 flex items-center justify-center min-w-[34px] text-foreground"
+              role="img"
+              aria-label={landmark.country}
+            >
               {landmark.flag}
             </span>
             <div>
@@ -436,7 +440,9 @@ export default function WorldPuzzleGame({
           <div className="bg-surface border border-border rounded-2xl p-4 max-w-sm w-full shadow-2xl relative">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-2xl">{landmark.flag}</span>
+                <span className="text-sm font-black px-2 py-1 rounded-lg bg-surface-muted border border-border shadow-xs shrink-0 flex items-center justify-center min-w-[34px] text-foreground">
+                  {landmark.flag}
+                </span>
                 <div>
                   <h4 className="font-display font-bold text-[15px] text-foreground">{landmark.name}</h4>
                   <p className="text-[11px] text-foreground-muted">
