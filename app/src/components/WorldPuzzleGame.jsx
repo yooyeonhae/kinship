@@ -72,6 +72,9 @@ export default function WorldPuzzleGame({
   player2 = '선수2',
   myTurn = true,
   onNewGame,
+  session = null,
+  currentMemberId = null,
+  onInviteFamily = null,
 }) {
   const [selectedIdx, setSelectedIdx] = useState(null)
   const [showOriginalModal, setShowOriginalModal] = useState(false)
@@ -81,23 +84,41 @@ export default function WorldPuzzleGame({
   const [hintActive, setHintActive] = useState(false)
   const [hintSecondsLeft, setHintSecondsLeft] = useState(0)
 
+  const isRemote = Boolean(session)
+  const myRole = session?.p1_member_id === currentMemberId ? 'p1' : session?.p2_member_id === currentMemberId ? 'p2' : 'p1'
+  const oppRole = myRole === 'p1' ? 'p2' : 'p1'
+  const oppName = oppRole === 'p1' ? player1 : player2
+  const oppJoined = Boolean(session?.p2_member_id)
+
   const landmark = getLandmarkById(state?.destinationId)
   const gridSize = state?.gridSize || 3
-  const tiles = state?.tiles || []
-  const progress = calcProgress(tiles)
 
-  const mode = state?.mode || 'solo' // 'solo' (혼자 즐기기) | 'battle' (2인 이동횟수 대결)
-  const battleStage = state?.battleStage || 'p1' // 'p1' | 'p2_ready' | 'p2' | 'result'
+  // 원격 세션일 경우 각자 독립된 타일과 이동 횟수 사용
+  const p1Data = state?.p1 || { tiles: state?.tiles || [], moves: state?.moves || 0, completed: Boolean(state?.winner), time: 0, hintUsed: Boolean(state?.hintUsed) }
+  const p2Data = state?.p2 || { tiles: state?.initialTiles || state?.tiles || [], moves: 0, completed: false, time: 0, hintUsed: false }
+
+  const activeTiles = isRemote
+    ? (myRole === 'p2' ? (p2Data.tiles || state?.tiles || []) : (p1Data.tiles || state?.tiles || []))
+    : (state?.tiles || [])
+  const activeMoves = isRemote
+    ? (myRole === 'p2' ? (p2Data.moves || 0) : (p1Data.moves || 0))
+    : (state?.moves || 0)
+  const progress = calcProgress(activeTiles)
   const isComplete = progress.isComplete
+
+  const oppData = oppRole === 'p1' ? p1Data : p2Data
+
+  const mode = isRemote ? 'battle' : (state?.mode || 'solo') // 'solo' | 'battle'
+  const battleStage = state?.battleStage || 'p1' // 'p1' | 'p2_ready' | 'p2' | 'result'
 
   // 경과 시간 타이머
   useEffect(() => {
-    if (state?.winner || isComplete || battleStage === 'p2_ready' || battleStage === 'result') return
+    if (state?.winner || isComplete || (!isRemote && (battleStage === 'p2_ready' || battleStage === 'result'))) return
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(timer)
-  }, [state?.winner, isComplete, battleStage, state?.roundId])
+  }, [state?.winner, isComplete, battleStage, state?.roundId, isRemote])
 
   // 새 라운드 시작 시 리셋
   useEffect(() => {
@@ -122,18 +143,31 @@ export default function WorldPuzzleGame({
 
   // 번호 힌트 사용 처리 (판당 1회)
   const handleUseNumberHint = () => {
-    if (state?.hintUsed || hintActive || isComplete || state?.winner) return
+    const isHintUsed = isRemote ? (myRole === 'p2' ? p2Data.hintUsed : p1Data.hintUsed) : state?.hintUsed
+    if (isHintUsed || hintActive || isComplete || state?.winner) return
     setHintActive(true)
     setHintSecondsLeft(6)
-    onStateChange({
-      ...state,
-      hintUsed: true,
-    })
+    if (isRemote) {
+      const myNewData = {
+        ...(myRole === 'p1' ? p1Data : p2Data),
+        hintUsed: true,
+      }
+      onStateChange({
+        ...state,
+        p1: myRole === 'p1' ? myNewData : p1Data,
+        p2: myRole === 'p2' ? myNewData : p2Data,
+      })
+    } else {
+      onStateChange({
+        ...state,
+        hintUsed: true,
+      })
+    }
   }
 
-  // 모드 전환
+  // 모드 전환 (로컬 모드일 때만 허용)
   const handleSwitchMode = (newMode) => {
-    if (mode === newMode) return
+    if (mode === newMode || isRemote) return
     const newTiles = shuffleTiles(3)
     setSelectedIdx(null)
     setElapsedSeconds(0)
@@ -141,7 +175,10 @@ export default function WorldPuzzleGame({
     onStateChange({
       ...state,
       mode: newMode,
-      tiles: newTiles,
+      tiles: [...newTiles],
+      initialTiles: [...newTiles],
+      p1: { tiles: [...newTiles], moves: 0, completed: false, time: 0, hintUsed: false },
+      p2: { tiles: [...newTiles], moves: 0, completed: false, time: 0, hintUsed: false },
       moves: 0,
       winner: null,
       battleStage: 'p1',
@@ -153,7 +190,8 @@ export default function WorldPuzzleGame({
 
   // 퍼즐 조각 클릭 인터랙션
   const handleTileClick = (clickedIdx) => {
-    if (state?.winner || isComplete || !myTurn || battleStage === 'p2_ready') return
+    if (state?.winner || isComplete) return
+    if (!isRemote && (!myTurn || battleStage === 'p2_ready')) return
 
     if (selectedIdx === null) {
       setSelectedIdx(clickedIdx)
@@ -167,7 +205,7 @@ export default function WorldPuzzleGame({
     }
 
     // 타일 스왑
-    const newTiles = [...tiles]
+    const newTiles = [...activeTiles]
     const firstVal = newTiles[selectedIdx]
     const secondVal = newTiles[clickedIdx]
     newTiles[selectedIdx] = secondVal
@@ -189,11 +227,53 @@ export default function WorldPuzzleGame({
       playChime('swap')
     }
 
-    const nextMoves = (state.moves || 0) + 1
+    const nextMoves = activeMoves + 1
     const nextProgress = calcProgress(newTiles)
     setSelectedIdx(null)
 
-    // 퍼즐 100% 완성 체크
+    if (isRemote) {
+      // 🌐 원격 대결: 내 창에서 연속으로 풀며, 양쪽 완료 시 이동 횟수 비교
+      if (nextProgress.isComplete) {
+        playChime('win')
+        let winner = null
+        if (oppData.completed) {
+          const p1Final = myRole === 'p1' ? nextMoves : p1Data.moves
+          const p2Final = myRole === 'p2' ? nextMoves : p2Data.moves
+          if (p1Final < p2Final) winner = 'p1'
+          else if (p2Final < p1Final) winner = 'p2'
+          else winner = 'draw'
+        }
+
+        const myNewData = {
+          tiles: newTiles,
+          moves: nextMoves,
+          completed: true,
+          time: elapsedSeconds,
+          hintUsed: myRole === 'p1' ? p1Data.hintUsed : p2Data.hintUsed,
+        }
+
+        onStateChange({
+          ...state,
+          p1: myRole === 'p1' ? myNewData : p1Data,
+          p2: myRole === 'p2' ? myNewData : p2Data,
+          winner: winner || null,
+        })
+      } else {
+        const myNewData = {
+          ...(myRole === 'p1' ? p1Data : p2Data),
+          tiles: newTiles,
+          moves: nextMoves,
+        }
+        onStateChange({
+          ...state,
+          p1: myRole === 'p1' ? myNewData : p1Data,
+          p2: myRole === 'p2' ? myNewData : p2Data,
+        })
+      }
+      return
+    }
+
+    // 로컬 모드 (1인 또는 로컬 2인 순차 대결)
     if (nextProgress.isComplete) {
       playChime('win')
 
@@ -379,7 +459,7 @@ export default function WorldPuzzleGame({
               <i className="ph-bold ph-timer"></i> {formatTime(elapsedSeconds)}
             </span>
             <span className="flex items-center gap-1 text-foreground-muted font-medium">
-              <i className="ph-bold ph-arrows-clockwise"></i> {state?.moves || 0}회 이동
+              <i className="ph-bold ph-arrows-clockwise"></i> {activeMoves}회 이동
             </span>
           </div>
 
@@ -388,21 +468,21 @@ export default function WorldPuzzleGame({
             <div className="flex items-center gap-2">
               <span
                 className={`px-2 py-0.5 rounded-md font-display font-bold text-[11px] ${
-                  battleStage === 'p1'
-                    ? 'bg-primary text-on-primary ring-2 ring-primary/30'
-                    : 'bg-surface text-foreground-muted border border-border'
+                  isRemote
+                    ? myRole === 'p1' ? 'bg-primary text-on-primary' : 'bg-surface text-foreground-muted border border-border'
+                    : battleStage === 'p1' ? 'bg-primary text-on-primary ring-2 ring-primary/30' : 'bg-surface text-foreground-muted border border-border'
                 }`}
               >
-                {player1}: {state?.p1Result ? `${state.p1Result.moves}회` : '도전 전'}
+                {player1}: {isRemote ? (p1Data.completed ? `🎉 ${p1Data.moves}회` : `${p1Data.moves || 0}회 중`) : state?.p1Result ? `${state.p1Result.moves}회` : '도전 전'}
               </span>
               <span
                 className={`px-2 py-0.5 rounded-md font-display font-bold text-[11px] ${
-                  battleStage === 'p2'
-                    ? 'bg-secondary-dark text-on-secondary ring-2 ring-secondary/30'
-                    : 'bg-surface text-foreground-muted border border-border'
+                  isRemote
+                    ? myRole === 'p2' ? 'bg-secondary-dark text-on-secondary' : 'bg-surface text-foreground-muted border border-border'
+                    : battleStage === 'p2' ? 'bg-secondary-dark text-on-secondary ring-2 ring-secondary/30' : 'bg-surface text-foreground-muted border border-border'
                 }`}
               >
-                {player2}: {state?.p2Result ? `${state.p2Result.moves}회` : '대기 중'}
+                {player2}: {isRemote ? (p2Data.completed ? `🎉 ${p2Data.moves}회` : oppJoined ? `${p2Data.moves || 0}회 중` : '대기 중') : state?.p2Result ? `${state.p2Result.moves}회` : '대기 중'}
               </span>
             </div>
           ) : (
@@ -413,37 +493,88 @@ export default function WorldPuzzleGame({
         </div>
       </div>
 
+      {/* 로컬 대결 모드일 때 가족 대결 신청 버튼 노출 */}
+      {!isRemote && mode === 'battle' && onInviteFamily && (
+        <div className="w-full flex justify-end mb-2.5">
+          <button
+            type="button"
+            onClick={() => onInviteFamily('worldpuzzle')}
+            className="px-3 py-1.5 bg-pastel-mint border border-foreground/30 text-foreground font-display font-bold text-xs rounded-lg shadow-sticker active:scale-95 transition flex items-center gap-1.5 hover:bg-pastel-mint/80"
+          >
+            <i className="ph-bold ph-paper-plane-tilt"></i> 💌 가족에게 원격 대결 신청하기
+          </button>
+        </div>
+      )}
+
       {/* 대결 모드 단계별 안내 배너 */}
       {mode === 'battle' && (
         <div className="w-full bg-surface border border-border rounded-xl p-2.5 mb-2.5 text-center shadow-xs">
-          {battleStage === 'p1' && (
-            <p className="text-[12px] font-bold text-foreground">
-              ⚔️ <strong className="text-primary">{player1}</strong>님의 차례! 몇 번 만에 맞출 수 있을까요?
-            </p>
-          )}
-          {battleStage === 'p2_ready' && (
-            <div className="flex flex-col items-center gap-2 py-1 animate-fade-in">
-              <p className="text-[13px] font-display font-black text-foreground">
-                🎉 {player1}님 완료! <span className="text-primary font-bold">{state?.p1Result?.moves}회 이동</span> ({formatTime(state?.p1Result?.seconds || 0)})
-              </p>
-              <button
-                type="button"
-                onClick={handleStartP2Battle}
-                className="w-full py-2 bg-secondary-dark text-on-secondary rounded-lg font-display font-bold text-[13px] active:scale-95 transition shadow-xs"
-              >
-                👉 이제 {player2}님 도전하기! ({player1}님의 {state?.p1Result?.moves}회 깨기)
-              </button>
+          {isRemote ? (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-display font-black text-primary flex items-center gap-1">
+                  🌐 원격 대결 (각자의 창에서 이동 횟수 경쟁)
+                </span>
+                {state?.winner ? (
+                  <span className="text-[11px] font-bold px-2 py-0.5 bg-primary text-on-primary rounded-full">
+                    대결 종료
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2 py-0.5 bg-surface text-primary border border-primary/30 rounded-full animate-pulse">
+                    실시간 진행 중
+                  </span>
+                )}
+              </div>
+              {!oppJoined ? (
+                <p className="text-xs text-foreground-muted">
+                  ⏳ <strong>{oppName}</strong>님의 입장을 기다리고 있어요. 먼저 퍼즐을 시작하셔도 좋아요!
+                </p>
+              ) : state?.winner ? (
+                <p className="text-xs font-bold text-foreground">
+                  🏆 최종 결과: {player1} ({p1Data.moves}회) vs {player2} ({p2Data.moves}회) → {state.winner === 'draw' ? '무승부!' : `${state.winner === 'p1' ? player1 : player2} 승리!`}
+                </p>
+              ) : isComplete ? (
+                <p className="text-xs font-bold text-primary">
+                  🎉 나는 {activeMoves}회로 완성했어요! 상대방({oppName})의 완성을 기다리는 중...
+                </p>
+              ) : (
+                <p className="text-xs text-foreground-muted">
+                  상대방을 신경 쓰지 않고 내 속도대로 가장 적은 이동 횟수로 완성해보세요!
+                </p>
+              )}
             </div>
-          )}
-          {battleStage === 'p2' && (
-            <p className="text-[12px] font-bold text-foreground">
-              ⚔️ <strong className="text-secondary-dark">{player2}</strong>님의 차례! {player1}님의 <span className="text-primary font-bold">{state?.p1Result?.moves}회</span>보다 적게 성공해보세요!
-            </p>
-          )}
-          {battleStage === 'result' && (
-            <p className="text-[12px] font-bold text-foreground">
-              🏁 대결 종료! {player1}: {state?.p1Result?.moves}회 vs {player2}: {state?.p2Result?.moves}회
-            </p>
+          ) : (
+            <>
+              {battleStage === 'p1' && (
+                <p className="text-[12px] font-bold text-foreground">
+                  ⚔️ <strong className="text-primary">{player1}</strong>님의 차례! 몇 번 만에 맞출 수 있을까요?
+                </p>
+              )}
+              {battleStage === 'p2_ready' && (
+                <div className="flex flex-col items-center gap-2 py-1 animate-fade-in">
+                  <p className="text-[13px] font-display font-black text-foreground">
+                    🎉 {player1}님 완료! <span className="text-primary font-bold">{state?.p1Result?.moves}회 이동</span> ({formatTime(state?.p1Result?.seconds || 0)})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleStartP2Battle}
+                    className="w-full py-2 bg-secondary-dark text-on-secondary rounded-lg font-display font-bold text-[13px] active:scale-95 transition shadow-xs"
+                  >
+                    👉 이제 {player2}님 도전하기! ({player1}님의 {state?.p1Result?.moves}회 깨기)
+                  </button>
+                </div>
+              )}
+              {battleStage === 'p2' && (
+                <p className="text-[12px] font-bold text-foreground">
+                  ⚔️ <strong className="text-secondary-dark">{player2}</strong>님의 차례! {player1}님의 <span className="text-primary font-bold">{state?.p1Result?.moves}회</span>보다 적게 성공해보세요!
+                </p>
+              )}
+              {battleStage === 'result' && (
+                <p className="text-[12px] font-bold text-foreground">
+                  🏁 대결 종료! {player1}: {state?.p1Result?.moves}회 vs {player2}: {state?.p2Result?.moves}회
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
@@ -461,27 +592,35 @@ export default function WorldPuzzleGame({
         {/* 힌트 버튼들 */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* 번호 힌트 (한 게임당 1회 제한) */}
-          <button
-            type="button"
-            onClick={handleUseNumberHint}
-            disabled={state?.hintUsed || hintActive || isComplete || !!state?.winner}
-            className={`px-2 py-1 rounded-md text-[11px] font-bold border transition flex items-center gap-1 ${
-              hintActive
-                ? 'bg-amber-500 text-white border-amber-500 animate-pulse'
-                : state?.hintUsed
-                  ? 'bg-surface-muted text-foreground-muted border-border/60 opacity-50 cursor-not-allowed'
-                  : 'bg-surface text-foreground border-border hover:bg-surface-muted active:scale-95'
-            }`}
-            title={state?.hintUsed ? '이번 판 힌트를 이미 사용했습니다' : '한 게임당 1회 6초간 번호가 보여요'}
-          >
-            {hintActive ? (
-              <>🔢 번호 ({hintSecondsLeft}초)</>
-            ) : state?.hintUsed ? (
-              <>🔢 힌트완료(0/1)</>
-            ) : (
-              <>🔢 번호힌트(1회)</>
-            )}
-          </button>
+          {(() => {
+            // 원격 대결에서는 내 역할(p1/p2)의 hintUsed 상태를 사용
+            const myHintUsed = isRemote
+              ? (myRole === 'p2' ? p2Data.hintUsed : p1Data.hintUsed)
+              : Boolean(state?.hintUsed)
+            return (
+              <button
+                type="button"
+                onClick={handleUseNumberHint}
+                disabled={myHintUsed || hintActive || isComplete || !!state?.winner}
+                className={`px-2 py-1 rounded-md text-[11px] font-bold border transition flex items-center gap-1 ${
+                  hintActive
+                    ? 'bg-amber-500 text-white border-amber-500 animate-pulse'
+                    : myHintUsed
+                      ? 'bg-surface-muted text-foreground-muted border-border/60 opacity-50 cursor-not-allowed'
+                      : 'bg-surface text-foreground border-border hover:bg-surface-muted active:scale-95'
+                }`}
+                title={myHintUsed ? '이번 판 힌트를 이미 사용했습니다' : '한 게임당 1회 6초간 번호가 보여요'}
+              >
+                {hintActive ? (
+                  <>🔢 번호 ({hintSecondsLeft}초)</>
+                ) : myHintUsed ? (
+                  <>🔢 힌트완료(0/1)</>
+                ) : (
+                  <>🔢 번호힌트(1회)</>
+                )}
+              </button>
+            )
+          })()}
 
           {/* 원본 사진 힌트 보기 */}
           <button
@@ -503,7 +642,7 @@ export default function WorldPuzzleGame({
             gridTemplateRows: `repeat(${gridSize}, 1fr)`,
           }}
         >
-          {tiles.map((tileVal, slotIdx) => {
+          {activeTiles.map((tileVal, slotIdx) => {
             const isCorrect = tileVal === slotIdx
             const isSelected = selectedIdx === slotIdx
 
@@ -517,7 +656,7 @@ export default function WorldPuzzleGame({
                 key={slotIdx}
                 type="button"
                 onClick={() => handleTileClick(slotIdx)}
-                disabled={!!state?.winner || isComplete || !myTurn || battleStage === 'p2_ready'}
+                disabled={!!state?.winner || isComplete || (!isRemote && (!myTurn || battleStage === 'p2_ready'))}
                 className={`relative w-full h-full rounded-lg overflow-hidden transition-all duration-200 active:scale-95 focus:outline-none ${
                   isSelected
                     ? 'ring-4 ring-amber-400 scale-[1.04] z-10 shadow-lg'
@@ -554,11 +693,21 @@ export default function WorldPuzzleGame({
       </div>
 
       {/* 승리 / 완성 메시지 영역 */}
-      {(state?.winner || (mode === 'solo' && isComplete)) && (
+      {(state?.winner || (mode === 'solo' && isComplete) || (isRemote && isComplete)) && (
         <div className="w-full bg-pastel-mint/30 border border-pastel-mint rounded-xl p-3.5 text-center mb-3 animate-fade-in shadow-xs">
           <p className="text-[15px] font-display font-black text-foreground mb-1">
             {mode === 'solo' ? (
-              <>🎉 축하합니다! {state?.moves || 0}번의 이동으로 {formatTime(elapsedSeconds)} 만에 {landmark.name}을(를) 완성했어요!</>
+              <>🎉 축하합니다! {activeMoves}번의 이동으로 {formatTime(elapsedSeconds)} 만에 {landmark.name}을(를) 완성했어요!</>
+            ) : isRemote ? (
+              state?.winner ? (
+                state?.winner === 'draw' ? (
+                  <>🤝 무승부! 두 사람 모두 {p1Data.moves}번의 이동으로 똑같이 완성했어요!</>
+                ) : (
+                  <>🏆 축하합니다! {state?.winner === 'p1' ? player1 : player2} 승리! ({player1} {p1Data.moves}회 vs {player2} {p2Data.moves}회) 더 적은 이동 횟수로 성공했어요!</>
+                )
+              ) : (
+                <>🎉 내 퍼즐 완성 ({activeMoves}회 이동)! 상대방({oppName})의 완성을 기다리고 있어요...</>
+              )
             ) : state?.winner === 'draw' ? (
               <>🤝 무승부! 둘 다 {state?.p1Result?.moves}번 만에 똑같이 멋지게 완성했어요!</>
             ) : (
