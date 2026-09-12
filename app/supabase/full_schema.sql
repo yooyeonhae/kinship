@@ -272,7 +272,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE TABLE IF NOT EXISTS game_results (
   result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
-  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain')),
+  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain', 'worldpuzzle')),
   winner_member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
   opponent_member_id UUID REFERENCES members (member_id) ON DELETE SET NULL,
   is_draw BOOLEAN NOT NULL DEFAULT FALSE,
@@ -284,7 +284,7 @@ CREATE TABLE IF NOT EXISTS game_results (
 CREATE TABLE IF NOT EXISTS game_sessions (
   session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
-  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain')),
+  game_key TEXT NOT NULL CHECK (game_key IN ('sum15', 'bingo', 'stairs', 'updown', 'wordchain', 'worldpuzzle')),
   p1_member_id UUID NOT NULL REFERENCES members (member_id) ON DELETE CASCADE,
   p2_member_id UUID REFERENCES members (member_id) ON DELETE CASCADE,
   state JSONB NOT NULL,

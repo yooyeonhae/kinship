@@ -4,8 +4,15 @@ import { useFamily } from '../context/FamilyContext'
 import { MEMBER_BG_CLASS, colorTokenForMember } from '../lib/memberColors'
 import FamilyRewards from '../components/FamilyRewards'
 import WordChainGame from '../components/WordChainGame'
+import WorldPuzzleGame from '../components/WorldPuzzleGame'
 import { characterOf } from '../lib/avatars'
 import { allowedHeads, checkWord, lastCharOf, randomSeedWord } from '../lib/wordChain'
+import {
+  WORLD_LANDMARKS,
+  getRandomLandmark,
+  getLandmarkById,
+  shuffleTiles,
+} from '../lib/worldPuzzleData'
 import { DEFAULT_SETTINGS, SETTINGS_EVENT, loadSettings } from '../lib/settings'
 import { notifyFamily } from '../lib/push'
 import {
@@ -38,7 +45,7 @@ import {
 const GAME_TABS = [
   { key: 'wordchain', label: '끝말잇기', sub: '끝 글자로 이어 말하기', icon: 'ph-chats-circle', bgClass: 'bg-pastel-mint' },
   { key: 'bingo', label: '계산 빙고', sub: '암산으로 한 줄 빙고', icon: 'ph-grid-four', bgClass: 'bg-pastel-sky' },
-  { key: 'stairs', label: '계단 오르기', sub: '주사위로 먼저 도착하기', icon: 'ph-flag-checkered', bgClass: 'bg-tape-pink/25' },
+  { key: 'worldpuzzle', label: '세계여행 퍼즐킹', sub: '세계 명소 사진 맞추기', icon: 'ph-globe-hemisphere-west', bgClass: 'bg-pastel-sky/40' },
   { key: 'updown', label: '숫자 맞히기', sub: '내 숫자 먼저 맞히기', icon: 'ph-arrows-down-up', bgClass: 'bg-tape-yellow/25' },
 ]
 
@@ -47,8 +54,6 @@ const BINGO_LINES = [
   [0, 3, 6], [1, 4, 7], [2, 5, 8],
   [0, 4, 8], [2, 4, 6],
 ]
-
-const STAIRS_TARGET = 30
 
 // 한 판이 끝났을 때 결과를 정확히 한 번만 기록하기 위한 식별자.
 // winner만 보고 기록하면 리렌더나 StrictMode의 이중 실행에서 같은 판이 두 번 들어간다.
@@ -138,42 +143,23 @@ function newBingoState(firstTurn = 'p1') {
   }
 }
 
-const DICE_ICON = ['', 'ph-dice-one', 'ph-dice-two', 'ph-dice-three', 'ph-dice-four', 'ph-dice-five', 'ph-dice-six']
-
-// 예전 계단 오르기는 "굴린다 → 그만큼 올라간다"가 전부여서 이길지 질지가 전부 운이었고,
-// 플레이어가 할 결정이 하나도 없었다. 굴린 눈을 바로 올리지 않고 '모아둔 칸'에 쌓아,
-// 한 번 더 굴릴지 여기서 멈출지 고르게 한다. 1이 나오면 모아둔 것을 전부 잃는다.
-// 한 턴에 모을 수 있는 상한을 두면(예전에는 10칸) "1이 나오기 전까지는 굴리는 게 항상
-// 이득"이라 상한에 닿을 때까지 굴리는 것 말고 할 게 없어진다 — 모아둔 칸이 매번 0 아니면
-// 10으로만 끝나고 고를 것이 사라진다. 상한을 없애면 "지금 멈출까"가 진짜 판단이 된다.
-// 선공이 첫 턴에 목표를 다 모으는 판이 걱정이지만, 그때도 chaseFor로 상대가 같은 조건의
-// 마지막 한 턴을 받는다.
-
-function newStairsState(firstTurn = 'p1') {
+// 세계여행 퍼즐킹. 전 세계 랜드마크 사진을 3x3 퍼즐 조각으로 나눠 맞추는 게임.
+// 조각을 탭하여 위치를 서로 바꾸며(Swap), 제자리에 맞춘 조각마다 점수를 얻는다.
+function newWorldPuzzleState(firstTurn = 'p1', destinationId = null) {
+  const landmark = destinationId ? getLandmarkById(destinationId) : getRandomLandmark()
+  const tiles = shuffleTiles(3)
   return {
     roundId: nextRoundId++,
-    p1: 0,
-    p2: 0,
-    pot: 0,
-    lastRoll: null,
-    bust: false,
-    // 굴린 횟수. 주사위 애니메이션을 이 값으로 돌리면, 상대 기기에서 굴린 것도
-    // 내 화면에서 똑같이 굴러간다 — 숫자만 바뀌면 상대가 굴렸는지 알아채기 어렵다.
-    rolls: 0,
-    // 마지막에 무슨 일이 있었는지(누가 / 굴렸나·잃었나·쌓았나 / 몇 칸).
-    // 특히 1이 나와 차례가 넘어가는 순간은 두 기기 모두에서 분명히 보여야 한다.
-    lastEvent: null,
+    destinationId: landmark.id,
+    gridSize: 3,
+    tiles,
+    scores: { p1: 0, p2: 0 },
+    moves: 0,
     turn: firstTurn,
-    // 먼저 목표에 닿아도 바로 끝내지 않는다. 상대에게 같은 횟수의 기회를 주지 않으면
-    // 선공이 그대로 유리하다. 이 값이 채워지면 "그 사람의 마지막 한 턴"이다.
-    chaseFor: null,
     winner: null,
+    mode: 'turn',
+    lastAction: null,
   }
-}
-
-function stairsVerdict(p1, p2) {
-  if (p1 === p2) return 'draw'
-  return p1 > p2 ? 'p1' : 'p2'
 }
 
 const UPDOWN_MIN = 1
@@ -228,10 +214,9 @@ function FamilyRoomScreen() {
   const [chain, setChain] = useState(newWordChainState)
   const [wordInput, setWordInput] = useState('')
   const [bingo, setBingo] = useState(newBingoState)
-  const [stairs, setStairs] = useState(newStairsState)
+  const [puzzle, setPuzzle] = useState(newWorldPuzzleState)
   const [updown, setUpdown] = useState(newUpdownState)
   const [updownGuess, setUpdownGuess] = useState('')
-  const [rolling, setRolling] = useState(false)
 
   // 원격 대전. null이면 예전처럼 한 기기에서 번갈아 한다.
   const [session, setSession] = useState(null)
@@ -271,17 +256,7 @@ function FamilyRoomScreen() {
     if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight
   }, [messages])
 
-  useEffect(() => {
-    if (!rolling) return
-    const t = setTimeout(() => setRolling(false), 400)
-    return () => clearTimeout(t)
-  }, [rolling])
 
-  // 굴린 횟수가 늘면 주사위를 굴린다. 내가 굴렸을 때든 상대가 굴렸을 때든 같다.
-  useEffect(() => {
-    if (!stairs.rolls) return
-    setRolling(true)
-  }, [stairs.rolls, stairs.roundId])
 
   // 초기 로드 — 대화 기록과 지금까지 쌓인 포인트
   useEffect(() => {
@@ -478,29 +453,29 @@ function FamilyRoomScreen() {
   }, [bingo.winner, bingo.roundId, finishRound])
 
   useEffect(() => {
-    if (stairs.winner) finishRound('stairs', stairs.roundId, stairs.winner)
-  }, [stairs.winner, stairs.roundId, finishRound])
+    if (puzzle.winner) finishRound('worldpuzzle', puzzle.roundId, puzzle.winner)
+  }, [puzzle.winner, puzzle.roundId, finishRound])
 
   useEffect(() => {
     if (updown.winner) finishRound('updown', updown.roundId, updown.winner)
   }, [updown.winner, updown.roundId, finishRound])
 
   const stateFor = useCallback(
-    (key) => (key === 'wordchain' ? chain : key === 'bingo' ? bingo : key === 'stairs' ? stairs : updown),
-    [chain, bingo, stairs, updown]
+    (key) => (key === 'wordchain' ? chain : key === 'bingo' ? bingo : key === 'worldpuzzle' ? puzzle : updown),
+    [chain, bingo, puzzle, updown]
   )
 
   const setStateFor = useCallback((key, value) => {
     if (key === 'wordchain') setChain(value)
     else if (key === 'bingo') setBingo(value)
-    else if (key === 'stairs') setStairs(value)
+    else if (key === 'worldpuzzle') setPuzzle(value)
     else setUpdown(value)
   }, [])
 
   function newStateFor(key) {
     if (key === 'wordchain') return newWordChainState()
     if (key === 'bingo') return newBingoState()
-    if (key === 'stairs') return newStairsState()
+    if (key === 'worldpuzzle') return newWorldPuzzleState()
     return newUpdownState()
   }
 
@@ -616,7 +591,7 @@ function FamilyRoomScreen() {
     return () => {
       alive = false
     }
-  }, [chain, bingo, stairs, updown, session, supabase, stateFor])
+  }, [chain, bingo, puzzle, updown, session, supabase, stateFor])
 
   useEffect(() => {
     sessionRef.current = session
@@ -656,66 +631,7 @@ function FamilyRoomScreen() {
     })
   }
 
-  function handleStairsRoll() {
-    setStairs((prev) => {
-      if (prev.winner) return prev
-      const roll = 1 + Math.floor(Math.random() * 6)
-      const cur = prev.turn
-      const other = cur === 'p1' ? 'p2' : 'p1'
-      const rolls = prev.rolls + 1
-      if (roll === 1) {
-        // 모아둔 것을 잃는다. 계단에 이미 올려둔 칸은 안전하다.
-        // 마지막 기회였다면 여기서 승부가 갈린다.
-        const lost = { who: cur, kind: 'bust', amount: prev.pot }
-        if (prev.chaseFor === cur) {
-          return {
-            ...prev,
-            pot: 0,
-            lastRoll: roll,
-            bust: true,
-            rolls,
-            lastEvent: lost,
-            winner: stairsVerdict(prev.p1, prev.p2),
-          }
-        }
-        return { ...prev, pot: 0, lastRoll: roll, bust: true, rolls, lastEvent: lost, turn: other }
-      }
-      return {
-        ...prev,
-        pot: prev.pot + roll,
-        lastRoll: roll,
-        bust: false,
-        rolls,
-        lastEvent: { who: cur, kind: 'roll', amount: roll },
-      }
-    })
-  }
 
-  // 모아둔 칸을 계단에 올리고 차례를 넘긴다. 계단이 늘어나는 건 이때뿐이다.
-  function handleStairsBank() {
-    setStairs((prev) => {
-      if (prev.winner || prev.pot === 0) return prev
-      const cur = prev.turn
-      const other = cur === 'p1' ? 'p2' : 'p1'
-      const next = {
-        ...prev,
-        [cur]: prev[cur] + prev.pot,
-        pot: 0,
-        bust: false,
-        lastEvent: { who: cur, kind: 'bank', amount: prev.pot },
-      }
-
-      // 마지막 기회를 받은 사람이 방금 멈췄다 → 점수를 비교해 끝낸다
-      if (prev.chaseFor === cur) {
-        return { ...next, winner: stairsVerdict(next.p1, next.p2) }
-      }
-      // 처음으로 목표에 닿았다 → 끝내지 않고 상대에게 마지막 한 턴을 준다
-      if (next[cur] >= STAIRS_TARGET) {
-        return { ...next, chaseFor: other, turn: other }
-      }
-      return { ...next, turn: other }
-    })
-  }
 
   function handleUpdownGuess(e) {
     e.preventDefault()
@@ -757,9 +673,6 @@ function FamilyRoomScreen() {
       ? memberName(session.p2_member_id)
       : '대기 중'
     : memberName(player2Id)
-
-  const stairsName = (key) => (key === 'p1' ? player1 : player2)
-
   // 내가 낄 수 있는 방만. 내가 이미 그 방의 선수면 '다시 열기'(새로고침으로 화면 상태를
   // 잃었을 때 돌아가는 길), 아직 상대가 없으면 '참가하기'. 남들끼리 하는 판은 감춘다.
   // 내가 만든 방에 내가 참가하면 p1·p2가 같은 사람이 되어 혼자 두 쪽을 두게 된다.
@@ -771,7 +684,7 @@ function FamilyRoomScreen() {
   const updownRange = updown.ranges[updown.turn]
 
   const activeState =
-    activeGame === 'wordchain' ? chain : activeGame === 'bingo' ? bingo : activeGame === 'stairs' ? stairs : updown
+    activeGame === 'wordchain' ? chain : activeGame === 'bingo' ? bingo : activeGame === 'worldpuzzle' ? puzzle : updown
 
   const onlineMembers = useMemo(
     () => members.filter((m) => onlineIds.includes(m.member_id)),
@@ -1243,114 +1156,17 @@ function FamilyRoomScreen() {
           </div>
         )}
 
-        {activeGame === 'stairs' && (
-          <div>
-            <p className="text-[13px] text-foreground-muted mb-3">
-              주사위를 굴려 모으고, <strong>멈추면</strong> 모은 만큼 계단을 올라가요. 욕심내서 계속 굴리다가{' '}
-              <strong>1</strong>이 나오면 모아둔 걸 전부 잃어요. 얼마든지 계속 굴릴 수 있으니 언제 멈출지가 승부예요.
-              누가 {STAIRS_TARGET}칸에 닿으면 상대도 마지막 한 턴을 받아요. 그 뒤 더 높이 오른 사람이 승리!
-            </p>
-
-            {stairs.chaseFor && !stairs.winner && (
-              <p className="text-[13px] font-display font-bold text-accent text-center mb-3">
-                마지막 기회! {stairs.chaseFor === 'p1' ? player1 : player2}이(가) 넘어야 해요.
-              </p>
-            )}
-
-            {/* 1이 나와 차례가 넘어가는 순간이 두 기기 모두에서 분명히 보여야 한다.
-                숫자만 조용히 바뀌면 상대는 자기 차례가 온 걸 모르고 기다린다. */}
-            {stairs.lastEvent && !stairs.winner && (
-              <p
-                className={`text-[13px] font-display font-bold text-center mb-2 ${
-                  stairs.lastEvent.kind === 'bust' ? 'text-destructive' : 'text-foreground-muted'
-                }`}
-              >
-                {stairs.lastEvent.kind === 'bust'
-                  ? stairs.lastEvent.amount > 0
-                    ? `${stairsName(stairs.lastEvent.who)}이(가) 1을 굴렸어요! 모아둔 ${stairs.lastEvent.amount}칸을 잃고 차례가 넘어갔어요.`
-                    : `${stairsName(stairs.lastEvent.who)}이(가) 1을 굴렸어요! 한 칸도 못 모으고 차례가 넘어갔어요.`
-                  : stairs.lastEvent.kind === 'bank'
-                    ? `${stairsName(stairs.lastEvent.who)}이(가) ${stairs.lastEvent.amount}칸을 쌓고 멈췄어요.`
-                    : `${stairsName(stairs.lastEvent.who)}이(가) ${stairs.lastEvent.amount}을(를) 굴렸어요.`}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3 mb-3">
-              {['p1', 'p2'].map((key) => {
-                const pct = Math.min(100, Math.round((stairs[key] / STAIRS_TARGET) * 100))
-                return (
-                  <div key={key}>
-                    <div className="flex items-center justify-between text-[13px] font-display font-bold mb-1">
-                      <span>{key === 'p1' ? player1 : player2}</span>
-                      <span>
-                        {stairs[key]} / {STAIRS_TARGET}
-                      </span>
-                    </div>
-                    <div className="h-3 bg-surface-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${key === 'p1' ? 'bg-primary' : 'bg-accent'} rounded-full transition-all duration-300`}
-                        style={{ width: `${pct}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            {/* 숫자만 오르던 화면에 실제 주사위를 놓는다 */}
-            <div className="flex items-center justify-center gap-4 bg-surface-muted rounded-md py-4 mb-3">
-              <i
-                key={`${stairs.lastRoll}-${stairs.pot}`}
-                className={`ph-fill ${DICE_ICON[stairs.lastRoll] || 'ph-dice-five'} text-[56px] ${
-                  stairs.lastRoll ? 'text-foreground' : 'text-foreground-muted opacity-40'
-                } ${rolling ? 'dice-rolling' : ''}`}
-                aria-hidden="true"
-              ></i>
-              <div>
-                <p className="text-[12px] text-foreground-muted">모아둔 칸</p>
-                <p className="font-display font-extrabold text-[28px] leading-none">{stairs.pot}</p>
-                <p className="text-[12px] text-foreground-muted mt-1">
-                  {stairs.bust
-                    ? '1이 나왔어요'
-                    : stairs.pot > 0
-                      ? '멈추면 내 계단에 쌓여요'
-                      : '굴려서 모아보세요'}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <button
-                type="button"
-                onClick={handleStairsRoll}
-                disabled={!!stairs.winner || !myTurn}
-                className="bg-primary text-on-primary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150 disabled:opacity-60"
-              >
-                <i className="ph-bold ph-dice-five"></i>한 번 더
-              </button>
-              <button
-                type="button"
-                onClick={handleStairsBank}
-                disabled={!!stairs.winner || stairs.pot === 0 || !myTurn}
-                className="bg-secondary-dark text-on-secondary rounded-md py-3 flex items-center justify-center gap-2 font-display font-bold text-[15px] active:scale-[0.97] transition duration-150 disabled:opacity-40"
-              >
-                <i className="ph-bold ph-hand-palm"></i>멈추기
-              </button>
-            </div>
-            <p className="text-[14px] font-display font-bold text-center mb-3">
-              {stairs.winner
-                ? stairs.winner === 'draw'
-                  ? `무승부! 둘 다 ${stairs.p1}칸이에요.`
-                  : `${stairs.winner === 'p1' ? player1 : player2} 승리! ${stairs.p1}칸 대 ${stairs.p2}칸.`
-                : ' '}
-            </p>
-            <button
-              type="button"
-              onClick={() => setStairs((prev) => newStairsState(prev.winner === 'p1' ? 'p2' : 'p1'))}
-              className="w-full bg-surface-muted border border-border rounded-md py-2.5 font-display font-bold text-[14px] active:scale-[0.97] transition duration-150"
-            >
-              새 게임
-            </button>
-          </div>
+        {activeGame === 'worldpuzzle' && (
+          <WorldPuzzleGame
+            state={puzzle}
+            onStateChange={setPuzzle}
+            player1={player1}
+            player2={player2}
+            myTurn={myTurn}
+            onNewGame={(destinationId) =>
+              setPuzzle(newWorldPuzzleState(puzzle.winner === 'p1' ? 'p2' : 'p1', destinationId))
+            }
+          />
         )}
 
         {activeGame === 'updown' && (
