@@ -11,6 +11,9 @@ function RecipeDetail({ recipe, onClose }) {
     const initial = getRecipePhoto(recipe)
     setPhotoUrl(initial)
 
+    // 사용자가 직접 등록/지정한 이미지가 있으면 그대로 유지
+    if (recipe?.image_url) return
+
     fetchHybridMenuImage(recipe?.title).then((url) => {
       if (alive && url && url !== initial) {
         setPhotoUrl(url)

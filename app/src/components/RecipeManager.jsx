@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { parseDescription, parseSteps, getRecipePhoto } from '../lib/recipes'
 import { CURATED_FOOD_PHOTOS } from '../lib/menuService'
+import { compressImage } from '../lib/imageUtils'
+import { useFamily } from '../context/FamilyContext'
 
 const EMPTY = { title: '', ingredients: '', note: '', cookMinutes: '', steps: '', imageUrl: '' }
 
@@ -58,10 +60,16 @@ function draftFrom(recipe) {
 }
 
 function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
+  const { supabase, familyId } = useFamily()
+  const cameraInputRef = useRef(null)
+  const fileInputRef = useRef(null)
+
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState(EMPTY)
   const [formError, setFormError] = useState('')
+  const [photoError, setPhotoError] = useState('')
+  const [processingPhoto, setProcessingPhoto] = useState(false)
 
   const mine = recipes.filter((r) => r.family_id)
   const shared = recipes.filter((r) => !r.family_id)
@@ -70,6 +78,7 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
     setEditingId(null)
     setDraft(EMPTY)
     setFormError('')
+    setPhotoError('')
     setOpen(true)
   }
 
@@ -77,7 +86,51 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
     setEditingId(recipe.recipe_id)
     setDraft(draftFrom(recipe))
     setFormError('')
+    setPhotoError('')
     setOpen(true)
+  }
+
+  // 사진 촬영 및 앨범 선택 처리 (압축 + 필요 시 스토리지 업로드 / Base64 동기화)
+  async function handlePhotoFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoError('')
+    setProcessingPhoto(true)
+
+    try {
+      // 1. 최대 900px, 0.82 압축 (고화질 유지하면서 40~70KB로 최적화)
+      const compressed = await compressImage(file, 900, 0.82)
+      let finalUrl = compressed.base64
+
+      // 2. Supabase Storage 버킷이 사용 가능할 경우 저장 시도
+      if (supabase && familyId) {
+        try {
+          const filePath = `${familyId}/recipes/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.webp`
+          const { error: uploadErr } = await supabase.storage
+            .from('recipes')
+            .upload(filePath, compressed.blob, { contentType: 'image/webp', upsert: true })
+
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from('recipes').getPublicUrl(filePath)
+            if (urlData?.publicUrl) {
+              finalUrl = urlData.publicUrl
+            }
+          }
+        } catch {
+          // 스토리지 에러 시에도 base64 dataURL로 100% 정상 작동
+        }
+      }
+
+      setDraft((prev) => ({
+        ...prev,
+        imageUrl: finalUrl,
+      }))
+    } catch (err) {
+      setPhotoError(err.message || '사진을 불러오지 못했습니다.')
+    } finally {
+      setProcessingPhoto(false)
+      if (e.target) e.target.value = ''
+    }
   }
 
   async function submit(e) {
@@ -112,6 +165,12 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
   // 실시간 미리보기 이미지 URL
   const previewPhoto = draft.imageUrl || getRecipePhoto({ title: draft.title })
 
+  // 사용자가 직접 촬영/등록한 사진 여부 판별
+  const isUserCustomPhoto = Boolean(
+    draft.imageUrl &&
+      (draft.imageUrl.startsWith('data:image/') || !PHOTO_OPTIONS.some((opt) => opt.url === draft.imageUrl))
+  )
+
   return (
     <section className="mt-8">
       <div className="flex items-center justify-between mb-3">
@@ -136,55 +195,127 @@ function RecipeManager({ recipes, onCreate, onUpdate, onDelete, busy }) {
 
       {open && (
         <form onSubmit={submit} className="bg-surface border-2 border-foreground rounded-xl shadow-sticker p-4 mb-4 flex flex-col gap-3.5">
-          {/* 요리 사진 미리보기 및 선택 바 */}
-          <div>
-            <p className="font-display font-bold text-label tracking-wide text-foreground-muted mb-2">
-              대표 요리 사진 (자동 매칭 및 선택)
-            </p>
-            <div className="flex gap-3 items-center mb-2.5">
-              <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-foreground bg-surface-muted shrink-0 shadow-soft">
+          {/* 요리 사진 등록 (촬영 · 앨범 · 선택) */}
+          <div className="bg-surface-muted/60 border border-border rounded-xl p-3.5">
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="font-display font-bold text-[13px] tracking-wide text-foreground flex items-center gap-1.5">
+                <i className="ph-bold ph-camera text-primary text-base"></i>
+                <span>요리 사진 등록 (직접 촬영 · 앨범)</span>
+              </p>
+              {isUserCustomPhoto && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30 flex items-center gap-1">
+                  <i className="ph-bold ph-check-circle"></i>
+                  <span>직접 등록한 사진</span>
+                </span>
+              )}
+            </div>
+
+            {/* 숨겨진 파일 인풋: 카메라 직접 촬영 및 앨범/갤러리 선택 */}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              ref={cameraInputRef}
+              onChange={handlePhotoFile}
+              className="hidden"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handlePhotoFile}
+              className="hidden"
+            />
+
+            <div className="flex gap-3 items-center">
+              {/* 사진 미리보기 박스 */}
+              <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-foreground bg-surface shrink-0 shadow-soft">
                 <img
                   src={previewPhoto}
                   alt="요리 사진 미리보기"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
+                {processingPhoto && (
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[11px] gap-1">
+                    <i className="ph-bold ph-circle-notch animate-spin text-lg"></i>
+                    <span>압축 중...</span>
+                  </div>
+                )}
               </div>
-              <div className="text-[12px] text-foreground-muted leading-tight">
-                <p className="font-display font-bold text-foreground mb-1">
-                  {draft.title ? `"${draft.title}" 매칭 사진` : '요리명에 맞춰 자동 매칭돼요'}
-                </p>
-                <p>원하는 사진 칩을 직접 클릭하여 지정할 수도 있어요.</p>
+
+              {/* 촬영 & 앨범 선택 버튼 */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <button
+                    type="button"
+                    disabled={processingPhoto}
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex-1 min-w-[105px] inline-flex items-center justify-center gap-1.5 bg-primary text-on-primary border-2 border-foreground rounded-lg py-2 px-3 font-display font-bold text-[13px] shadow-xs active:translate-x-0.5 active:translate-y-0.5 transition duration-150 disabled:opacity-60"
+                  >
+                    <i className="ph-bold ph-camera text-base"></i>
+                    <span>사진 촬영</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={processingPhoto}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 min-w-[105px] inline-flex items-center justify-center gap-1.5 bg-surface text-foreground border border-border hover:border-foreground/50 rounded-lg py-2 px-3 font-display font-bold text-[13px] shadow-xs active:scale-[0.98] transition duration-150 disabled:opacity-60"
+                  >
+                    <i className="ph-bold ph-image text-base"></i>
+                    <span>앨범에서 선택</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-foreground-muted">
+                  <span className="truncate">
+                    {draft.imageUrl
+                      ? (isUserCustomPhoto ? '카메라/앨범 사진 적용 중' : '선택한 칩 사진 적용 중')
+                      : (draft.title ? `"${draft.title}" 자동 매칭 중` : '직접 찍거나 앨범에서 골라보세요')}
+                  </span>
+                  {draft.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, imageUrl: '' }))}
+                      className="text-destructive font-bold hover:underline shrink-0 ml-2"
+                    >
+                      기본으로 복원
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* 빠른 사진 칩 */}
-            <div className="flex flex-wrap gap-1.5">
-              {PHOTO_OPTIONS.map((opt) => (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, imageUrl: opt.url })}
-                  className={`text-[11px] font-display font-bold px-2.5 py-1 rounded-full border transition active:scale-95 flex items-center gap-1 ${
-                    draft.imageUrl === opt.url
-                      ? 'bg-primary text-on-primary border-foreground shadow-xs'
-                      : 'bg-surface-muted text-foreground border-border hover:bg-surface'
-                  }`}
-                >
-                  <span>{opt.emoji}</span>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
-              {draft.imageUrl && (
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, imageUrl: '' })}
-                  className="text-[11px] text-destructive hover:underline ml-1 self-center"
-                >
-                  자동 매칭으로 복원
-                </button>
-              )}
-            </div>
+            {photoError && <p className="text-[12px] text-destructive mt-2">{photoError}</p>}
+
+            {/* 추천 사진 칩 (아코디언 토글) */}
+            <details className="group mt-3 pt-2.5 border-t border-border/70">
+              <summary className="cursor-pointer text-[12px] font-bold text-foreground-muted hover:text-foreground flex items-center justify-between select-none py-1">
+                <span className="flex items-center gap-1">
+                  <span>앱 기본 사진 칩에서 고르기</span>
+                  <span className="text-[10px] font-normal text-foreground-muted/70">({PHOTO_OPTIONS.length}개)</span>
+                </span>
+                <i className="ph-bold ph-caret-down transition-transform group-open:rotate-180 text-sm"></i>
+              </summary>
+              <div className="flex flex-wrap gap-1.5 pt-2.5 max-h-36 overflow-y-auto">
+                {PHOTO_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, imageUrl: opt.url })}
+                    className={`text-[11px] font-display font-bold px-2.5 py-1 rounded-full border transition active:scale-95 flex items-center gap-1 ${
+                      draft.imageUrl === opt.url
+                        ? 'bg-primary text-on-primary border-foreground shadow-xs'
+                        : 'bg-surface text-foreground border-border hover:bg-surface-muted'
+                    }`}
+                  >
+                    <span>{opt.emoji}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
           </div>
 
           <div>

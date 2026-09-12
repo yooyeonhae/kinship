@@ -5,7 +5,9 @@ export { getMenuImage, getMenuImageSync, SEED_MENU_50 }
 // 하위 호환성을 위해 getRecipePhoto를 getMenuImageSync로 매핑
 export const getRecipePhoto = (recipe) => {
   if (!recipe) return getMenuImageSync('')
-  if (recipe.image_url && (recipe.image_url.startsWith('http') || recipe.image_url.startsWith('/'))) return recipe.image_url
+  if (recipe.image_url && typeof recipe.image_url === 'string' && recipe.image_url.trim()) {
+    return recipe.image_url.trim()
+  }
   return getMenuImageSync(recipe.title || '')
 }
 
