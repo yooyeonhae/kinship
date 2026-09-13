@@ -345,6 +345,64 @@ export default function WorldPuzzleGame({
     })
   }
 
+  // 내 퍼즐 판만 다시 섞기 (상대방 판은 절대 건드리지 않고 각자 독립 보장)
+  const handleShuffle = () => {
+    const newTiles = shuffleTiles(gridSize)
+    setSelectedIdx(null)
+    setElapsedSeconds(0)
+    setHintActive(false)
+    setHintSecondsLeft(0)
+    playChime('swap')
+
+    if (isRemote) {
+      // 🌐 원격 대전 모드: 오직 내 데이터(p1 또는 p2)만 새로 섞고 리셋, 상대방 데이터는 100% 보존
+      const myNewData = {
+        tiles: newTiles,
+        moves: 0,
+        completed: false,
+        time: 0,
+        hintUsed: false,
+      }
+      onStateChange({
+        ...state,
+        p1: myRole === 'p1' ? myNewData : p1Data,
+        p2: myRole === 'p2' ? myNewData : p2Data,
+        // 내가 다시 섞었으므로 승자가 아직 정해지지 않았다면 winner는 null
+        winner: state?.winner && !oppData?.completed ? null : state?.winner,
+      })
+    } else {
+      // 🏠 로컬 모드
+      if (mode === 'solo') {
+        onStateChange({
+          ...state,
+          tiles: newTiles,
+          moves: 0,
+          winner: null,
+          clearTime: null,
+          hintUsed: false,
+        })
+      } else if (battleStage === 'p1') {
+        onStateChange({
+          ...state,
+          tiles: newTiles,
+          moves: 0,
+          winner: null,
+          hintUsed: false,
+        })
+      } else if (battleStage === 'p2') {
+        onStateChange({
+          ...state,
+          tiles: newTiles,
+          moves: 0,
+          hintUsed: false,
+        })
+      } else {
+        // 승패 결과 화면에서 다시 섞기를 누르면 새 게임 시작
+        if (onNewGame) onNewGame(landmark.id, mode)
+      }
+    }
+  }
+
   // 여행지 변경 (이전 / 다음)
   const handleChangeLandmark = (step) => {
     const curIndex = WORLD_LANDMARKS.findIndex((l) => l.id === landmark.id)
@@ -722,7 +780,7 @@ export default function WorldPuzzleGame({
       <div className="w-full grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => onNewGame && onNewGame(landmark.id, mode)}
+          onClick={handleShuffle}
           className="bg-surface-muted border border-border text-foreground hover:bg-surface rounded-xl py-2.5 flex items-center justify-center gap-1.5 font-display font-bold text-[13px] active:scale-[0.97] transition duration-150"
         >
           <i className="ph-bold ph-arrow-counter-clockwise text-[15px]"></i> 다시 섞기
