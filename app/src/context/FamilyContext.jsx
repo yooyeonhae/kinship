@@ -192,6 +192,156 @@ export function FamilyProvider({ children }) {
     return data
   }, [])
 
+  // 가족 식구 추가 (RPC 우선, fallback direct insert)
+  const addMember = useCallback(
+    async ({ name, role, avatar, color }) => {
+      const trimmedName = (name || '').trim()
+      if (!trimmedName) return { ok: false, error: 'name_required' }
+
+      // 1. RPC 호출 시도
+      try {
+        const { data, error } = await supabase.rpc('add_family_member', {
+          p_name: trimmedName,
+          p_role: role,
+          p_avatar: avatar || null,
+          p_color: color || '#3b82f6',
+        })
+
+        if (!error && data) {
+          if (data.ok) {
+            await reload()
+            return { ok: true, member: data.member }
+          }
+          return data
+        }
+
+        // RPC 함수가 미반영된 환경인 경우 직접 insert 시도
+        if (error && (error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist'))) {
+          const { error: insertErr } = await supabase.from('members').insert({
+            family_id: familyId,
+            name: trimmedName,
+            role,
+            avatar: avatar || null,
+            color: color || '#3b82f6',
+            stars: 0,
+          })
+          if (insertErr) return { ok: false, error: insertErr.message }
+          await reload()
+          return { ok: true }
+        }
+
+        return { ok: false, error: error?.message || 'add_failed' }
+      } catch (err) {
+        return { ok: false, error: err.message || 'network' }
+      }
+    },
+    [familyId, reload]
+  )
+
+  // 가족 식구 정보 수정 (RPC 우선, fallback direct update)
+  const updateMember = useCallback(
+    async (memberId, { name, role, avatar, color }) => {
+      const trimmedName = (name || '').trim()
+      if (!trimmedName) return { ok: false, error: 'name_required' }
+
+      // 마지막 부모 강등 방지 클라이언트 검증
+      const existing = members.find((m) => m.member_id === memberId)
+      if (existing?.role === 'parent' && role === 'child') {
+        const parentCount = members.filter((m) => m.role === 'parent').length
+        if (parentCount <= 1) {
+          return { ok: false, error: 'last_parent_cannot_be_child' }
+        }
+      }
+
+      try {
+        const { data, error } = await supabase.rpc('update_family_member', {
+          p_member_id: memberId,
+          p_name: trimmedName,
+          p_role: role,
+          p_avatar: avatar || null,
+          p_color: color || '#3b82f6',
+        })
+
+        if (!error && data) {
+          if (data.ok) {
+            await reload()
+            return { ok: true, member: data.member }
+          }
+          return data
+        }
+
+        // Direct update fallback
+        if (error && (error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist'))) {
+          const { error: updateErr } = await supabase
+            .from('members')
+            .update({
+              name: trimmedName,
+              role,
+              avatar: avatar || null,
+              color: color || '#3b82f6',
+            })
+            .eq('member_id', memberId)
+          if (updateErr) return { ok: false, error: updateErr.message }
+          await reload()
+          return { ok: true }
+        }
+
+        return { ok: false, error: error?.message || 'update_failed' }
+      } catch (err) {
+        return { ok: false, error: err.message || 'network' }
+      }
+    },
+    [members, reload]
+  )
+
+  // 가족 식구 삭제 (RPC 우선, fallback direct delete)
+  const deleteMember = useCallback(
+    async (memberId) => {
+      // 마지막 부모 삭제 방지 클라이언트 검증
+      const existing = members.find((m) => m.member_id === memberId)
+      if (existing?.role === 'parent') {
+        const parentCount = members.filter((m) => m.role === 'parent').length
+        if (parentCount <= 1) {
+          return { ok: false, error: 'cannot_delete_last_parent' }
+        }
+      }
+
+      try {
+        const { data, error } = await supabase.rpc('delete_family_member', {
+          p_member_id: memberId,
+        })
+
+        let success = false
+        if (!error && data?.ok) {
+          success = true
+        } else if (error && (error.code === '42883' || error.message?.includes('function') || error.message?.includes('does not exist'))) {
+          const { error: delErr } = await supabase.from('members').delete().eq('member_id', memberId)
+          if (!delErr) success = true
+          else return { ok: false, error: delErr.message }
+        } else {
+          return { ok: false, error: data?.error || error?.message || 'delete_failed' }
+        }
+
+        if (success) {
+          // 삭제된 멤버가 현재 부모 인증 대상이면 인증 해제
+          if (parentAuth?.memberId === memberId) {
+            clearParentAuth()
+          }
+          // 삭제된 멤버가 현재 활성 사용자면 선택 해제
+          if (currentMemberId === memberId) {
+            setCurrentMember(null)
+          }
+          await reload()
+          return { ok: true }
+        }
+        return { ok: false, error: 'delete_failed' }
+      } catch (err) {
+        return { ok: false, error: err.message || 'network' }
+      }
+    },
+    [members, parentAuth, clearParentAuth, currentMemberId, setCurrentMember, reload]
+  )
+
   const currentMember = useMemo(
     () => members.find((m) => m.member_id === currentMemberId) || null,
     [members, currentMemberId]
@@ -227,6 +377,9 @@ export function FamilyProvider({ children }) {
       parentLogin,
       parentLogout,
       setParentPin,
+      addMember,
+      updateMember,
+      deleteMember,
     }),
     [
       familyId,
@@ -246,6 +399,9 @@ export function FamilyProvider({ children }) {
       parentLogin,
       parentLogout,
       setParentPin,
+      addMember,
+      updateMember,
+      deleteMember,
     ]
   )
 

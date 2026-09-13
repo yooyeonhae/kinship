@@ -551,7 +551,127 @@ BEGIN
   RETURN json_build_object('ok', true);
 END $$;
 
+-- 가족 식구 추가 RPC
+DROP FUNCTION IF EXISTS add_family_member(TEXT, TEXT, TEXT, TEXT) CASCADE;
+CREATE OR REPLACE FUNCTION add_family_member(p_name TEXT, p_role TEXT, p_avatar TEXT DEFAULT NULL, p_color TEXT DEFAULT '#3b82f6')
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_name TEXT := btrim(coalesce(p_name, ''));
+  v_member members;
+BEGIN
+  IF v_family IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'family_required');
+  END IF;
+  IF NOT is_parent() THEN
+    RETURN json_build_object('ok', false, 'error', 'parent_only');
+  END IF;
+  IF v_name = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'name_required');
+  END IF;
+  IF char_length(v_name) > 20 THEN
+    RETURN json_build_object('ok', false, 'error', 'name_too_long');
+  END IF;
+  IF p_role NOT IN ('parent', 'child') THEN
+    RETURN json_build_object('ok', false, 'error', 'role_invalid');
+  END IF;
+
+  INSERT INTO members (family_id, name, role, avatar, color, stars)
+  VALUES (v_family, v_name, p_role, p_avatar, coalesce(p_color, '#3b82f6'), 0)
+  RETURNING * INTO v_member;
+
+  RETURN json_build_object('ok', true, 'member', row_to_json(v_member));
+END $$;
+
+-- 가족 식구 정보 수정 RPC
+DROP FUNCTION IF EXISTS update_family_member(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
+CREATE OR REPLACE FUNCTION update_family_member(p_member_id UUID, p_name TEXT, p_role TEXT, p_avatar TEXT DEFAULT NULL, p_color TEXT DEFAULT '#3b82f6')
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_name TEXT := btrim(coalesce(p_name, ''));
+  v_existing members;
+  v_parent_count INT;
+  v_updated members;
+BEGIN
+  IF v_family IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'family_required');
+  END IF;
+  IF NOT is_parent() THEN
+    RETURN json_build_object('ok', false, 'error', 'parent_only');
+  END IF;
+  IF v_name = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'name_required');
+  END IF;
+  IF char_length(v_name) > 20 THEN
+    RETURN json_build_object('ok', false, 'error', 'name_too_long');
+  END IF;
+  IF p_role NOT IN ('parent', 'child') THEN
+    RETURN json_build_object('ok', false, 'error', 'role_invalid');
+  END IF;
+
+  SELECT * INTO v_existing FROM members WHERE member_id = p_member_id AND family_id = v_family;
+  IF v_existing.member_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'not_found');
+  END IF;
+
+  -- 마지막 부모를 자녀로 강등하려는 경우 차단
+  IF v_existing.role = 'parent' AND p_role = 'child' THEN
+    SELECT count(*) INTO v_parent_count FROM members WHERE family_id = v_family AND role = 'parent';
+    IF v_parent_count <= 1 THEN
+      RETURN json_build_object('ok', false, 'error', 'last_parent_cannot_be_child');
+    END IF;
+  END IF;
+
+  UPDATE members SET
+    name = v_name,
+    role = p_role,
+    avatar = p_avatar,
+    color = coalesce(p_color, '#3b82f6')
+  WHERE member_id = p_member_id AND family_id = v_family
+  RETURNING * INTO v_updated;
+
+  RETURN json_build_object('ok', true, 'member', row_to_json(v_updated));
+END $$;
+
+-- 가족 식구 삭제 RPC
+DROP FUNCTION IF EXISTS delete_family_member(UUID) CASCADE;
+CREATE OR REPLACE FUNCTION delete_family_member(p_member_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_family UUID := current_family_id();
+  v_existing members;
+  v_parent_count INT;
+BEGIN
+  IF v_family IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'family_required');
+  END IF;
+  IF NOT is_parent() THEN
+    RETURN json_build_object('ok', false, 'error', 'parent_only');
+  END IF;
+
+  SELECT * INTO v_existing FROM members WHERE member_id = p_member_id AND family_id = v_family;
+  IF v_existing.member_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'not_found');
+  END IF;
+
+  -- 마지막 부모 삭제 차단
+  IF v_existing.role = 'parent' THEN
+    SELECT count(*) INTO v_parent_count FROM members WHERE family_id = v_family AND role = 'parent';
+    IF v_parent_count <= 1 THEN
+      RETURN json_build_object('ok', false, 'error', 'cannot_delete_last_parent');
+    END IF;
+  END IF;
+
+  DELETE FROM members WHERE member_id = p_member_id AND family_id = v_family;
+  RETURN json_build_object('ok', true);
+END $$;
+
 -- 자녀 완료 토글 RPC
+DROP FUNCTION IF EXISTS toggle_my_todo(UUID) CASCADE;
 CREATE OR REPLACE FUNCTION toggle_my_todo(p_todo_id UUID)
 RETURNS JSON
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$

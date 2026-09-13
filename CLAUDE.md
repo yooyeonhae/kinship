@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+> [!IMPORTANT]
+> **본 문서의 모든 프로젝트 지침과 Supabase 규칙은 [`AGENTS.md`](./AGENTS.md)로 통합되었습니다.**  
+> Claude, Gemini 등 모든 AI 에이전트는 혼동을 방지하기 위해 프로젝트 루트의 **[`AGENTS.md`](./AGENTS.md)를 최우선 단일 진실 공급원(Single Source of Truth)**으로 참조하여 작업합니다.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## PRD 요약 (기준 문서)

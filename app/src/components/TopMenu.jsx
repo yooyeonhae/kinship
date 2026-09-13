@@ -4,6 +4,7 @@ import { useFamily } from '../context/FamilyContext'
 import { characterOf } from '../lib/avatars'
 import FamilyInvite from './FamilyInvite'
 import FamilySettings from './FamilySettings'
+import FamilyMemberManager from './FamilyMemberManager'
 import { currentSubscription, disablePush, enablePush, pushSupported } from '../lib/push'
 
 // 우측 상단 메뉴. 여기 모으기 전에는 설정 성격의 것들이 화면마다 흩어져 있었다 —
@@ -32,6 +33,7 @@ function TopMenu() {
   const [pushMsg, setPushMsg] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showMemberManager, setShowMemberManager] = useState(false)
   const panelRef = useRef(null)
   const buttonRef = useRef(null)
 
@@ -126,6 +128,15 @@ function TopMenu() {
 
             <div className="py-1">
               <MenuItem icon="ph-users-three" label="다른 사람으로 바꾸기" onClick={() => go('/')} />
+
+              <MenuItem
+                icon="ph-user-gear"
+                label="가족 식구 관리"
+                onClick={() => {
+                  close()
+                  setShowMemberManager(true)
+                }}
+              />
 
               {isParentRole && isParentAuthed && (
                 <MenuItem
@@ -265,6 +276,10 @@ function TopMenu() {
             </div>
           </div>
         </>
+      )}
+
+      {showMemberManager && (
+        <FamilyMemberManager onClose={() => setShowMemberManager(false)} />
       )}
     </div>
   )
