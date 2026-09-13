@@ -80,7 +80,7 @@ export default function WorldPuzzleGame({
   const [showOriginalModal, setShowOriginalModal] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
-  // 번호 힌트 1회 제한 및 카운트다운 타이머 (6초간 표시)
+  // 번호 힌트 1회 제한 및 카운트다운 타이머 (3초간 표시)
   const [hintActive, setHintActive] = useState(false)
   const [hintSecondsLeft, setHintSecondsLeft] = useState(0)
 
@@ -128,7 +128,7 @@ export default function WorldPuzzleGame({
     setHintSecondsLeft(0)
   }, [state?.roundId, battleStage])
 
-  // 번호 힌트 카운트다운 (6초)
+  // 번호 힌트 카운트다운 (3초)
   useEffect(() => {
     if (!hintActive) return
     if (hintSecondsLeft <= 0) {
@@ -146,7 +146,7 @@ export default function WorldPuzzleGame({
     const isHintUsed = isRemote ? (myRole === 'p2' ? p2Data.hintUsed : p1Data.hintUsed) : state?.hintUsed
     if (isHintUsed || hintActive || isComplete || state?.winner) return
     setHintActive(true)
-    setHintSecondsLeft(6)
+    setHintSecondsLeft(3)
     if (isRemote) {
       const myNewData = {
         ...(myRole === 'p1' ? p1Data : p2Data),
@@ -667,7 +667,7 @@ export default function WorldPuzzleGame({
                       ? 'bg-surface-muted text-foreground-muted border-border/60 opacity-50 cursor-not-allowed'
                       : 'bg-surface text-foreground border-border hover:bg-surface-muted active:scale-95'
                 }`}
-                title={myHintUsed ? '이번 판 힌트를 이미 사용했습니다' : '한 게임당 1회 6초간 번호가 보여요'}
+                title={myHintUsed ? '이번 판 힌트를 이미 사용했습니다' : '한 게임당 1회 3초간 번호가 보여요'}
               >
                 {hintActive ? (
                   <>🔢 번호 ({hintSecondsLeft}초)</>
