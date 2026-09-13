@@ -239,6 +239,8 @@ function FamilyRoomScreen() {
   const [topInvite, setTopInvite] = useState(null)
   const [inviteModalGame, setInviteModalGame] = useState(null) // 초대 모달 열린 게임 키
   const [selectedInviteTarget, setSelectedInviteTarget] = useState('') // 초대 대상 멤버 ID (빈 문자열이면 전체 가족)
+  const [inviteError, setInviteError] = useState('') // 초대 모달 전용 에러 메시지
+  const [inviteSending, setInviteSending] = useState(false) // 초대장 전송 중 로딩 상태
   const effectiveMemberId = currentMemberId || members[0]?.member_id
 
   const [points, setPoints] = useState(null)
@@ -546,84 +548,106 @@ function FamilyRoomScreen() {
   )
 
   async function startRemote(gameKey, targetMemberId = null) {
-    if (!effectiveMemberId) return
-    setRemoteBusy(true)
-    // 방 만들기를 여러 번 누르면 빈 방이 줄줄이 남는다. 내 빈 방은 하나만 둔다.
-    await removeMyOpenSessions(supabase, effectiveMemberId)
-    const state = newStateFor(gameKey)
-    const { data, error } = await createSession(supabase, {
-      familyId,
-      gameKey,
-      memberId: effectiveMemberId,
-      state,
-    })
-    setRemoteBusy(false)
-    if (error) {
-      setRemoteMsg(
-        isUnknownGameKey(error)
-          ? '게임 원격 대전은 최신 SQL 마이그레이션을 실행한 뒤에 쓸 수 있어요.'
-          : isMissingTable(error)
-            ? '원격 대전은 migration_16을 실행한 뒤에 쓸 수 있어요.'
-            : '방을 만들지 못했어요.'
-      )
+    // 에러/로딩 초기화
+    setInviteError('')
+    if (!effectiveMemberId) {
+      setInviteError('먼저 홈에서 누구인지 선택한 뒤 이용해주세요.')
       return
     }
-    setRemoteMsg('')
-    applySession(data)
-    setInviteModalGame(null)
+    if (!familyId) {
+      setInviteError('가족 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.')
+      return
+    }
+    setInviteSending(true)
+    setRemoteBusy(true)
+    try {
+      // 방 만들기를 여러 번 누르면 빈 방이 줄줄이 남는다. 내 빈 방은 하나만 둔다.
+      await removeMyOpenSessions(supabase, effectiveMemberId)
+      const state = newStateFor(gameKey)
+      const { data, error } = await createSession(supabase, {
+        familyId,
+        gameKey,
+        memberId: effectiveMemberId,
+        state,
+      })
+      if (error) {
+        const msg = isUnknownGameKey(error)
+          ? `'${gameKey}' 게임이 DB에 등록되지 않았어요. Supabase SQL Editor에서 최신 migration을 실행해주세요.`
+          : isMissingTable(error)
+            ? '원격 대전은 migration_16을 실행한 뒤에 쓸 수 있어요.'
+            : `방을 만들지 못했어요. (${error.message || error.code || '알 수 없는 오류'})`
+        setInviteError(msg)
+        setRemoteMsg(msg)
+        return
+      }
+      if (!data) {
+        setInviteError('세션 데이터를 받지 못했어요. 다시 시도해주세요.')
+        return
+      }
 
-    const info = GAME_INVITES[gameKey] || { label: '미니게임', icon: '🎮', tag: `[${gameKey} 초대]`, defaultRoom: '대전' }
-    const currentMember = members.find((m) => m.member_id === effectiveMemberId) || { name: '가족' }
-    const targetMember = members.find((m) => m.member_id === targetMemberId)
-    const targetName = targetMember ? targetMember.name : '가족 모두'
-    const targetIds = targetMemberId ? [targetMemberId] : members.map((m) => m.member_id).filter((id) => id !== effectiveMemberId)
-    const roomName = `${currentMember.name}님의 ${info.defaultRoom}`
+      setRemoteMsg('')
+      setInviteError('')
+      applySession(data)
+      setInviteModalGame(null)
 
-    // 1. 가족 단체 톡방(chat_messages)에 게임 대전 초대 메시지 등록
-    const inviteChatContent = `${info.icon} ${info.tag} '${roomName}' 방으로 초대합니다! (초대 대상: ${targetName}) [sid:${data.session_id}]`
-    const chatRes = await sendChat(supabase, {
-      familyId,
-      memberId: effectiveMemberId,
-      senderName: currentMember.name,
-      content: inviteChatContent,
-    })
-    if (!chatRes.error && chatRes.data) {
-      setMessages((prev) => [...prev, chatRes.data])
+      const info = GAME_INVITES[gameKey] || { label: '미니게임', icon: '🎮', tag: `[${gameKey} 초대]`, defaultRoom: '대전' }
+      const currentMember = members.find((m) => m.member_id === effectiveMemberId) || { name: '가족' }
+      const targetMember = members.find((m) => m.member_id === targetMemberId)
+      const targetName = targetMember ? targetMember.name : '가족 모두'
+      const targetIds = targetMemberId ? [targetMemberId] : members.map((m) => m.member_id).filter((id) => id !== effectiveMemberId)
+      const roomName = `${currentMember.name}님의 ${info.defaultRoom}`
+
+      // 1. 가족 단체 톡방(chat_messages)에 게임 대전 초대 메시지 등록
+      const inviteChatContent = `${info.icon} ${info.tag} '${roomName}' 방으로 초대합니다! (초대 대상: ${targetName}) [sid:${data.session_id}]`
+      const chatRes = await sendChat(supabase, {
+        familyId,
+        memberId: effectiveMemberId,
+        senderName: currentMember.name,
+        content: inviteChatContent,
+      })
+      if (!chatRes.error && chatRes.data) {
+        setMessages((prev) => [...prev, chatRes.data])
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: CHAT_EVENT,
+          payload: chatRes.data,
+        })
+      }
+
+      // 2. 실시간 가족 초대 알림 브로드캐스트 (game:invite)
       channelRef.current?.send({
         type: 'broadcast',
-        event: CHAT_EVENT,
-        payload: chatRes.data,
+        event: 'game:invite',
+        payload: {
+          sessionId: data.session_id,
+          gameKey,
+          roomName,
+          hostId: effectiveMemberId,
+          hostName: currentMember.name,
+          hostAvatar: characterOf(currentMember) || '👑',
+          invitedMemberIds: targetIds,
+        },
       })
+
+      // 3. 게임 세션 알림 브로드캐스트
+      channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: data.session_id } })
+
+      // 4. 모바일 푸시 알림
+      notifyFamily({
+        familyId,
+        senderName: currentMember.name,
+        excludeMemberId: effectiveMemberId,
+        title: `💌 ${currentMember.name}님이 ${info.label} 대전으로 초대했어요!`,
+        body: `'${roomName}' 방이 열렸어요. 함께 대결해보세요!`,
+      })
+
+      refreshSessions()
+    } catch (e) {
+      setInviteError(`예상치 못한 오류가 발생했어요. (${e?.message || '알 수 없는 오류'})`)
+    } finally {
+      setRemoteBusy(false)
+      setInviteSending(false)
     }
-
-    // 2. 실시간 가족 초대 알림 브로드캐스트 (game:invite)
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'game:invite',
-      payload: {
-        sessionId: data.session_id,
-        gameKey,
-        roomName,
-        hostId: effectiveMemberId,
-        hostName: currentMember.name,
-        hostAvatar: characterOf(currentMember) || '👑',
-        invitedMemberIds: targetIds,
-      },
-    })
-
-    // 3. 게임 세션 알림 브로드캐스트
-    channelRef.current?.send({ type: 'broadcast', event: GAME_EVENT, payload: { sessionId: data.session_id } })
-
-    // 4. 모바일 푸시 알림
-    notifyFamily({
-      familyId,
-      senderName: currentMember.name,
-      excludeMemberId: effectiveMemberId,
-      title: `💌 ${currentMember.name}님이 ${info.label} 대전으로 초대했어요!`,
-      body: `'${roomName}' 방이 열렸어요. 함께 대결해보세요!`,
-    })
-
-    refreshSessions()
   }
 
   async function joinRemote(row) {
@@ -1403,8 +1427,9 @@ function FamilyRoomScreen() {
               </p>
               <button
                 type="button"
-                onClick={() => setInviteModalGame(null)}
+                onClick={() => { setInviteModalGame(null); setInviteError('') }}
                 className="p-1 text-foreground-muted hover:text-foreground text-sm"
+                disabled={inviteSending}
               >
                 ✕
               </button>
@@ -1414,10 +1439,19 @@ function FamilyRoomScreen() {
               대결할 가족을 선택하세요. 가족톡으로 초대장이 전송되고 실시간 알림이 울립니다!
             </p>
 
+            {/* 에러 메시지: 모달 안에 직접 표시 */}
+            {inviteError && (
+              <div className="bg-destructive/10 border border-destructive rounded-xl px-3 py-2.5 mb-3 flex items-start gap-2">
+                <i className="ph-bold ph-warning-circle text-destructive mt-0.5 shrink-0"></i>
+                <p className="text-xs text-destructive leading-[18px]">{inviteError}</p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2 mb-4 max-h-48 overflow-y-auto">
               <button
                 type="button"
                 onClick={() => setSelectedInviteTarget('')}
+                disabled={inviteSending}
                 className={`p-2.5 rounded-xl border-2 text-left flex items-center justify-between transition ${
                   selectedInviteTarget === ''
                     ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs'
@@ -1440,6 +1474,7 @@ function FamilyRoomScreen() {
                       key={m.member_id}
                       type="button"
                       onClick={() => setSelectedInviteTarget(m.member_id)}
+                      disabled={inviteSending}
                       className={`p-2.5 rounded-xl border-2 text-left flex items-center justify-between transition ${
                         isSelected
                           ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs'
@@ -1459,18 +1494,29 @@ function FamilyRoomScreen() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setInviteModalGame(null)}
-                className="py-2.5 border border-border rounded-xl text-xs font-bold text-foreground-muted hover:bg-surface-muted active:scale-95 transition"
+                onClick={() => { setInviteModalGame(null); setInviteError('') }}
+                disabled={inviteSending}
+                className="py-2.5 border border-border rounded-xl text-xs font-bold text-foreground-muted hover:bg-surface-muted active:scale-95 transition disabled:opacity-50"
               >
                 취소
               </button>
               <button
                 type="button"
-                onClick={() => startRemote(inviteModalGame, selectedInviteTarget || null)}
-                disabled={remoteBusy}
-                className="py-2.5 bg-primary text-on-primary font-display font-black text-xs rounded-xl shadow-sticker active:scale-95 transition disabled:opacity-60 flex items-center justify-center gap-1"
+                onClick={() => { setInviteError(''); startRemote(inviteModalGame, selectedInviteTarget || null) }}
+                disabled={inviteSending || remoteBusy}
+                className="py-2.5 bg-primary text-on-primary font-display font-black text-xs rounded-xl shadow-sticker active:scale-95 transition disabled:opacity-60 flex items-center justify-center gap-1.5"
               >
-                <i className="ph-bold ph-paper-plane-tilt"></i> 초대장 보내기
+                {inviteSending ? (
+                  <>
+                    <i className="ph-bold ph-circle-notch animate-spin"></i>
+                    전송 중...
+                  </>
+                ) : (
+                  <>
+                    <i className="ph-bold ph-paper-plane-tilt"></i>
+                    초대장 보내기
+                  </>
+                )}
               </button>
             </div>
           </div>
