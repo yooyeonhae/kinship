@@ -69,6 +69,12 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 기존 테이블에 누락된 컬럼 보강 (멱등성 보장)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#3b82f6';
+ALTER TABLE members ADD COLUMN IF NOT EXISTS stars INT NOT NULL DEFAULT 0;
+
 -- (3) 부모 PIN 보안 테이블 (parent_pins)
 CREATE TABLE IF NOT EXISTS parent_pins (
   member_id UUID PRIMARY KEY REFERENCES members (member_id) ON DELETE CASCADE,
@@ -476,4 +482,8 @@ BEGIN
   DELETE FROM members WHERE member_id = p_member_id AND family_id = v_family;
   RETURN json_build_object('ok', true);
 END $$;
+
+-- PostgREST 스키마 캐시 즉시 리로드
+NOTIFY pgrst, 'reload schema';
+
 

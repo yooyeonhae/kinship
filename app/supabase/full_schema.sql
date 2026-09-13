@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS members (
   family_id UUID NOT NULL REFERENCES families (family_id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
+  avatar TEXT,
   avatar_url TEXT,
   color TEXT DEFAULT '#3b82f6',
   stars INT NOT NULL DEFAULT 0,
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS members (
 );
 
 -- 기존 members 테이블 업그레이드 보장
+ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#3b82f6';
 ALTER TABLE members ADD COLUMN IF NOT EXISTS stars INT NOT NULL DEFAULT 0;
@@ -1215,6 +1217,8 @@ DROP POLICY IF EXISTS "member_feed_preferences_all" ON member_feed_preferences;
 CREATE POLICY "member_feed_preferences_all" ON member_feed_preferences FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ==============================================================================
--- 10. 최종 확인
+-- 10. 최종 확인 및 스키마 캐시 갱신
 -- ==============================================================================
+NOTIFY pgrst, 'reload schema';
 SELECT 'Kinship Master Schema Successfully Installed!' AS status;
+
